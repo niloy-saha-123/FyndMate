@@ -1,11 +1,29 @@
-import React from 'react'
+import { Tabs } from 'expo-router';
+import React from 'react';
+import {
+  configureReanimatedLogger,
+  ReanimatedLogLevel,
+} from "react-native-reanimated";
 
-const _layout = () => {
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn, 
+  strict: false,                  
+});
+
+export default function TabLayout() {
+
   return (
-    <div>
-      
-    </div>
-  )
-}
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+      }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+        }}
+      />
 
-export default _layout
+    </Tabs>
+  );
+}

@@ -1,11 +1,15 @@
-import React from 'react'
+import { Text, StyleSheet } from 'react-native';
 
-const index = () => {
+export default function HomeScreen() {
   return (
-    <div>
-      
-    </div>
-  )
+    <Text style = {styles.BI}>
+      Hello World
+    </Text>
+  );
 }
 
-export default index
+const styles = StyleSheet.create({
+  BI:{
+    color:'#000',
+  }
+});
