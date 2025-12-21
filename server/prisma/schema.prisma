@@ -1,0 +1,170 @@
+// This is the Prisma schema file for the FyndMate backend,
+// docs: https://pris.ly/d/prisma-schema
+
+// Prisma Client: The tool that generates the TypeScript types
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // will read from the .env file
+}
+
+// ============================================
+// USER MODEL
+// ============================================
+// Core user profile for developers on the platform
+// Contains personal info, professional details, and GitHub integration
+
+model User {
+  id             String    @id @default(cuid())
+  auth0Id        String    @unique                // Auth0 user identifier
+  email          String    @unique
+  name           String
+  profilePicture String?                          // S3 URL for profile image
+  bio            String?                          // Short bio/description
+
+  // Professional Info
+  experience     String?                          // e.g., "5 years", "Senior Developer"
+  skills         String[]                         // Array of skills: ["React", "Node.js", "TypeScript"]
+  interests      String[]                         // What they want to work on: ["AI/ML", "Web3", "Mobile"]
+  commitment     String?                          // "Full-time", "Part-time", "Weekends", "Flexible"
+
+  // GitHub Integration
+  githubUsername String?   @unique                // GitHub username for API calls
+  githubData     Json?                            // Cached GitHub profile data (repos, followers, etc.) optional
+  githubActivity Json?                            // Contribution graph data (cached from GitHub API)
+
+  // Location
+  location       String                          // City, Country required
+  timezone       String                          // e.g., "America/New_York"
+
+  // Timestamps
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // ============================================
+  // RELATIONS
+  // ============================================
+  
+  // User's projects/portfolio
+  projects       Project[]
+  
+  // Matches where this user is user1 (the one who initiated or was shown first)
+  matchesAsUser1 Match[]   @relation("User1Matches")
+  
+  // Matches where this user is user2 (the one being swiped on)
+  matchesAsUser2 Match[]   @relation("User2Matches")
+  
+  // Messages sent by this user
+  sentMessages   Message[] @relation("SentMessages")
+
+  // Swipes made by this user (for tracking who they've already seen)
+  swipesMade     Swipe[]   @relation("SwipesMade")
+  
+  // Swipes received by this user
+  swipesReceived Swipe[]   @relation("SwipesReceived")
+
+  // ============================================
+  // INDEXES
+  // ============================================
+  @@index([auth0Id])                              // Fast lookup by Auth0 ID
+  @@index([githubUsername])                       // Fast lookup by GitHub username
+  @@index([createdAt])                            // For sorting new users
+}
+
+// ============================================
+// PROJECT MODEL
+// ============================================
+// Portfolio projects that users can showcase
+// Displayed on their profile card during swiping
+
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String                              // Project name
+  description String                              // What the project does
+  techStack   String[]                            // Technologies used: ["React", "Node.js", "PostgreSQL"]
+  githubUrl   String?                             // Link to GitHub repo
+  liveUrl     String?                             // Link to live demo/deployment
+  imageUrl    String?                             // Screenshot/preview image (S3 URL)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relation to user
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])                               // Fast lookup of user's projects
+}
+
+// ============================================
+// SWIPE MODEL
+// ============================================
+// Tracks individual swipe actions (like/pass)
+// Used to determine matches and filter feed
+
+model Swipe {
+  id          String   @id @default(cuid())
+  swiperId    String                              // User who made the swipe
+  swipedId    String                              // User who was swiped on
+  liked       Boolean                             // true = like (right swipe), false = pass (left swipe)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  swiper      User     @relation("SwipesMade", fields: [swiperId], references: [id], onDelete: Cascade)
+  swiped      User     @relation("SwipesReceived", fields: [swipedId], references: [id], onDelete: Cascade)
+
+  // Ensure a user can only swipe on another user once
+  @@unique([swiperId, swipedId])
+  @@index([swiperId])                             // Fast lookup of swipes made by user
+  @@index([swipedId])                             // Fast lookup of swipes on a user
+  @@index([swiperId, liked])                      // Filter by user's likes
+}
+
+// ============================================
+// MATCH MODEL
+// ============================================
+// Created when two users mutually like each other
+// Enables messaging between matched users
+
+model Match {
+  id          String   @id @default(cuid())
+  user1Id     String                              // First user in the match
+  user2Id     String                              // Second user in the match
+  createdAt   DateTime @default(now())            // When the match was created
+
+  // Relations
+  user1       User     @relation("User1Matches", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2       User     @relation("User2Matches", fields: [user2Id], references: [id], onDelete: Cascade)
+  messages    Message[]                           // Messages in this match conversation
+
+  // Ensure unique match between two users (order matters, so we use both combinations)
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])                              // Fast lookup of user1's matches
+  @@index([user2Id])                              // Fast lookup of user2's matches
+}
+
+// ============================================
+// MESSAGE MODEL
+// ============================================
+// Individual messages within a match conversation
+// Supports read receipts for real-time chat
+
+model Message {
+  id        String    @id @default(cuid())
+  matchId   String                                // Which match/conversation this belongs to
+  senderId  String                                // Who sent the message
+  content   String                                // Message text content
+  createdAt DateTime  @default(now())             // When message was sent
+  readAt    DateTime?                             // When message was read (null = unread)
+
+  // Relations
+  match     Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  sender    User      @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, createdAt])                   // Fast retrieval of messages in order
+  @@index([senderId])                             // Fast lookup of messages by sender
+  @@index([matchId, readAt])                      // Fast count of unread messages
+}
+
