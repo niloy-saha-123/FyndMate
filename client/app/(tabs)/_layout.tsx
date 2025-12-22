@@ -23,6 +23,30 @@ export default function TabLayout() {
           title: 'Home',
         }}
       />
+      <Tabs.Screen
+        name="communityPage"
+        options={{
+          title: 'Communities',
+        }}
+      />
+      <Tabs.Screen
+        name="likesPage"
+        options={{
+          title: 'Likes',
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Chat',
+        }}
+      />
+      <Tabs.Screen
+        name="profilePage"
+        options={{
+          title: 'Profile',
+        }}
+      />
 
     </Tabs>
   );
