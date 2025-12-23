@@ -1,15 +1,20 @@
-import { Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet, View } from 'react-native';
 
 export default function Chat() {
   return (
-    <Text style = {styles.BI}>
-      This is the chat page
-    </Text>
+    <View style = {styles.BI}>
+      <Text>
+        This is the chat page
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   BI:{
     color:'#000',
+    flex: 1,
+    justifyContent:"center",
+    alignItems: 'center'
   }
 });

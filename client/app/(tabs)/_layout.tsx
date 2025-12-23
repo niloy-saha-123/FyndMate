@@ -4,6 +4,8 @@ import {
   configureReanimatedLogger,
   ReanimatedLogLevel,
 } from "react-native-reanimated";
+import { StyleSheet } from 'react-native';
+import {TabBar} from "../../src/components/TabBar"
 
 configureReanimatedLogger({
   level: ReanimatedLogLevel.warn, 
@@ -16,7 +18,8 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-      }}>
+      }}
+      tabBar={props => <TabBar {...props}/>}>
       <Tabs.Screen
         name="index"
         options={{
