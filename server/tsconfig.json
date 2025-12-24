@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "module": "ESNext",
+    "module": "NodeNext",
     "lib": ["ES2023"],
     "outDir": "./dist",
     "rootDir": ".",
@@ -10,16 +10,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "moduleResolution": "bundler",
+    "moduleResolution": "NodeNext",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true
+    "types": ["node"]
   },
-  "include": ["src/**/*", "generated/prisma/**/*"],
-  "exclude": ["node_modules", "dist", "prisma"]
+  "include": ["src/**/*"]
 }
-
