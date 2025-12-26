@@ -1,22 +1,20 @@
 {
   "name": "fyndmate-server",
   "version": "1.0.0",
+  "type": "module",
   "description": "FyndMate backend API server",
   "main": "dist/server.js",
   "scripts": {
     "// === DEVELOPMENT ===": "",
     "dev": "tsx watch src/server.ts",
     "dev:debug": "tsx watch --inspect src/server.ts",
-
     "// === BUILD & PRODUCTION ===": "",
     "build": "npm run clean && tsc",
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
-
     "// === TYPE CHECKING ===": "",
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch",
-
     "// === DATABASE (PRISMA) ===": "",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -27,39 +25,42 @@
     "db:studio": "prisma studio",
     "db:format": "prisma format",
     "db:validate": "prisma validate",
-
     "// === UTILITIES ===": "",
     "clean": "rm -rf dist",
     "clean:all": "rm -rf dist node_modules",
-
     "// === PRE-DEPLOYMENT ===": "",
     "prebuild": "npm run db:generate",
     "prestart:prod": "npm run db:migrate:prod"
   },
-  "keywords": ["fastify", "api", "backend", "fyndmate"],
+  "keywords": [
+    "fastify",
+    "api",
+    "backend",
+    "fyndmate"
+  ],
   "author": "",
   "license": "ISC",
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "fastify": "^4.24.3",
-    "@fastify/jwt": "^7.2.4",
     "@fastify/cors": "^8.4.0",
     "@fastify/multipart": "^8.0.0",
     "@fastify/websocket": "^8.3.0",
-    "@prisma/client": "^5.7.1",
-    "socket.io": "^4.6.1",
-    "auth0": "^3.2.0",
-    "@aws-sdk/client-s3": "^3.490.0",
     "@octokit/graphql": "^7.0.1",
-    "dotenv": "^16.3.1"
+    "@prisma/adapter-pg": "^5.22.0",
+    "@prisma/client": "5.22.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "fastify": "^4.24.3",
+    "pg": "^8.13.0",
+    "socket.io": "^4.6.1"
   },
   "devDependencies": {
-    "@types/node": "^20.10.5",
-    "typescript": "^5.3.3",
-    "tsx": "^4.7.0",
-    "prisma": "^5.7.1"
+    "@types/node": "^20.19.27",
+    "dotenv": "^17.2.3",
+    "dotenv-cli": "^11.0.0",
+    "prisma": "5.22.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.3"
   }
 }
-
