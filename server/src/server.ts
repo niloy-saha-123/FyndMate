@@ -1,4 +1,11 @@
-import { buildApp } from './app';
+/**
+ * @file src/server.ts
+ * @description Entry point for the server. Bootstraps the Fastify application
+ *              and starts listening on the configured port. This file should
+ *              contain minimal logic - just startup and error handling.
+ */
+
+import { buildApp } from './app.js';
 
 const start = async () => {
   const app = await buildApp();

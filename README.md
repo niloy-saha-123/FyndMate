@@ -1,6 +1,59 @@
 # FyndMate
 Tinder for finding project partners
 
+## Architecture Overview
+
+FyndMate uses a **Supabase + Fastify Hybrid** architecture designed for rapid MVP development while maintaining flexibility for future scaling (e.g., migrating to Go).
+
+### Responsibility Split
+
+| Layer | Technology | Responsibilities |
+|-------|------------|------------------|
+| **Auth & Storage** | Supabase | User authentication, PostgreSQL hosting, image/file storage |
+| **Core Logic** | Fastify (Node.js) | Swiping logic, match algorithms, feed generation, Socket.io messaging |
+| **Real-time Chat** | Socket.io | Direct WebSocket connections (NOT Supabase Realtime) |
+| **Database Access** | Prisma ORM | Type-safe queries against Supabase PostgreSQL |
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        SUPABASE (BaaS)                              │
+│  ┌─────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
+│  │  Supabase   │  │    Supabase     │  │      Supabase           │  │
+│  │    Auth     │  │    Storage      │  │      PostgreSQL         │  │
+│  │  (Sign up,  │  │  (Profile pics, │  │  (Users, Matches, etc.) │  │
+│  │   Login)    │  │   Projects)     │  │                         │  │
+│  └─────────────┘  └─────────────────┘  └─────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ JWT Token + Direct DB Connection
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                     FASTIFY SERVER (Node.js)                        │
+│  ┌─────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
+│  │   Auth      │  │    Business     │  │      Socket.io          │  │
+│  │ Middleware  │  │     Logic       │  │     (Real-time)         │  │
+│  │  (Verify    │  │  (Swiping,      │  │  (Chat messages,        │  │
+│  │   Supabase  │  │   Matching,     │  │   typing indicators)    │  │
+│  │   tokens)   │  │   Feed)         │  │                         │  │
+│  └─────────────┘  └─────────────────┘  └─────────────────────────┘  │
+│                              │                                      │
+│                     Prisma ORM (Type-safe DB access)                │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      MOBILE APP (React Native)                      │
+│              Expo + Supabase JS SDK + Socket.io Client              │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Why this hybrid approach?**
+- **Supabase**: Fast to set up auth, storage, and hosted Postgres — no AWS configuration
+- **Fastify**: Keeps complex business logic in TypeScript, easy to migrate to Go later
+- **Socket.io on Fastify**: Full control over messaging logic (not limited by Supabase Realtime)
+
+---
+
 ## Tech Stack
 
 ### Frontend (Client)
@@ -10,7 +63,8 @@ Tinder for finding project partners
 - **React Navigation** - Navigation stack
 - **React Native Gesture Handler** - Swipe gestures (left/right)
 - **React Native Reanimated** - Smooth animations for card swipes
-- **Socket.io-client** - Real-time messaging
+- **@supabase/supabase-js** - Auth, storage, and database client
+- **Socket.io-client** - Real-time messaging (connects to Fastify server)
 - **React Query/TanStack Query** - API state management and caching
 - **Expo Image Picker** - Profile picture upload
 - **React Native Chart Kit** or **Victory Native** - GitHub activity graph visualization
@@ -18,26 +72,23 @@ Tinder for finding project partners
 ### Backend (Server)
 - **Node.js** with **Fastify** - High-performance REST API server
 - **TypeScript** - Type safety on backend
-- **PostgreSQL** - Primary database (via AWS RDS or local)
 - **Prisma ORM** - Database access layer and migrations
-- **Socket.io** (Fastify adapter) - WebSocket server for real-time messaging
-- **Auth0** - Authentication and authorization
-- **JWT** - Token-based authentication
+- **@supabase/supabase-js** - Token verification and storage uploads
+- **Socket.io** - WebSocket server for real-time messaging
 - **GitHub API v4 (GraphQL)** - Fetch developer activity and contributions
-- **AWS S3** - Profile picture storage
 
 **Why Fastify?**
 - Scalable and high-performance
-- Real-time ready with Socket.io adapter
+- Real-time ready with Socket.io
 - Mobile-friendly API design
 - Built-in request/response validation (JSON Schema)
 - Easy to replace with Go later if needed
 
 ### Infrastructure & Services
-- **Auth0** - Authentication provider
-- **AWS S3** - Image storage
-- **AWS RDS PostgreSQL** - Managed database (production)
-- **Socket.io** - Real-time communication
+- **Supabase Auth** - Authentication provider (email, OAuth, magic links)
+- **Supabase Storage** - Image storage (profile pictures, project screenshots)
+- **Supabase PostgreSQL** - Managed database (production)
+- **Socket.io** - Real-time communication (on Fastify, NOT Supabase Realtime)
 - **GitHub API** - Developer activity data
 
 ---
@@ -79,11 +130,18 @@ Tinder for finding project partners
 | `@tanstack/react-query` | Server state management with caching | Use for API calls - handles loading states, caching, refetching, and error states automatically |
 | `axios` | HTTP client for API requests | Use for making REST API calls to the server (can also use fetch) |
 
+#### Authentication & Supabase (Phase 1)
+
+| Package | Purpose | When to Use |
+|---------|---------|-------------|
+| `@supabase/supabase-js` | Supabase client for auth, storage, and database | Use for user login/signup, uploading images, and direct database access if needed |
+| `expo-secure-store` | Secure storage for sensitive data | Use to persist Supabase session tokens securely on device |
+
 #### Real-time Messaging (Phase 4)
 
 | Package | Purpose | When to Use |
 |---------|---------|-------------|
-| `socket.io-client` | WebSocket client for real-time communication | Use for instant messaging - connects to server's Socket.io for live message updates |
+| `socket.io-client` | WebSocket client for real-time communication | Use for instant messaging - connects to Fastify server's Socket.io for live message updates |
 
 #### Media & Files (Phase 2)
 
@@ -97,13 +155,6 @@ Tinder for finding project partners
 |---------|---------|-------------|
 | `react-native-chart-kit` | Charts and graphs for React Native | Use for GitHub activity heatmap/contribution graph visualization |
 | `victory-native` | Alternative charting library (more customizable) | Use if react-native-chart-kit doesn't meet design needs |
-
-#### Authentication (Phase 1)
-
-| Package | Purpose | When to Use |
-|---------|---------|-------------|
-| `expo-auth-session` | OAuth authentication flows in Expo | Use for Auth0 login - handles redirect URLs and token exchange |
-| `expo-secure-store` | Secure storage for sensitive data | Use to store JWT tokens securely on device (encrypted) |
 
 ---
 
@@ -120,18 +171,19 @@ Tinder for finding project partners
 | `tsx` | TypeScript execution and watch mode | Development dependency - runs TypeScript directly without compiling, hot reloads on file changes |
 | `@types/node` | TypeScript definitions for Node.js | Required for TypeScript to understand Node.js APIs |
 
-#### Authentication & Security (Phase 1)
+#### Authentication & Supabase (Phase 1)
 
 | Package | Purpose | When to Use |
 |---------|---------|-------------|
-| `@fastify/jwt` | JWT token generation and verification | Use for creating and validating access tokens after Auth0 login |
-| `auth0` | Auth0 Management API client | Use for verifying Auth0 tokens and fetching user metadata from Auth0 |
+| `@supabase/supabase-js` | Supabase client for token verification and storage | Use in auth middleware to verify JWT tokens, and in services to upload files to Supabase Storage |
 
 #### Database (Phase 1)
 
 | Package | Purpose | When to Use |
 |---------|---------|-------------|
 | `@prisma/client` | Auto-generated database client | Use for all database operations - type-safe queries, creates, updates, deletes |
+| `@prisma/adapter-pg` | PostgreSQL driver adapter for Prisma 7 | Required for Prisma 7 to connect to PostgreSQL |
+| `pg` | PostgreSQL client for Node.js | Required by @prisma/adapter-pg |
 | `prisma` | Database toolkit (migrations, studio) | Development dependency - run `prisma migrate` for schema changes, `prisma studio` for GUI |
 
 #### File Uploads (Phase 2)
@@ -139,7 +191,8 @@ Tinder for finding project partners
 | Package | Purpose | When to Use |
 |---------|---------|-------------|
 | `@fastify/multipart` | Handles multipart/form-data requests | Use when receiving file uploads (profile pictures, project images) from the app |
-| `@aws-sdk/client-s3` | AWS S3 client for file storage | Use to upload images to S3 bucket and generate access URLs |
+
+*Note: Files are uploaded to Supabase Storage, not AWS S3*
 
 #### Real-time Communication (Phase 4)
 
@@ -156,11 +209,51 @@ Tinder for finding project partners
 
 ---
 
+## Environment Variables
+
+### Client (`client/.env`)
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+EXPO_PUBLIC_API_URL=http://localhost:3000/api
+EXPO_PUBLIC_SOCKET_URL=http://localhost:3000
+```
+
+### Server (`server/.env`)
+
+```env
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key  # For admin operations
+
+# Database (Supabase PostgreSQL)
+DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
+DIRECT_URL=postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+
+# Server
+PORT=3000
+NODE_ENV=development
+
+# GitHub OAuth (optional)
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+```
+
+**Database URL Notes:**
+- `DATABASE_URL`: Use the **Transaction pooler** (port 6543) for Prisma queries
+- `DIRECT_URL`: Use the **Session mode** (port 5432) for Prisma migrations
+
+---
+
 ## When to Install What (By Phase)
 
 ### Phase 1: Foundation
 ```bash
-# Client - already installed
+# Client
+cd client && npm install @supabase/supabase-js expo-secure-store
+
 # Server - already installed
 ```
 
@@ -170,7 +263,7 @@ Tinder for finding project partners
 cd client && npm install expo-image-picker @tanstack/react-query axios
 
 # Server (already installed)
-# @aws-sdk/client-s3, @octokit/graphql are pre-installed
+# @octokit/graphql is pre-installed
 ```
 
 ### Phase 3: Matching System
@@ -199,7 +292,8 @@ cd client && npm install victory-native
 
 | Folder | Purpose | Example |
 |--------|---------|---------|
-| `plugins/` | Fastify plugins that extend functionality | `prisma.plugin.ts` - decorates Fastify with Prisma client |
+| `lib/` | Singleton instances and shared utilities | `prisma.ts` - Prisma client singleton, `supabase.ts` - Supabase client |
+| `middleware/` | Request middleware (auth, validation) | `auth.middleware.ts` - verifies Supabase JWT tokens |
 | `routes/` | Define API endpoints and attach controllers | `users.routes.ts` - GET /users/:id, PUT /users/:id |
 | `controllers/` | Handle HTTP request/response logic | `users.controller.ts` - validates input, calls service, returns response |
 | `services/` | Business logic, database operations | `matching.service.ts` - algorithm to find compatible developers |
@@ -209,10 +303,12 @@ cd client && npm install victory-native
 ### Data Flow
 
 ```
-Request → Route → Schema Validation → Controller → Service → Database
-                                                      ↓
-Response ← Controller ← Service Result ←─────────────┘
+Request → Route → Auth Middleware → Schema Validation → Controller → Service → Database
+                                                                        ↓
+Response ← Controller ← Service Result ←────────────────────────────────┘
 ```
+
+---
 
 ## Project Structure
 
@@ -220,7 +316,7 @@ Response ← Controller ← Service Result ←───────────�
 FyndMate/
 ├── client/                        # Frontend (React Native/Expo)
 │   ├── app/
-│   │   ├── _layout.tsx            # Root layout with Auth0 provider
+│   │   ├── _layout.tsx            # Root layout with Supabase provider
 │   │   ├── (auth)/
 │   │   │   ├── login.tsx          # Login screen
 │   │   │   └── _layout.tsx
@@ -244,12 +340,14 @@ FyndMate/
 │   │   │   ├── MessageList.tsx    # Chat message list
 │   │   │   └── MessageInput.tsx   # Chat input component
 │   │   ├── hooks/
-│   │   │   ├── useAuth.ts         # Auth0 hook wrapper
+│   │   │   ├── useAuth.ts         # Supabase auth hook wrapper
 │   │   │   ├── useMatches.ts      # Fetch matches
 │   │   │   ├── useDevelopers.ts   # Fetch developer cards
 │   │   │   ├── useMessages.ts     # Chat messages hook
 │   │   │   ├── useSocket.ts       # Socket.io connection
 │   │   │   └── useGitHubActivity.ts # GitHub API hook
+│   │   ├── lib/
+│   │   │   └── supabase.ts        # Supabase client singleton
 │   │   ├── services/
 │   │   │   ├── api.ts             # Axios instance with auth
 │   │   │   ├── socket.ts          # Socket.io client setup
@@ -271,12 +369,12 @@ FyndMate/
 │
 └── server/                         # Backend API (Node.js/Fastify)
     ├── src/
-    │   ├── plugins/                  # Fastify plugins
-    │   │   ├── auth.plugin.ts        # Auth0 JWT plugin
-    │   │   ├── prisma.plugin.ts      # Prisma client plugin
-    │   │   ├── socket.plugin.ts      # Socket.io plugin
-    │   │   └── jwt.plugin.ts         # JWT utilities plugin
-    │   ├── routes/                    # Route definitions
+    │   ├── lib/                      # Singleton instances
+    │   │   ├── prisma.ts             # Prisma client (singleton pattern)
+    │   │   └── supabase.ts           # Supabase admin client
+    │   ├── middleware/               # Request middleware
+    │   │   └── auth.middleware.ts    # Verify Supabase JWT tokens
+    │   ├── routes/                   # Route definitions
     │   │   ├── auth.routes.ts
     │   │   ├── users.routes.ts
     │   │   ├── matches.routes.ts
@@ -288,12 +386,12 @@ FyndMate/
     │   │   ├── matches.controller.ts
     │   │   ├── messages.controller.ts
     │   │   └── github.controller.ts
-    │   ├── services/                  # Business logic
+    │   ├── services/                 # Business logic
     │   │   ├── auth.service.ts
-    │   │   ├── matching.service.ts    # Matching algorithm
-    │   │   ├── github.service.ts      # GitHub API integration
-    │   │   └── s3.service.ts          # AWS S3 upload
-    │   ├── schemas/                   # Request/response validation (JSON Schema)
+    │   │   ├── matching.service.ts   # Matching algorithm
+    │   │   ├── github.service.ts     # GitHub API integration
+    │   │   └── storage.service.ts    # Supabase Storage uploads
+    │   ├── schemas/                  # Request/response validation (JSON Schema)
     │   │   ├── auth.schema.ts
     │   │   ├── users.schema.ts
     │   │   ├── matches.schema.ts
@@ -302,28 +400,32 @@ FyndMate/
     │   ├── utils/
     │   │   ├── logger.ts
     │   │   └── constants.ts
-    │   ├── app.ts                     # Fastify instance setup
-    │   └── server.ts                  # Server entry point with Socket.io
+    │   ├── app.ts                    # Fastify instance setup
+    │   └── server.ts                 # Server entry point with Socket.io
+    ├── generated/
+    │   └── prisma/                   # Generated Prisma client (from prisma generate)
     ├── prisma/
-    │   ├── schema.prisma              # Database schema
+    │   ├── schema.prisma             # Database schema
     │   └── migrations/
+    ├── prisma.config.ts              # Prisma CLI configuration
     ├── .env.example
     ├── package.json
     ├── package-lock.json
     └── tsconfig.json
 ```
 
+---
+
 ## API Endpoints
 
 ### Authentication (`/api/auth`)
-- `POST /api/auth/login` - Auth0 callback handler
-- `POST /api/auth/logout` - Logout
-- `GET /api/auth/me` - Get current user
+- `POST /api/auth/callback` - Handle Supabase auth callback (sync user to DB)
+- `GET /api/auth/me` - Get current user profile
 
 ### Users (`/api/users`)
 - `GET /api/users/:id` - Get user profile
 - `PUT /api/users/:id` - Update user profile
-- `POST /api/users/:id/profile-picture` - Upload profile picture
+- `POST /api/users/:id/profile-picture` - Upload profile picture (to Supabase Storage)
 - `GET /api/users/feed` - Get developers to swipe (exclude already swiped/matched)
 
 ### Matches (`/api/matches`)
@@ -353,18 +455,20 @@ FyndMate/
 - `user_typing` - Typing indicator: `{ userId, isTyping }`
 - `match_created` - New match notification: `{ match }`
 
+---
+
 ## Implementation Phases
 
 ### Phase 1: Foundation
-1. Set up backend structure (Fastify + TypeScript)
-2. Configure Prisma with PostgreSQL
+1. Set up Supabase project (Auth, Database, Storage)
+2. Configure Prisma with Supabase PostgreSQL
 3. Create database schema and migrations
-4. Set up Auth0 integration (backend + frontend)
+4. Set up Supabase Auth integration (client + server middleware)
 5. Basic user registration/profile creation
 
 ### Phase 2: Core Features
 1. Developer profile creation/editing
-2. Image upload to S3
+2. Image upload to Supabase Storage
 3. GitHub OAuth integration
 4. GitHub API service (fetch activity graph)
 5. Developer feed API (exclude swiped users)
@@ -376,7 +480,7 @@ FyndMate/
 4. Swipeable card UI component
 
 ### Phase 4: Messaging
-1. Socket.io server setup
+1. Socket.io server setup (on Fastify)
 2. Real-time messaging implementation
 3. Chat UI components
 4. Message persistence

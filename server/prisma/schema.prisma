@@ -1,14 +1,19 @@
-// This is the Prisma schema file for the FyndMate backend,
-// docs: https://pris.ly/d/prisma-schema
+/// @file prisma/schema.prisma
+/// @description Database schema definition for FyndMate. Defines all data models,
+///              relations, and indexes. Run `npm run db:generate` after changes
+///              to regenerate the Prisma client types.
+///              Docs: https://pris.ly/d/prisma-schema
 
 // Prisma Client: The tool that generates the TypeScript types
 generator client {
   provider = "prisma-client-js"
 }
 
+// PostgreSQL database connection (Prisma v5 expects URLs here)
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL") // will read from the .env file
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================
@@ -18,11 +23,11 @@ datasource db {
 // Contains personal info, professional details, and GitHub integration
 
 model User {
-  id             String    @id @default(cuid())
-  auth0Id        String    @unique                // Auth0 user identifier
+  id             String    @id @default(cuid())   // unique identifier for the user (cuid instead of uuid for better security)
+  supabaseId     String    @unique                // Supabase Auth user UUID
   email          String    @unique
   name           String
-  profilePicture String?                          // S3 URL for profile image
+  profilePicture String?                          // Supabase Storage URL for profile image
   bio            String?                          // Short bio/description
 
   // Professional Info
@@ -69,7 +74,7 @@ model User {
   // ============================================
   // INDEXES
   // ============================================
-  @@index([auth0Id])                              // Fast lookup by Auth0 ID
+  @@index([supabaseId])                           // Fast lookup by Supabase user ID
   @@index([githubUsername])                       // Fast lookup by GitHub username
   @@index([createdAt])                            // For sorting new users
 }
@@ -88,7 +93,7 @@ model Project {
   techStack   String[]                            // Technologies used: ["React", "Node.js", "PostgreSQL"]
   githubUrl   String?                             // Link to GitHub repo
   liveUrl     String?                             // Link to live demo/deployment
-  imageUrl    String?                             // Screenshot/preview image (S3 URL)
+  imageUrl    String?                             // Screenshot/preview image (Supabase Storage URL)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -105,11 +110,12 @@ model Project {
 // Used to determine matches and filter feed
 
 model Swipe {
-  id          String   @id @default(cuid())
-  swiperId    String                              // User who made the swipe
-  swipedId    String                              // User who was swiped on
-  liked       Boolean                             // true = like (right swipe), false = pass (left swipe)
-  createdAt   DateTime @default(now())
+  id          String   @id @default(cuid())       // unique identifier for the swipe (cuid instead of uuid for better security)
+  swiperId    String                              // User who made the swipe (required)
+  swipedId    String                              // User who was swiped on (required)
+  liked       Boolean                             // true = tick (like/right), false = cross (pass/left) (required)
+  message     String?                             // REQUIRED when liked=true (tick). Optional/empty for cross.
+  createdAt   DateTime @default(now())            // timestamp when the swipe was created (required)
 
   // Relations
   swiper      User     @relation("SwipesMade", fields: [swiperId], references: [id], onDelete: Cascade)
@@ -167,4 +173,3 @@ model Message {
   @@index([senderId])                             // Fast lookup of messages by sender
   @@index([matchId, readAt])                      // Fast count of unread messages
 }
-
