@@ -1,10 +1,10 @@
 import { Text, StyleSheet, View } from 'react-native';
 
-export default function HomeScreen() {
+export default function Chat() {
   return (
     <View style = {styles.BI}>
       <Text>
-        Hello World
+        This is the chat page
       </Text>
     </View>
   );
