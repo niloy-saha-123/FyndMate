@@ -44,7 +44,12 @@ ALTER TABLE "Message" ENABLE ROW LEVEL SECURITY;
 
 CREATE OR REPLACE FUNCTION get_current_user_id()
 RETURNS TEXT AS $$
-  SELECT id FROM "User" WHERE "supabaseId" = auth.uid()::TEXT
+  -- LIMIT 1 is a defensive guard: supabaseId is unique, but this prevents errors
+  -- if bad data is ever inserted manually.
+  SELECT id
+  FROM "User"
+  WHERE "supabaseId" = auth.uid()::TEXT
+  LIMIT 1
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 
@@ -147,7 +152,7 @@ CREATE POLICY "project_delete_own"
 -- 4. Person B does NOT see Person A in their feed (already liked by A)
 -- 5. Person A cannot see Person B until B accepts (no stalking pending likes)
 -- 6. Person B accepts → Match created → Both move to Chat
--- 7. If Person B rejects → Person A might reappear in B's feed later
+-- 7. If Person B declines → Swipe is archived, A never reappears in B's feed
 --
 -- PASS/CROSS FLOW:
 -- 1. Person A passes on Person C
@@ -209,15 +214,16 @@ CREATE POLICY "swipe_insert_own"
 -- ============================================
 -- STEP 6: MATCH TABLE POLICIES
 -- ============================================
--- Matches are created when TWO users mutually like each other.
+-- Matches are created when Person A likes Person B, and Person B accepts.
+-- This is Hinge-style (one-sided accept), NOT Tinder-style (mutual like).
 --
 -- Access Pattern:
 -- - Users can only see matches they're part of
--- - INSERT is NOT allowed from client (server creates matches)
--- - Either user can delete (unmatch)
+-- - INSERT is NOT allowed from client (server creates matches on accept)
+-- - DELETE is NOT allowed from client (unmatch is server-side via status change)
 --
--- SECURITY DECISION: Matches should be created server-side only.
--- This prevents users from creating fake matches with anyone.
+-- SECURITY DECISION: All match mutations are server-side only.
+-- This prevents manipulation and ensures proper state management.
 
 -- SELECT: Users can view matches they're part of
 -- Why: The matches list shows people the user is matched with
@@ -229,28 +235,16 @@ CREATE POLICY "match_select_own"
     OR "user2Id" = get_current_user_id()
   );
 
--- NO INSERT POLICY!
--- Matches are created by the SERVER (using service role) when it detects
--- that both users have liked each other. This prevents manipulation.
--- 
--- If the client ever needs to create a match, uncomment this:
--- CREATE POLICY "match_insert_own"
---   ON "Match" FOR INSERT
---   TO authenticated
---   WITH CHECK (
---     "user1Id" = get_current_user_id() 
---     OR "user2Id" = get_current_user_id()
---   );
+-- ❌ NO INSERT POLICY!
+-- Matches are created by the SERVER (using service role) when recipient accepts.
+-- This prevents users from creating fake matches with anyone.
 
--- DELETE: Either user can unmatch (delete the match)
--- Why: Both parties should be able to end a match
-CREATE POLICY "match_delete_own"
-  ON "Match" FOR DELETE
-  TO authenticated
-  USING (
-    "user1Id" = get_current_user_id() 
-    OR "user2Id" = get_current_user_id()
-  );
+-- ❌ NO UPDATE POLICY!
+-- Match status changes (e.g., unmatched) are handled server-side only.
+
+-- ❌ NO DELETE POLICY!
+-- Unmatch is handled server-side by updating Match.status, not by deleting.
+-- This preserves history and prevents abuse (harassment loops).
 
 
 -- ============================================
@@ -321,15 +315,15 @@ CREATE POLICY "message_delete_own"
 -- User:     Public read, owner-only write
 -- Project:  Public read, owner-only write  
 -- Swipe:    Hinge-style (see likes received, own passes, insert only)
--- Match:    Participants only, server-side creation only
+-- Match:    Participants SELECT only, all mutations server-side
 -- Message:  Match participants (read/insert/delete), no updates from client
 --
 -- HINGE-STYLE MATCHING FLOW:
 -- 1. Person A likes Person B with a proposal message
 -- 2. Person B sees Person A in "Likes" section with the message
 -- 3. Person A CANNOT see Person B until matched (no stalking pending likes)
--- 4. Person B accepts → Match created → Both move to Chat
--- 5. Person B rejects → Person A may reappear in B's feed later
+-- 4. Person B accepts → Match created (server-side) → Both move to Chat
+-- 5. Person B declines → Swipe archived (server-side) → A never reappears
 --
 -- LOOK BACK FEATURE:
 -- - Users can see their own PASSES (but not LIKES)
