@@ -1,7 +1,10 @@
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native';
+import { AuthProvider } from "../src/auth/AuthProvider";
+import { supabase } from "../src/auth/supabaseClient";
+import { useEffect } from 'react';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -9,13 +12,32 @@ export const unstable_settings = {
 
 export default function RootLayout() {
 
+   useEffect(() => {
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        console.log("AUTH CHANGE", session);
+
+        if (session) {
+          router.replace("/(tabs)");
+        } else {
+          router.replace("/login");
+        }
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+  
   return (
-      
+
+      <AuthProvider>
         <SafeAreaView style={styles.statusbar}>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           </Stack>
         </SafeAreaView>
+      </AuthProvider>
       
   );
 }

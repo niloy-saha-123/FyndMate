@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import React from 'react';
 import {
   configureReanimatedLogger,
@@ -6,6 +6,7 @@ import {
 } from "react-native-reanimated";
 import { StyleSheet } from 'react-native';
 import {TabBar} from "../../src/components/TabBar"
+import { useAuth } from '../../src/auth/AuthProvider';
 
 configureReanimatedLogger({
   level: ReanimatedLogLevel.warn, 
@@ -14,6 +15,11 @@ configureReanimatedLogger({
 
 export default function TabLayout() {
 
+  const { user, loading } = useAuth();
+  if (loading) return null;
+
+  if (!user) return <Redirect href="/login" />;
+  
   return (
     <Tabs
       screenOptions={{
