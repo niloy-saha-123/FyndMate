@@ -50,7 +50,8 @@
     "@octokit/graphql": "^7.0.1",
     "@prisma/adapter-pg": "^5.22.0",
     "@prisma/client": "5.22.0",
-    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/supabase-js": "^2.89.0",
+    "express": "^5.2.1",
     "fastify": "^4.24.3",
     "pg": "^8.13.0",
     "sharp": "^0.34.5",
@@ -58,6 +59,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^20.19.27",
     "dotenv": "^17.2.3",
     "dotenv-cli": "^11.0.0",
