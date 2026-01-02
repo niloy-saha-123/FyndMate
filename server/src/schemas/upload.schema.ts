@@ -79,17 +79,25 @@ export type RequestUploadInput = z.infer<typeof requestUploadSchema>;
  * 
  * Example request body:
  * {
- *   "uploadPath": "clx7abc123/1703849600-x7y8z9.jpg"
+ *   "uploadPath": "clx7abc123/1703849600-x7y8z9.jpg",
+ *   "idempotencyKey": "upload-abc123-def456" // Optional: prevents duplicate processing
  * }
  * 
  * Validation:
  * - uploadPath: Must be a non-empty string (the path returned from request endpoint)
+ * - idempotencyKey: Optional UUID/string to prevent duplicate submissions
+ *   If the same key is sent twice, server returns the cached result instead of reprocessing
  */
 export const confirmUploadSchema = z.object({
   uploadPath: z.string().min(1, 'Upload path is required'),
+
+  // Idempotency key: prevents duplicate uploads if user clicks "confirm" multiple times
+  // Client should generate once per upload attempt (e.g., UUID v4)
+  // Server caches result by key and returns same response for duplicate requests
+  idempotencyKey: z.string().optional(),
 });
 
-// TypeScript type: { uploadPath: string }
+// TypeScript type: { uploadPath: string; idempotencyKey?: string }
 export type ConfirmUploadInput = z.infer<typeof confirmUploadSchema>;
 
 // ============================================

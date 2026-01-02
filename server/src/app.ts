@@ -10,6 +10,68 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { prisma } from './lib/prisma.js';
+import uploadRoutes from './routes/upload.routes.js';
+
+/**
+ * ============================================
+ * TODO: PRODUCTION MONITORING SETUP
+ * ============================================
+ * 
+ * Before deploying to production with real users, add monitoring to catch
+ * errors and track performance. Recommended: Sentry (free tier: 5k events/month)
+ * 
+ * Step 1: Install Sentry
+ *   npm install @sentry/node @sentry/profiling-node
+ * 
+ * Step 2: Add to .env:
+ *   SENTRY_DSN=https://your-key@sentry.io/your-project-id
+ *   NODE_ENV=production
+ * 
+ * Step 3: Initialize Sentry (add BEFORE buildApp):
+ *   import * as Sentry from '@sentry/node';
+ *   import { ProfilingIntegration } from '@sentry/profiling-node';
+ *   
+ *   if (process.env.NODE_ENV === 'production') {
+ *     Sentry.init({
+ *       dsn: process.env.SENTRY_DSN,
+ *       environment: process.env.NODE_ENV,
+ *       integrations: [new ProfilingIntegration()],
+ *       tracesSampleRate: 0.1,  // 10% of requests (saves quota)
+ *       profilesSampleRate: 0.1, // 10% profiling
+ *     });
+ *   }
+ * 
+ * Step 4: Add error handler to Fastify (in buildApp function):
+ *   app.setErrorHandler((error, request, reply) => {
+ *     // Log to Sentry in production
+ *     if (process.env.NODE_ENV === 'production') {
+ *       Sentry.captureException(error, {
+ *         user: { id: request.user?.id },
+ *         tags: { endpoint: request.url },
+ *       });
+ *     }
+ *     
+ *     request.log.error(error);
+ *     reply.status(500).send({ error: 'Internal server error' });
+ *   });
+ * 
+ * What you get:
+ * - Email/Slack alerts when errors occur
+ * - Stack traces with exact line numbers
+ * - User context (who hit the error)
+ * - Performance monitoring (slow endpoints)
+ * - Error trends (which errors are most common)
+ * 
+ * Pricing:
+ * - Free tier: 5,000 errors/month (plenty for MVP)
+ * - Team plan: $26/month for 50k errors (when scaling)
+ * 
+ * Alternatives:
+ * - Sentry: Best for error tracking (recommended)
+ * - Datadog: Best for metrics + logs (expensive)
+ * - New Relic: All-in-one APM (expensive)
+ * - LogRocket: Session replay + errors (for frontend)
+ */
 
 export async function buildApp() {
   const app = Fastify({
@@ -19,10 +81,36 @@ export async function buildApp() {
   // ============================================
   // CORE PLUGINS
   // ============================================
-  
-  // CORS - Allow cross-origin requests from mobile app
+
+  /**
+   * CORS (Cross-Origin Resource Sharing) Configuration
+   * 
+   * CURRENT (DEVELOPMENT):
+   * - origin: true → Allows requests from ANY domain
+   * - Good for development (works with localhost, Expo dev server, etc.)
+   * 
+   * ⚠️ TODO: PRODUCTION SETUP (When you deploy with a domain)
+   * 
+   * Step 1: Add to .env file:
+   *   ALLOWED_ORIGINS=https://fyndmate.com,https://www.fyndmate.com,https://app.fyndmate.com
+   *   NODE_ENV=production
+   * 
+   * Step 2: Replace 'origin: true' below with:
+   *   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
+   *   
+   *   origin: process.env.NODE_ENV === 'production' 
+   *     ? allowedOrigins  // Production: whitelist only your domains
+   *     : true,           // Development: allow all (for testing)
+   * 
+   * Why this matters:
+   * - Without whitelist: evil-site.com can make requests to your API
+   * - With whitelist: Only YOUR domains can make requests
+   * 
+   * Security: Prevents CSRF attacks where malicious sites try to use
+   * the user's logged-in session to upload malware or steal data.
+   */
   await app.register(cors, {
-    origin: true,
+    origin: true, // TODO: Replace with whitelist when deploying (see comments above)
   });
 
   // Multipart - File uploads
@@ -44,13 +132,19 @@ export async function buildApp() {
   });
 
   // ============================================
-  // ROUTES (add as you build features)
+  // ROUTES (add as we build features)
   // ============================================
-  
+
   // Health check endpoint
   app.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
+
+  // Upload routes (profile pictures)
+  // Endpoints:
+  //   POST /api/upload/profile-picture/request - Get signed upload URL
+  //   POST /api/upload/profile-picture/confirm - Confirm upload and save to DB
+  await app.register(uploadRoutes, { prefix: '/api/upload' });
 
   // API routes will be added here:
   // await app.register(authRoutes, { prefix: '/api/auth' });

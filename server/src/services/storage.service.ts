@@ -48,9 +48,25 @@
  * - Post-upload validation catches bypassed client-side checks
  * - Invalid files are auto-deleted
  * - Uses supabaseAdmin (service role) which bypasses RLS for server operations
+ * 
+ * IMAGE OPTIMIZATION (FRONTEND IMPLEMENTATION):
+ * This backend stores original images as-is. For optimal performance, the frontend
+ * should use Supabase Image Transformations when DISPLAYING images:
+ * 
+ * Example:
+ * <Image source={{ uri: `${user.profilePicture}?width=500&quality=85` }} />
+ * 
+ * Benefits:
+ * - Automatic resizing (500px width for mobile screens)
+ * - Compression (85% quality = visually identical, 50-70% smaller file)
+ * - CDN caching (faster loads)
+ * - Original preserved (can get high-res if needed)
+ * 
+ * No backend code changes needed - just add URL parameters in frontend!
  */
 
 import { supabaseAdmin } from '../lib/supabase.js';
+import { withCircuitBreaker } from '../utils/circuit-breaker.js';
 
 const BUCKET_NAME = 'profile-pictures';
 const SIGNED_URL_EXPIRES_IN = 120; // 2 minutes
@@ -67,14 +83,36 @@ export async function createSignedUploadUrl(
   userId: string,
   fileExtension: string
 ): Promise<{ signedUrl: string; path: string; expiresAt: Date }> {
-  // Generate unique filename: {userId}/{timestamp}-{random}.{ext}
+  // Generate a secure file name with timestamp and cryptographically secure random ID
+  // OLD (WEAK): Math.random() - predictable, not cryptographically secure
+  // NEW (SECURE): crypto.randomBytes() - cryptographically secure randomness
+  // 
+  // Why this matters:
+  // - Math.random() uses a predictable pseudo-random algorithm
+  // - Attackers can predict filenames and enumerate storage
+  // - crypto.randomBytes() uses OS-level secure random generation
+  // 
+  // Format: {timestamp}-{secureRandomId}.{extension}
+  // Example: 1704153600000-a3f9c2e7.jpg
   const timestamp = Date.now();
-  const randomId = Math.random().toString(36).substring(2, 8);   // Generate a random string for the filename
+
+  // Generate cryptographically secure random ID (8 hex characters)
+  // randomBytes(4) = 4 bytes = 32 bits of entropy
+  const crypto = await import('crypto');
+  const randomBytes = crypto.randomBytes(4);
+  const randomId = randomBytes.toString('hex'); // 8 hex chars
+
   const path = `${userId}/${timestamp}-${randomId}.${fileExtension}`;
 
-  const { data, error } = await supabaseAdmin.storage
-    .from(BUCKET_NAME)
-    .createSignedUploadUrl(path);
+  // Wrap Supabase call with circuit breaker for health checking
+  // If Supabase fails 3 times, circuit opens and rejects requests for 30s
+  // This prevents cascading failures and gives Supabase time to recover
+  const { data, error } = await withCircuitBreaker(
+    'createSignedUploadUrl',
+    async () => await supabaseAdmin.storage
+      .from(BUCKET_NAME)
+      .createSignedUploadUrl(path)
+  );
 
   if (error || !data) {
     throw new Error(`Failed to create signed URL: ${error?.message}`);
@@ -123,19 +161,111 @@ export async function validateUploadedFile(
     return { valid: false, error: 'File exceeds 5MB limit' };
   }
 
-  // Check MIME type
-  const mimeType = file.metadata?.mimetype;
-  if (mimeType && !ALLOWED_MIME_TYPES.includes(mimeType)) {
-    // Delete the invalid file
+  // ═══════════════════════════════════════════════════════════════════════
+  // SECURITY: Magic Byte Validation + Image Sanitization
+  // ═══════════════════════════════════════════════════════════════════════
+  // This prevents malware attacks where attackers upload:
+  // - Executables renamed as images (virus.exe → image.jpg)
+  // - Polyglot files (image.jpg.html with embedded scripts)
+  // - SVG with malicious <script> tags
+  // - Decompression bombs (small file → crashes when opened)
+  //
+  // Protection mechanism:
+  // 1. Download file buffer
+  // 2. Check magic bytes (file signature) - validates it's a real image
+  // 3. Use sharp to re-encode - strips EXIF/metadata and sanitizes
+  // 4. Replace original with sanitized version
+  // ═══════════════════════════════════════════════════════════════════════
+
+  try {
+    // Step 1: Download file from storage
+    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+      .from(BUCKET_NAME)
+      .download(path);
+
+    if (downloadError || !fileData) {
+      await supabaseAdmin.storage.from(BUCKET_NAME).remove([path]);
+      return { valid: false, error: 'Failed to download file for validation' };
+    }
+
+    // Step 2: Convert to buffer for analysis
+    const arrayBuffer = await fileData.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Step 3: Check magic bytes (file signature)
+    // This verifies the file is actually an image, not malware disguised as one
+    const magicBytes = buffer.slice(0, 12);
+
+    const isJPEG = magicBytes[0] === 0xFF && magicBytes[1] === 0xD8 && magicBytes[2] === 0xFF;
+    const isPNG = magicBytes[0] === 0x89 && magicBytes[1] === 0x50 && magicBytes[2] === 0x4E && magicBytes[3] === 0x47;
+    const isWebP = magicBytes[0] === 0x52 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 && magicBytes[3] === 0x46;
+
+    if (!isJPEG && !isPNG && !isWebP) {
+      await supabaseAdmin.storage.from(BUCKET_NAME).remove([path]);
+      return {
+        valid: false,
+        error: 'Invalid file signature - file is not a valid image (possible malware)',
+      };
+    }
+
+    // Step 4: Use sharp to verify image integrity + sanitize
+    // This does two things:
+    // a) Confirms it's a valid, parseable image (not corrupted or malicious)
+    // b) Re-encodes to strip EXIF data (GPS coordinates, device info)
+    // c) Removes any embedded scripts or malicious payloads
+    // d) Resizes if needed to prevent decompression bombs
+    const sharp = (await import('sharp')).default;
+
+    const sanitizedBuffer = await sharp(buffer)
+      .rotate() // Auto-rotate based on EXIF orientation
+      .resize(2000, 2000, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .jpeg({
+        quality: 90,
+        mozjpeg: true, // Better compression
+      })
+      .toBuffer();
+
+    // Step 5: Replace original file with sanitized version
+    // This overwrites the uploaded file with the clean version
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(BUCKET_NAME)
+      .upload(path, sanitizedBuffer, {
+        upsert: true,
+        contentType: 'image/jpeg',
+        cacheControl: '3600',
+      });
+
+    if (uploadError) {
+      await supabaseAdmin.storage.from(BUCKET_NAME).remove([path]);
+      return { valid: false, error: 'Failed to sanitize image' };
+    }
+
+    // Success - file is validated, sanitized, and safe
+    return {
+      valid: true,
+      size: sanitizedBuffer.length,
+      mimeType: 'image/jpeg',
+    };
+
+  } catch (imageProcessingError) {
+    // If sharp throws an error, the file is corrupted or malicious
     await supabaseAdmin.storage.from(BUCKET_NAME).remove([path]);
-    return { valid: false, error: 'Invalid file type' };
+
+    const errorMessage = imageProcessingError instanceof Error
+      ? imageProcessingError.message
+      : 'Unknown error';
+
+    return {
+      valid: false,
+      error: `Image validation failed: ${errorMessage} (file may be corrupted or malicious)`,
+    };
   }
 
-  return {
-    valid: true,
-    size: file.metadata?.size,
-    mimeType,
-  };
+  // Note: The old MIME type check is now redundant since we re-encode everything
+  // to JPEG above. All validation happens via magic bytes + sharp processing.
 }
 
 /**
