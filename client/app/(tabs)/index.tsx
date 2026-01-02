@@ -11,7 +11,7 @@ export default function HomeScreen() {
       return;
     }
 
-    router.replace("/login");   // 👈 send user back to login
+    router.replace("/login");   
   };
 
   return (
