@@ -1,48 +1,43 @@
 import { supabase } from "./supabaseClient";
 
-export async function signIn(email: string, password: string) {
-  console.log("SIGN IN CLICKED");
+const API_URL = process.env.EXPO_PUBLIC_API_URL!;
 
+/* ---------------- SIGN IN (unchanged) ---------------- */
+
+export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
-    console.log("SIGN IN ERROR:", error.message);
     alert(error.message);
-    return null;
+    throw error;
   }
 
-  console.log("SIGNED IN:", data.session);
-  alert("Signed in successfully!");
   return data;
 }
+
+/* ---------------- SIGN UP (SECURE) ---------------- */
 
 export async function signUp(
   email: string,
   password: string,
   name: string
 ) {
-  console.log("SIGN UP CLICKED");
-
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: name,   
-      },
-    },
+  const res = await fetch(`${API_URL}/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, name }),
   });
 
-  if (error) {
-    console.log("SIGN UP ERROR:", error.message);
-    alert(error.message);
-    return null;
+  const data = await res.json();
+
+  if (!res.ok) {
+    alert(data.error || "Signup failed");
+    throw new Error(data.error);
   }
 
-  console.log("SIGN UP SUCCESS:", data);
-  alert("Account created! Check your email to confirm.");
+  alert("Account created! Check your email.");
   return data;
 }
