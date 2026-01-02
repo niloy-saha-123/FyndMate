@@ -9,9 +9,9 @@ datasource db {
 }
 
 model User {
-  id             String     @id @default(cuid())
-  supabaseId     String     @unique
-  email          String     @unique
+  id             String          @id @default(cuid())
+  supabaseId     String          @unique
+  email          String          @unique
   name           String
   profilePicture String?
   bio            String?
@@ -19,20 +19,20 @@ model User {
   skills         String[]
   interests      String[]
   commitment     String?
-  githubUsername String?    @unique
+  githubUsername String?         @unique
   githubData     Json?
   githubActivity Json?
   location       String
   timezone       String
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  auditLogs      AuditLog[] @relation("UserAuditLogs")
-  matchesAsUser1 Match[]    @relation("User1Matches")
-  matchesAsUser2 Match[]    @relation("User2Matches")
-  sentMessages   Message[]  @relation("SentMessages")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  auditLogs      AuditLog[]      @relation("UserAuditLogs")
+  matchesAsUser1 Match[]         @relation("User1Matches")
+  matchesAsUser2 Match[]         @relation("User2Matches")
+  sentMessages   Message[]       @relation("SentMessages")
   projects       Project[]
-  swipesReceived Swipe[]    @relation("SwipesReceived")
-  swipesMade     Swipe[]    @relation("SwipesMade")
+  swipesReceived Swipe[]         @relation("SwipesReceived")
+  swipesMade     Swipe[]         @relation("SwipesMade")
   uploadSessions UploadSession[] @relation("UserUploadSessions")
 
   @@index([supabaseId])

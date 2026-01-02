@@ -458,8 +458,9 @@ export default async function uploadRoutes(app: FastifyInstance) {
         const publicUrl = getPublicUrl(uploadPath);
 
         // Step 6: Get current user to check for existing profile picture
+        // userId is now the database ID (from auth middleware)
         const currentUser = await prisma.user.findUnique({
-          where: { supabaseId: userId },
+          where: { id: userId },
           select: { profilePicture: true },
         });
 
@@ -518,8 +519,9 @@ export default async function uploadRoutes(app: FastifyInstance) {
         }
 
         // Step 9: Update user's profile picture in database
+        // userId is now the database ID (from auth middleware)
         await prisma.user.update({
-          where: { supabaseId: userId },
+          where: { id: userId },
           data: { profilePicture: publicUrl },
         });
 
