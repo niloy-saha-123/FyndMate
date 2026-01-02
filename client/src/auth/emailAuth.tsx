@@ -2,8 +2,6 @@ import { supabase } from "./supabaseClient";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL!;
 
-/* ---------------- SIGN IN (unchanged) ---------------- */
-
 export async function signIn(email: string, password: string) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -18,7 +16,6 @@ export async function signIn(email: string, password: string) {
   return data;
 }
 
-/* ---------------- SIGN UP (SECURE) ---------------- */
 
 export async function signUp(
   email: string,
