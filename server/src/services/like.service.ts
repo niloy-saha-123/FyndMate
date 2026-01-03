@@ -1,5 +1,20 @@
+/**
+ * @file src/services/like.service.ts
+ * @description Manages the "Like" and "Pass" ACTIONS and the "Likes Section" VIEW.
+ * 
+ * CORE RESPONSIBILITIES:
+ * 1. Create Like: Handles the logic when a user Swipes Right.
+ *    - Validates Message Length (Min 20 chars for Intro).
+ *    - Checks for Blocks or Self-Likes.
+ * 2. Hinge-Style Likes Section: Fetches the "Likes You" list.
+ *    - This is NOT the Matches/Inbox. It's the list of pending likes waiting for response.
+ *    - Filters out people who blocked you (safety).
+ * 
+ * Used by: matching.routes.ts
+ */
 import { prisma } from '../lib/prisma.js';
 import { blockService } from './block.service.js';
+import { matchService } from './match.service.js';
 
 export class LikeService {
     /**
@@ -43,6 +58,31 @@ export class LikeService {
                 likerId_likedId: { likerId, likedId },
             },
         });
+
+        if (existing) {
+            // ... existing checks ...
+        }
+
+        // HINGE-STYLE "INSTANT MATCH" CHECK
+        // If we are LIKING them (liked=true), check if they ALREADY liked us.
+        // If yes -> This is an Instant Match!
+        if (liked && !existing) {
+            const reciprocalLike = await prisma.like.findFirst({
+                where: {
+                    likerId: likedId,
+                    likedId: likerId,
+                    status: 'active',
+                    liked: true
+                }
+            });
+
+            if (reciprocalLike) {
+                // They liked us first! Immediate Match.
+                // We treat our "Like" as the "Accept" action.
+                // Our message (if any) becomes the "Reply Message".
+                return await matchService.acceptLike(reciprocalLike.id, message);
+            }
+        }
 
         if (existing) {
             // If it was a PASS (liked=false) and we are now LIKING (liked=true) -> Update (Second Chance)

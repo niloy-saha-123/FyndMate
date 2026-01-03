@@ -1,3 +1,17 @@
+/**
+ * @file src/services/block.service.ts
+ * @description Manages user blocking logic and safety features.
+ * 
+ * CORE RESPONSIBILITIES:
+ * 1. Bidirectional Blocking: If A blocks B, neither can see each other.
+ * 2. Interaction Validation: PREVENTS pre-emptive blocking from Feed.
+ *    - You must have a Match or Like interaction to block someone.
+ * 3. Cleanup: When a block happens, it automatically cleans up:
+ *    - Existing Matches (Unmatches them).
+ *    - Existing Likes (Archives them).
+ * 
+ * Used by: matching.routes.ts
+ */
 import { prisma } from '../lib/prisma.js';
 
 export class BlockService {

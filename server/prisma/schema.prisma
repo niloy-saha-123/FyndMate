@@ -35,8 +35,7 @@ model User {
   likesMade      Like[]          @relation("LikesMade")
   blocksMade     Block[]         @relation("BlocksMade")
   blocksReceived Block[]         @relation("BlocksReceived")
-  reportsMade    Report[]        @relation("ReportsMade")
-  reportsReceived Report[]       @relation("ReportsReceived")
+
   
   // Safety & Moderation
   banned         Boolean         @default(false)
@@ -110,16 +109,7 @@ model Block {
   @@unique([blockerId, blockedId])
 }
 
-model Report {
-  id         String   @id @default(cuid())
-  reporterId String
-  reportedId String
-  reason     String
-  createdAt  DateTime @default(now())
-  
-  reporter   User @relation("ReportsMade", fields: [reporterId], references: [id])
-  reported   User @relation("ReportsReceived", fields: [reportedId], references: [id])
-}
+
 
 model Message {
   id        String    @id @default(cuid())

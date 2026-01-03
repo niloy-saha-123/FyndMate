@@ -1,3 +1,17 @@
+/**
+ * @file src/services/match.service.ts
+ * @description Manages active connections, chat initiation, and unmatching.
+ * 
+ * CORE RESPONSIBILITIES:
+ * 1. Transactional Acceptance: Converts a 'Like' into a 'Match' atomically.
+ *    - Archives the Like -> Creates Match -> Creates Intro Message.
+ *    - This ensures no data is lost during the handshake.
+ * 2. Unmatching: Soft-deletes the connection (status='unmatched').
+ *    - Prevents users from ever seeing each other again.
+ * 3. Match List: Retrieves the user's active matches for the "Chats" screen.
+ * 
+ * Used by: matching.routes.ts
+ */
 import { prisma } from '../lib/prisma.js';
 
 export class MatchService {
@@ -103,7 +117,7 @@ export class MatchService {
     }
 
     /**
-     * Get User's Matches (Inbox)
+     * Get User's Matches (The "Inbox" / Chat List)
      */
     async getMatches(userId: string) {
         return await prisma.match.findMany({

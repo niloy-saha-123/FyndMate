@@ -1,3 +1,17 @@
+/**
+ * @file src/services/feed.service.ts
+ * @description The "Discovery Engine". Calculates which profiles a user should see.
+ * 
+ * CORE RESPONSIBILITIES:
+ * 1. The "Double Exclusion" Logic:
+ *    - Exclude people I Liked/Passed (I already saw them).
+ *    - Exclude people who Liked ME (They belong in the "Likes Section", not Feed).
+ *    - Exclude Matches and Blocks.
+ * 2. Pagination: Uses a cursor-based approach for infinite scroll.
+ * 3. Limits: Hard-capped at 50 profiles per request for DoS protection.
+ * 
+ * Used by: feed.routes.ts
+ */
 import { prisma } from '../lib/prisma.js';
 
 export class FeedService {
@@ -16,7 +30,7 @@ export class FeedService {
             select: { likedId: true },
         });
 
-        // B. Incoming Likes (They liked me -> They are in my Inbox, not Feed)
+        // B. Incoming Likes (They liked me -> They are in my Likes Section, not Feed)
         // Note: If they PASSED me (liked=false), they DO appear in feed (Asymmetric).
         const incomingLikes = await prisma.like.findMany({
             where: { likedId: userId, liked: true },

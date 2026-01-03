@@ -1,3 +1,21 @@
+/**
+ * @file src/routes/matching.routes.ts
+ * @description API Endpoints for all User Interactions (Likes, Matches, Blocks).
+ * 
+ * ENDPOINTS:
+ * 1. LIKES
+ *    - POST /api/likes: Send a Like (Swipe Right) or Pass (Swipe Left).
+ *    - GET /api/likes/received: Get the "Likes You" Section.
+ *    - POST /api/likes/:id/accept: Match with someone who liked you.
+ *    - POST /api/likes/:id/decline: Remove someone from your likes list.
+ * 
+ * 2. MATCHES
+ *    - GET /api/matches: Get your active chat list.
+ *    - POST /api/matches/:id/unmatch: Break a match.
+ * 
+ * 3. SAFETY
+ *    - POST /api/users/block: Block a user you have interacted with.
+ */
 import { FastifyInstance } from 'fastify';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { likeService } from '../services/like.service.js';

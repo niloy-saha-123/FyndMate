@@ -1,3 +1,13 @@
+/**
+ * @file src/routes/feed.routes.ts
+ * @description API Endpoint for the Discovery Feed.
+ * 
+ * ENDPOINTS:
+ * - GET /api/feed
+ *   - Fetches a list of compatible users for the swipe deck.
+ *   - Params: ?limit=20&cursor=timestamp
+ *   - Auth: Protected (Requires JWT)
+ */
 import { FastifyInstance } from 'fastify';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { feedService } from '../services/feed.service.js';
