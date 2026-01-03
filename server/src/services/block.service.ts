@@ -22,7 +22,34 @@ export class BlockService {
      * Also ensures any existing match/like logic is handled (e.g. unmatch).
      */
     async blockUser(blockerId: string, blockedId: string) {
-        // 1. Check if already blocked
+        // 1. Validation: Must have Interaction (Match or Like) to block
+        // We strictly disallow generic blocking from Feed to prevent abuse/confusion.
+
+        // Check Match
+        const matchExists = await prisma.match.findFirst({
+            where: {
+                OR: [
+                    { user1Id: blockerId, user2Id: blockedId },
+                    { user1Id: blockedId, user2Id: blockerId },
+                ]
+            }
+        });
+
+        // Check Like (Incoming or Outgoing)
+        const likeExists = await prisma.like.findFirst({
+            where: {
+                OR: [
+                    { likerId: blockerId, likedId: blockedId },
+                    { likerId: blockedId, likedId: blockerId },
+                ]
+            }
+        });
+
+        if (!matchExists && !likeExists) {
+            throw new Error("You can only block users you have matched with or interacted with.");
+        }
+
+        // 2. Check if already blocked
         const existing = await prisma.block.findUnique({
             where: {
                 blockerId_blockedId: { blockerId, blockedId },
@@ -31,7 +58,7 @@ export class BlockService {
 
         if (existing) return existing;
 
-        // 2. Create Block and auto-resolve any conflicts
+        // 3. Create Block and auto-resolve any conflicts
         // We use a transaction to ensure we clean up matches/likes if they exist
         return await prisma.$transaction(async (tx) => {
             // Create block
