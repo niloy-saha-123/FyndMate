@@ -32,12 +32,16 @@ export class FeedService {
 
         // B. Incoming Likes (They liked me -> They are in my Likes Section, not Feed)
         // Note: If they PASSED me (liked=false), they DO appear in feed (Asymmetric).
+        // CRITICAL: Do NOT filter by status='active'. 
+        // We must also exclude 'archived' (Declined) likes so they don't reappear.
         const incomingLikes = await prisma.like.findMany({
             where: { likedId: userId, liked: true },
             select: { likerId: true },
         });
 
-        // C. Matches (Active or Unmatched need to be excluded? Unmatched definitely excluded)
+        // C. Matches
+        // CRITICAL: Do NOT filter by status='active'.
+        // We must exclude 'unmatched' users so ex-partners don't reappear.
         const matches = await prisma.match.findMany({
             where: {
                 OR: [{ user1Id: userId }, { user2Id: userId }],
