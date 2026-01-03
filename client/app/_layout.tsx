@@ -12,22 +12,22 @@ export const unstable_settings = {
 
 export default function RootLayout() {
 
-   useEffect(() => {
+  //  useEffect(() => {
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        console.log("AUTH CHANGE", session);
+  //   const { data: listener } = supabase.auth.onAuthStateChange(
+  //     (_event, session) => {
+  //       console.log("AUTH CHANGE", session);
 
-        if (session) {
-          router.replace("/(tabs)");
-        } else {
-          router.replace("/login");
-        }
-      }
-    );
+  //       if (session) {
+  //         router.replace("/(tabs)");
+  //       } else {
+  //         router.replace("/login");
+  //       }
+  //     }
+  //   );
 
-    return () => listener.subscription.unsubscribe();
-  }, []);
+  //   return () => listener.subscription.unsubscribe();
+  // }, []);
   
   return (
 

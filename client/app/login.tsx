@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { signIn, signUp } from "../src/auth/emailAuth";
 import { signInWithGoogle } from "../src/auth/googleOAuth";
+import { router } from "expo-router";
+
 
 export default function Login() {
   const [name, setName] = useState("");
@@ -49,16 +51,27 @@ export default function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAuth = () => {
+  const handleAuth = async() => {
     if (!validate()) return;
 
+    try {
     if (isSignUp) {
-      signUp(email.trim(), password, name.trim());
+      await signUp(email.trim(), password, name.trim());
     } else {
-      signIn(email.trim(), password);
-    }
-  };
+      const { session, user } = await signIn(email.trim(), password);
 
+      if (!session) {
+        alert("Sign in failed. Did you confirm your email?");
+        return;
+      }
+      console.log("Signed in user:", user);
+
+      router.replace("/(tabs)");
+    }
+  } catch (e: any) {
+    console.error("Auth error:", e.message);
+  }
+};
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === "ios" ? "padding" : "height"} 
