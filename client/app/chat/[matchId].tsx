@@ -1,95 +1,83 @@
 import { useEffect, useState, useRef } from "react";
-import { View, Text, FlatList, TextInput, Pressable, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  FlatList,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Modal,
+  KeyboardAvoidingView,
+  Platform
+} from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../src/auth/AuthProvider";
 import {
   getMessages,
-  sendMessage
+  sendMessage,
+  editMessage
 } from "../../src/chat/chat.service";
 import { subscribeToMessages } from "../../src/chat/chat.realtime";
 
 export default function ChatScreen() {
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
   const { user } = useAuth();
+
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState("");
-  const [pendingMessageIds, setPendingMessageIds] = useState<Set<string>>(new Set());
+  const [editingMessage, setEditingMessage] = useState<any | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<any | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     if (!matchId || !user) return;
 
-    console.log("🔵 Current user object:", JSON.stringify(user, null, 2));
-    console.log("🔵 Current user ID:", user.id);
+    getMessages(matchId).then(setMessages);
 
-    // Load initial messages
-    getMessages(matchId).then(msgs => {
-      console.log("Loaded", msgs.length, "messages");
-      setMessages(msgs);
-    });
-
-    // Subscribe to new messages
     const unsubscribe = subscribeToMessages(matchId, msg => {
-      console.log("Real-time message received:", msg.id);
-      
       setMessages(prev => {
-        const withoutTemp = prev.filter(m => !m.id.toString().startsWith('temp-'));
-
-        const exists = withoutTemp.some(m => m.id === msg.id);
+        const exists = prev.some(m => m.id === msg.id);
         if (exists) {
-          console.log("  Message already exists, skipping");
-          return prev;
+          return prev.map(m => (m.id === msg.id ? msg : m));
         }
-        
-        console.log("Adding message");
-        return [...withoutTemp, msg];
-      });
-
-      setPendingMessageIds(prev => {
-        const next = new Set(prev);
-        next.delete(msg.id);
-        return next;
+        return [...prev, msg];
       });
     });
 
     return unsubscribe;
   }, [matchId, user]);
 
+  function canEditMessage(message: any) {
+    const FIVE_MIN = 5 * 60 * 1000;
+    return (
+      message.senderId === user?.id &&
+      Date.now() - new Date(message.createdAt).getTime() < FIVE_MIN
+    );
+  }
+
   async function handleSend() {
     if (!text.trim() || !user) return;
-    
+
     const content = text.trim();
-    setText(""); 
-    
-    console.log("Sending message:", content);
-    
-    const tempId = `temp-${Date.now()}-${Math.random()}`;
-    const tempMessage = {
-      id: tempId,
-      matchId,
-      senderId: user.id,
-      content,
-      createdAt: new Date().toISOString(),
-      readAt: null,
-      isOptimistic: true
-    };
+    setText("");
 
-    setMessages(prev => [...prev, tempMessage]);
-    
     try {
-      const result = await sendMessage(matchId, content);
-      console.log("✅ Message sent, ID:", result?.id);
-      
-      if (result?.id) {
-        setPendingMessageIds(prev => new Set(prev).add(result.id));
+      if (editingMessage) {
+        setSavingEdit(true);
+        await editMessage(editingMessage.id, content);
+        setEditingMessage(null);
+        setSavingEdit(false);
+      } else {
+        await sendMessage(matchId!, content);
       }
-      
-
-    } catch (error) {
-      console.error("Failed to send message:", error);
-      setMessages(prev => prev.filter(m => m.id !== tempId));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to send");
       setText(content);
-      alert("Failed to send message. Please try again.");
+      setSavingEdit(false);
     }
   }
 
@@ -97,90 +85,124 @@ export default function ChatScreen() {
     if (messages.length > 0) {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      }, 50);
     }
   }, [messages.length]);
 
-  if (!user) {
-    return <Text>Loading...</Text>;
-  }
+  if (!user) return <Text>Loading...</Text>;
 
   return (
-    <View style={styles.container}>
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(m, index) => m.id || `msg-${index}`}
-        contentContainerStyle={styles.messageList}
-        renderItem={({ item }) => {
-          const isMyMessage = item.senderId === user.id;
-          const isSending = item.isOptimistic === true;
-          
-          console.log(`Message ${item.id}: senderId="${item.senderId}" vs userId="${user.id}" -> isMyMessage=${isMyMessage}`);
-          
-          return (
-            <View
-              style={[
-                styles.messageBubble,
-                isMyMessage ? styles.myMessage : styles.theirMessage,
-                isSending && styles.sendingMessage
-              ]}
-            >
-              <Text
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={80}
+    >
+      <View style={styles.container}>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={m => m.id}
+          contentContainerStyle={styles.messageList}
+          renderItem={({ item }) => {
+            const isMyMessage = item.senderId === user.id;
+
+            return (
+              <Pressable
+                onLongPress={() => {
+                  if (!canEditMessage(item)) return;
+                  setSelectedMessage(item);
+                  setModalVisible(true);
+                }}
                 style={[
-                  styles.messageText,
-                  isMyMessage ? styles.myMessageText : styles.theirMessageText
+                  styles.messageBubble,
+                  isMyMessage ? styles.myMessage : styles.theirMessage
                 ]}
               >
-                {item.content}
-              </Text>
-              <Text style={[
-                styles.timestamp,
-                isMyMessage && { color: '#cce5ff' }
-              ]}>
-                {isSending ? "Sending..." : new Date(item.createdAt).toLocaleTimeString([], {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </Text>
-            </View>
-          );
-        }}
-      />
+                <Text
+                  style={[
+                    styles.messageText,
+                    isMyMessage ? styles.myMessageText : styles.theirMessageText
+                  ]}
+                >
+                  {item.content}
+                </Text>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          placeholder="Type a message..."
-          style={styles.input}
-          multiline
-          maxLength={1000}
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  <Text style={styles.timestamp}>
+                    {new Date(item.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit"
+                    })}
+                  </Text>
+
+                  {item.editedAt && (
+                    <Text style={styles.edited}>edited</Text>
+                  )}
+                </View>
+              </Pressable>
+            );
+          }}
         />
-        <Pressable
-          onPress={handleSend}
-          style={[
-            styles.sendButton,
-            !text.trim() && styles.sendButtonDisabled
-          ]}
-          disabled={!text.trim()}
+
+        <View style={styles.inputContainer}>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder={editingMessage ? "Edit message…" : "Type a message…"}
+            style={styles.input}
+            multiline
+          />
+          <Pressable
+            onPress={handleSend}
+            disabled={!text.trim() || savingEdit}
+            style={[
+              styles.sendButton,
+              (!text.trim() || savingEdit) && styles.sendButtonDisabled
+            ]}
+          >
+            <Text style={styles.sendButtonText}>
+              {editingMessage ? "Save" : "Send"}
+            </Text>
+          </Pressable>
+        </View>
+
+        <Modal
+          transparent
+          animationType="fade"
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
         >
-          <Text style={styles.sendButtonText}>Send</Text>
-        </Pressable>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setModalVisible(false)}
+          >
+            <View style={styles.modalBox}>
+              <Pressable
+                onPress={() => {
+                  setEditingMessage(selectedMessage);
+                  setText(selectedMessage.content);
+                  setModalVisible(false);
+                }}
+              >
+                <Text style={styles.modalAction}>Edit</Text>
+              </Pressable>
+
+              <Pressable onPress={() => setModalVisible(false)}>
+                <Text style={[styles.modalAction, { color: "red" }]}>
+                  Cancel
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5"
-  },
-  messageList: {
-    padding: 16,
-    paddingBottom: 8
-  },
+  container: { flex: 1, backgroundColor: "#f5f5f5" },
+  messageList: { padding: 16 },
   messageBubble: {
     maxWidth: "75%",
     padding: 12,
@@ -199,31 +221,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e0e0e0"
   },
-  sendingMessage: {
-    opacity: 0.6
-  },
-  messageText: {
-    fontSize: 16,
-    lineHeight: 20
-  },
-  myMessageText: {
-    color: "#fff"
-  },
-  theirMessageText: {
-    color: "#000"
-  },
-  timestamp: {
-    fontSize: 11,
-    color: "#999",
-    marginTop: 4
-  },
+  messageText: { fontSize: 16 },
+  myMessageText: { color: "#fff" },
+  theirMessageText: { color: "#000" },
+  timestamp: { fontSize: 11, color: "#ccc" },
+  edited: { fontSize: 11, color: "#ccc", fontStyle: "italic" },
+
   inputContainer: {
     flexDirection: "row",
     padding: 8,
     backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-    alignItems: "flex-end"
+    borderTopColor: "#e0e0e0"
   },
   input: {
     flex: 1,
@@ -233,23 +242,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     fontSize: 16,
-    maxHeight: 100,
     backgroundColor: "#f9f9f9"
   },
   sendButton: {
     backgroundColor: "#007AFF",
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    justifyContent: "center",
     borderRadius: 20,
-    marginLeft: 8,
-    justifyContent: "center"
+    marginLeft: 8
   },
-  sendButtonDisabled: {
-    backgroundColor: "#ccc"
+  sendButtonDisabled: { backgroundColor: "#ccc" },
+  sendButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center"
   },
-  sendButtonText: {
-    color: "#fff",
+  modalBox: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 12,
+    width: 200
+  },
+  modalAction: {
     fontSize: 16,
-    fontWeight: "600"
+    paddingVertical: 12,
+    textAlign: "center"
   }
 });

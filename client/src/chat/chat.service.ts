@@ -28,6 +28,21 @@ export async function getMessages(matchId: string) {
   return data;
 }
 
+export async function editMessage(messageId: string, content: string) {
+  const { data, error } = await supabase
+    .from("Message")
+    .update({
+      content,
+      editedAt: new Date().toISOString(),
+    })
+    .eq("id", messageId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function sendMessage(matchId: string, content: string) {
   const { data, error } = await supabase
     .from("Message")

@@ -19,6 +19,8 @@ export default function ChatTab() {
     return <Text>Loading...</Text>;
   }
 
+// THE MAIN STYLING SHOULD BE DONE IN client/app/chat/[matchId].tsx
+
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
       <FlatList

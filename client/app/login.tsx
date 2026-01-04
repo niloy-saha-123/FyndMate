@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import { signIn, signUp } from "../src/auth/emailAuth";
 import { signInWithGoogle } from "../src/auth/googleOAuth";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
+import { useAuth } from "../src/auth/AuthProvider";
 
 
 export default function Login() {
@@ -24,7 +25,14 @@ export default function Login() {
     password?: string;
     name?: string;
   }>({});
+  const { user, loading } = useAuth();
 
+  if (loading) return null;
+
+  if (user) {
+    return <Redirect href="/(tabs)" />;
+  }
+  
   const isValidEmail = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -66,7 +74,7 @@ export default function Login() {
       }
       console.log("Signed in user:", user);
 
-      router.replace("/(tabs)");
+      // router.replace("/(tabs)");
     }
   } catch (e: any) {
     console.error("Auth error:", e.message);

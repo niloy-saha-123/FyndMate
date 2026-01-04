@@ -16,7 +16,7 @@ configureReanimatedLogger({
 export default function TabLayout() {
 
   const { user, loading } = useAuth();
-  // if (loading) return null;
+  if (loading) return null;
 
   if (!user) return <Redirect href="/login" />;
   
