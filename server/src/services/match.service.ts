@@ -29,6 +29,7 @@ export class MatchService {
             const like = await tx.like.findUnique({
                 where: { id: likeId },
             });
+            console.log("DEBUG: Processing Like:", JSON.stringify(like, null, 2));
 
             if (!like) throw new Error("Like not found.");
             if (like.status !== 'active') throw new Error("Like is no longer active.");
@@ -70,23 +71,21 @@ export class MatchService {
 
             // 5. Create Initial Messages
             // Message 1: The Liker's Intro
-            if (like.message) {
-                await tx.message.create({
-                    data: {
-                        matchId: match.id,
-                        senderId: like.likerId,
-                        content: like.message,
-                        readAt: new Date(), // They read it to accept it? optional.
-                    },
-                });
-            }
+            await tx.message.create({
+                data: {
+                    match: { connect: { id: match.id } },
+                    sender: { connect: { id: like.likerId } },
+                    content: like.message!,
+                    readAt: new Date(),
+                },
+            });
 
             // Message 2: The Accepter's Reply (if exists)
             if (replyMessage && replyMessage.trim().length > 0) {
                 await tx.message.create({
                     data: {
-                        matchId: match.id,
-                        senderId: like.likedId, // The person accepting
+                        match: { connect: { id: match.id } },
+                        sender: { connect: { id: like.likedId } }, // The person accepting
                         content: replyMessage,
                     }
                 });

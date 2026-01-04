@@ -28,6 +28,9 @@
     "// === UTILITIES ===": "",
     "clean": "rm -rf dist",
     "clean:all": "rm -rf dist node_modules",
+    "test": "dotenv -e .env.test -- vitest run",
+    "test:watch": "dotenv -e .env.test -- vitest",
+    "test:setup": "echo 'DATABASE_URL=\"postgresql://postgres:postgres@127.0.0.1:54322/postgres\"' > .env.test && echo 'DIRECT_URL=\"postgresql://postgres:postgres@127.0.0.1:54322/postgres\"' >> .env.test",
     "// === PRE-DEPLOYMENT ===": "",
     "prebuild": "npm run db:generate",
     "prestart:prod": "npm run db:migrate:prod"
@@ -65,6 +68,8 @@
     "dotenv-cli": "^11.0.0",
     "prisma": "5.22.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vite-tsconfig-paths": "^6.0.3",
+    "vitest": "^4.0.16"
   }
 }

@@ -60,16 +60,20 @@ export function useFeed(token: string) {
 
     // Swipe Action (Like or Pass)
     const swipe = async (likedId: string, liked: boolean, message?: string) => {
-        // 1. Optimistic Update: Remove from screen immediately
+        // 1. Find the profile BEFORE removing it (for rollback)
+        const swipedProfile = profiles.find(p => p.id === likedId);
+
+        if (!swipedProfile) return; // Should not happen
+
+        // 2. Optimistic Update: Remove from screen immediately
         setProfiles(prev => prev.filter(p => p.id !== likedId));
 
         try {
-            // 2. API Call
+            // 3. API Call
             const result = await sendLike(token, likedId, liked, message);
 
-            // 3. Check for Instant Match
-            if (result.matched) { // Assuming server returns { matched: true, match: ... }
-                // TODO: Trigger "It's a Match" Modal!
+            // 4. Check for Instant Match
+            if (result.matched) {
                 console.log("IT'S A MATCH!", result.match);
                 return { matched: true, match: result.match };
             }
@@ -77,10 +81,12 @@ export function useFeed(token: string) {
 
         } catch (err) {
             console.error("Swipe failed:", err);
-            // Revert optimistic update? Or just show error toast?
-            // Usually better to show error toast ("Network error, try again")
-            // and maybe reload feed.
-            setError("Failed to record swipe");
+
+            // 5. ROLLBACK: Put the card back!
+            // We usually put it back at the TOP (index 0) so the user sees it again.
+            setProfiles(prev => [swipedProfile, ...prev]);
+
+            setError("Failed to record swipe. Please try again.");
         }
     };
 
