@@ -96,30 +96,18 @@ export default function Login() {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Use phone number</Text>
-          </TouchableOpacity>
-
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or sign up with</Text>
+            <Text style={styles.dividerText}>or continue with</Text>
             <View style={styles.dividerLine} />
           </View>
 
           <View style={styles.socialButtonsRow}>
-            <TouchableOpacity style={styles.socialButton}>
-              <Ionicons name="logo-facebook" size={28} color="#1877F2" />
-            </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.socialButton}
               onPress={signInWithGoogle}
             >
               <Ionicons name="logo-google" size={28} color="#DB4437" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.socialButton}>
-              <Ionicons name="logo-apple" size={28} color="#000000" />
             </TouchableOpacity>
           </View>
         </View>
@@ -317,19 +305,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    borderWidth: 2,
-    borderColor: "#E77C02",
-    borderRadius: 30,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  secondaryButtonText: {
-    color: "#E77C02",
     fontSize: 16,
     fontWeight: "700",
   },

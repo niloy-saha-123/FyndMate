@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { router } from "expo-router";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL!;
 
@@ -13,6 +14,8 @@ export async function signIn(email: string, password: string) {
     throw error;
   }
 
+  // Navigate to main app after successful sign in
+  router.replace("/(tabs)");
   return data;
 }
 

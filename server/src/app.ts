@@ -11,6 +11,7 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { prisma } from './lib/prisma.js';
 import uploadRoutes from './routes/upload.routes.js';
+import authRoutes from './routes/auth.js';
 
 /**
  * ============================================
@@ -146,8 +147,10 @@ export async function buildApp() {
   //   POST /api/upload/profile-picture/confirm - Confirm upload and save to DB
   await app.register(uploadRoutes, { prefix: '/api/upload' });
 
-  // API routes will be added here:
-  // await app.register(authRoutes, { prefix: '/api/auth' });
+  // Auth routes (signup, etc.)
+  // Endpoints:
+  //   POST /auth/signup - Create new user account
+  await app.register(authRoutes, { prefix: '/auth' });
   // await app.register(userRoutes, { prefix: '/api/users' });
   // await app.register(matchRoutes, { prefix: '/api/matches' });
   // await app.register(messageRoutes, { prefix: '/api/messages' });
