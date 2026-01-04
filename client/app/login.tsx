@@ -1,22 +1,27 @@
 import { useState } from "react";
-import { 
-  View, 
-  TextInput, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  KeyboardAvoidingView, 
-  Platform, 
-  ScrollView 
+import {
+  View,
+  TextInput,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { signIn, signUp } from "../src/auth/emailAuth";
 import { signInWithGoogle } from "../src/auth/googleOAuth";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function Login() {
+  const router = useRouter();
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(true);
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
@@ -59,15 +64,85 @@ export default function Login() {
     }
   };
 
+  // Main sign up options screen
+  if (!showEmailForm) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.logoContainer}>
+          <View style={styles.logoWrapper}>
+            <LinearGradient
+              colors={["#F97316", "#EC4899", "#8B5CF6"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.logoGradient}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.title}>Sign up to continue</Text>
+
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => setShowEmailForm(true)}
+          >
+            <LinearGradient
+              colors={["#F59E0B", "#E77C02"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientButton}
+            >
+              <Text style={styles.primaryButtonText}>Continue with email</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or continue with</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <View style={styles.socialButtonsRow}>
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={signInWithGoogle}
+            >
+              <Ionicons name="logo-google" size={28} color="#DB4437" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.footer}>
+          <TouchableOpacity>
+            <Text style={styles.footerLink}>Terms of use</Text>
+          </TouchableOpacity>
+          <TouchableOpacity>
+            <Text style={styles.footerLink}>Privacy Policy</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Email form screen
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"} 
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => setShowEmailForm(false)}
+        >
+          <Ionicons name="arrow-back" size={24} color="#374151" />
+        </TouchableOpacity>
+
+        <View style={styles.formContainer}>
           <View style={styles.header}>
-            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.formTitle}>
+              {isSignUp ? "Create Account" : "Welcome Back"}
+            </Text>
             <Text style={styles.subtitle}>
               {isSignUp
                 ? "Create your account to get started"
@@ -135,40 +210,29 @@ export default function Login() {
 
           {!isSignUp && (
             <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={styles.forgotPasswordText}>
-                Forgot password?
-              </Text>
+              <Text style={styles.forgotPasswordText}>Forgot password?</Text>
             </TouchableOpacity>
           )}
 
           <TouchableOpacity
             style={[
-              styles.primaryButton,
+              styles.submitButton,
               (!email || !password || (isSignUp && !name)) && {
                 opacity: 0.6,
               },
             ]}
             onPress={handleAuth}
-            // disabled={!email || !password || (isSignUp && !name)}
           >
-            <Text style={styles.primaryButtonText}>
-              {isSignUp ? "Create Account" : "Sign In"}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity
-            style={styles.googleButton}
-            onPress={signInWithGoogle}
-          >
-            <Text style={styles.googleButtonText}>
-              Continue with Google
-            </Text>
+            <LinearGradient
+              colors={["#F59E0B", "#E77C02"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientButton}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isSignUp ? "Create Account" : "Sign In"}
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
 
           <View style={styles.toggleContainer}>
@@ -183,7 +247,6 @@ export default function Login() {
               </Text>
             </TouchableOpacity>
           </View>
-
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -193,29 +256,117 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#EBF4FF",
+    backgroundColor: "#FFFFFF",
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: "center",
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingVertical: 20,
   },
-  card: {
+  logoContainer: {
+    alignItems: "center",
+    marginTop: 80,
+    marginBottom: 40,
+  },
+  logoWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    overflow: "hidden",
+  },
+  logoGradient: {
+    width: "100%",
+    height: "100%",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1F2937",
+    textAlign: "center",
+    marginBottom: 40,
+  },
+  buttonsContainer: {
+    paddingHorizontal: 24,
+  },
+  primaryButton: {
+    borderRadius: 30,
+    overflow: "hidden",
+    marginBottom: 16,
+    shadowColor: "#E77C02",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  gradientButton: {
+    paddingVertical: 18,
+    alignItems: "center",
+    borderRadius: 30,
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#E5E7EB",
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: "#9CA3AF",
+    fontWeight: "500",
+  },
+  socialButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 20,
+  },
+  socialButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 32,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 40,
+    marginTop: "auto",
+    paddingBottom: 40,
+  },
+  footerLink: {
+    fontSize: 14,
+    color: "#E77C02",
+    fontWeight: "600",
+  },
+  backButton: {
+    marginTop: 20,
+    marginBottom: 20,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  formContainer: {
+    flex: 1,
   },
   header: {
     alignItems: "center",
     marginBottom: 32,
   },
-  title: {
+  formTitle: {
     fontSize: 28,
     fontWeight: "700",
     color: "#1F2937",
@@ -258,55 +409,18 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: "#3B82F6",
+    color: "#E77C02",
     fontWeight: "600",
   },
-  primaryButton: {
-    backgroundColor: "#3B82F6",
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
+  submitButton: {
+    borderRadius: 30,
+    overflow: "hidden",
     marginBottom: 24,
-    shadowColor: "#3B82F6",
+    shadowColor: "#E77C02",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#E5E7EB",
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    color: "#9CA3AF",
-    fontWeight: "500",
-  },
-  googleButton: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  googleButtonText: {
-    color: "#374151",
-    fontSize: 16,
-    fontWeight: "600",
   },
   toggleContainer: {
     flexDirection: "row",
@@ -320,7 +434,7 @@ const styles = StyleSheet.create({
   },
   toggleLink: {
     fontSize: 14,
-    color: "#3B82F6",
+    color: "#E77C02",
     fontWeight: "700",
   },
 });

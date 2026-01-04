@@ -20,9 +20,8 @@ export default function RootLayout() {
 
         if (session) {
           router.replace("/(tabs)");
-        } else {
-          router.replace("/login");
         }
+        // Don't auto-redirect to login - let the welcome screen handle that
       }
     );
 
@@ -34,6 +33,9 @@ export default function RootLayout() {
       <AuthProvider>
         <SafeAreaView style={styles.statusbar}>
           <Stack>
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="auth" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           </Stack>
         </SafeAreaView>
