@@ -15,9 +15,14 @@ import { useAuth } from "../../src/auth/AuthProvider";
 import {
   getMessages,
   sendMessage,
-  editMessage
+  editMessage,
+  deleteMessage
 } from "../../src/chat/chat.service";
 import { subscribeToMessages } from "../../src/chat/chat.realtime";
+
+
+// NOTE THIS FILE HANDLES THE DISPLAY FOR THE CHAT MESSAGES
+// ADDITIONAL NOTE: WE ARE UNSURE OF IF WE WANT THE DELETED MESSAGES TO LEAVE A TRACE. IF WE DO WANT IT, ADD THE LOGIC IN THIS FILE
 
 export default function ChatScreen() {
   const { matchId } = useLocalSearchParams<{ matchId: string }>();
@@ -26,10 +31,12 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState("");
   const [editingMessage, setEditingMessage] = useState<any | null>(null);
-  const [selectedMessage, setSelectedMessage] = useState<any | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
 
+  const [selectedMessage, setSelectedMessage] = useState<any | null>(null);
+  const [actionModalVisible, setActionModalVisible] = useState(false);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+
+  const [savingEdit, setSavingEdit] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -37,12 +44,17 @@ export default function ChatScreen() {
 
     getMessages(matchId).then(setMessages);
 
-    const unsubscribe = subscribeToMessages(matchId, msg => {
+    const unsubscribe = subscribeToMessages(matchId, (event, msg) => {
       setMessages(prev => {
+        if (event === "delete") {
+          return prev.filter(m => m.id !== msg.id);
+        }
+
         const exists = prev.some(m => m.id === msg.id);
         if (exists) {
           return prev.map(m => (m.id === msg.id ? msg : m));
         }
+
         return [...prev, msg];
       });
     });
@@ -75,10 +87,28 @@ export default function ChatScreen() {
       }
     } catch (err) {
       console.error(err);
-      alert("Failed to send");
+      alert("Failed to send message");
       setText(content);
       setSavingEdit(false);
     }
+  }
+
+  async function confirmDelete() {
+    if (!selectedMessage) return;
+
+    const msg = selectedMessage;
+    setMessages(prev => prev.filter(m => m.id !== msg.id));
+    setConfirmDeleteVisible(false);
+
+    try {
+      await deleteMessage(msg.id);
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Failed to delete message");
+      setMessages(prev => [...prev, msg]);
+    }
+
+    setSelectedMessage(null);
   }
 
   useEffect(() => {
@@ -111,7 +141,7 @@ export default function ChatScreen() {
                 onLongPress={() => {
                   if (!canEditMessage(item)) return;
                   setSelectedMessage(item);
-                  setModalVisible(true);
+                  setActionModalVisible(true);
                 }}
                 style={[
                   styles.messageBubble,
@@ -134,7 +164,6 @@ export default function ChatScreen() {
                       minute: "2-digit"
                     })}
                   </Text>
-
                   {item.editedAt && (
                     <Text style={styles.edited}>edited</Text>
                   )}
@@ -165,35 +194,58 @@ export default function ChatScreen() {
             </Text>
           </Pressable>
         </View>
-
-        <Modal
-          transparent
-          animationType="fade"
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
-        >
+        <Modal transparent animationType="fade" visible={actionModalVisible}>
           <Pressable
             style={styles.modalOverlay}
-            onPress={() => setModalVisible(false)}
+            onPress={() => setActionModalVisible(false)}
           >
             <View style={styles.modalBox}>
               <Pressable
                 onPress={() => {
                   setEditingMessage(selectedMessage);
                   setText(selectedMessage.content);
-                  setModalVisible(false);
+                  setActionModalVisible(false);
                 }}
               >
                 <Text style={styles.modalAction}>Edit</Text>
               </Pressable>
 
-              <Pressable onPress={() => setModalVisible(false)}>
+              <Pressable
+                onPress={() => {
+                  setActionModalVisible(false);
+                  setConfirmDeleteVisible(true);
+                }}
+              >
                 <Text style={[styles.modalAction, { color: "red" }]}>
-                  Cancel
+                  Delete
                 </Text>
+              </Pressable>
+
+              <Pressable onPress={() => setActionModalVisible(false)}>
+                <Text style={styles.modalAction}>Cancel</Text>
               </Pressable>
             </View>
           </Pressable>
+        </Modal>
+
+        <Modal transparent animationType="fade" visible={confirmDeleteVisible}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.confirmBox}>
+              <Text style={styles.confirmText}>
+                Delete this message?
+              </Text>
+
+              <View style={styles.confirmActions}>
+                <Pressable onPress={() => setConfirmDeleteVisible(false)}>
+                  <Text style={styles.confirmCancel}>No</Text>
+                </Pressable>
+
+                <Pressable onPress={confirmDelete}>
+                  <Text style={styles.confirmDelete}>Yes</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
         </Modal>
       </View>
     </KeyboardAvoidingView>
@@ -203,6 +255,7 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5" },
   messageList: { padding: 16 },
+
   messageBubble: {
     maxWidth: "75%",
     padding: 12,
@@ -221,6 +274,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e0e0e0"
   },
+
   messageText: { fontSize: 16 },
   myMessageText: { color: "#fff" },
   theirMessageText: { color: "#000" },
@@ -270,5 +324,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 12,
     textAlign: "center"
+  },
+
+  confirmBox: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 12,
+    width: 260
+  },
+  confirmText: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 16
+  },
+  confirmActions: {
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  confirmCancel: {
+    fontSize: 16
+  },
+  confirmDelete: {
+    fontSize: 16,
+    color: "red",
+    fontWeight: "600"
   }
 });

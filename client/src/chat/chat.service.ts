@@ -43,6 +43,15 @@ export async function editMessage(messageId: string, content: string) {
   return data;
 }
 
+export async function deleteMessage(messageId: string) {
+  const { error } = await supabase
+    .from("Message")
+    .delete()
+    .eq("id", messageId);
+
+  if (error) throw error;
+}
+
 export async function sendMessage(matchId: string, content: string) {
   const { data, error } = await supabase
     .from("Message")
