@@ -83,7 +83,7 @@ export default function ChatScreen() {
         setEditingMessage(null);
         setSavingEdit(false);
       } else {
-        await sendMessage(matchId!, content);
+        await sendMessage(matchId!, content, user.id);
       }
     } catch (err) {
       console.error(err);

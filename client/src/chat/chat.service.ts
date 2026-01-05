@@ -52,10 +52,10 @@ export async function deleteMessage(messageId: string) {
   if (error) throw error;
 }
 
-export async function sendMessage(matchId: string, content: string) {
+export async function sendMessage(matchId: string, content: string, senderId: string) {
   const { data, error } = await supabase
     .from("Message")
-    .insert({ matchId, content })
+    .insert({ matchId, content, senderId })
     .select()
     .single();
 
