@@ -64,9 +64,9 @@ export class LikeService {
         }
 
         // HINGE-STYLE "INSTANT MATCH" CHECK
-        // If we are LIKING them (liked=true), check if they ALREADY liked us.
-        // If yes -> This is an Instant Match!
-        if (liked && !existing) {
+        // If we are LIKING them (liked: true), check if they ALREADY liked us.
+        // This must run even on "Second Chance" likes (updating an existing Pass).
+        if (liked) {
             const reciprocalLike = await prisma.like.findFirst({
                 where: {
                     likerId: likedId,
@@ -78,18 +78,16 @@ export class LikeService {
 
             if (reciprocalLike) {
                 // They liked us first! Immediate Match.
-                // We treat our "Like" as the "Accept" action.
-                // Our message (if any) becomes the "Reply Message".
                 return await matchService.acceptLike(reciprocalLike.id, message);
             }
         }
 
         if (existing) {
-            // If it was a PASS (liked=false) and we are now LIKING (liked=true) -> Update (Second Chance)
+            // If it was a PASS (liked: false) and we are now LIKING (liked: true) -> Update (Second Chance)
             if (!existing.liked && liked) {
                 return await prisma.like.update({
                     where: { id: existing.id },
-                    data: { liked: true, message, status: 'active', createdAt: new Date() }, // Reset time?
+                    data: { liked: true, message, status: 'active', createdAt: new Date() },
                 });
             }
             // Otherwise, idempotent return or error

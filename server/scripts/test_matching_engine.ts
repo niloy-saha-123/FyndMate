@@ -1,15 +1,37 @@
 /**
  * @file scripts/test_matching_engine.ts
- * @description Automated Integration Test for the Matching Engine.
- * 
- * RUN WITH: npx tsx scripts/test_matching_engine.ts
- * 
- * SCENARIOS:
- * 1. Feed Generation (Exclusions).
- * 2. Liking & Passing.
- * 3. Match Creation (Instant & Async).
- * 4. Blocking.
+ * @description ⚠️ DESTRUCTIVE SCRIPT: Resets the database and seeds it with test data.
+ *
+ * PURPOSE:
+ * 1. Wipes the database (User, Like, Match, Block tables).
+ * 2. Creates 5 dummy users (Alice, Bob, Charlie, David, Eve).
+ * 3. Simulates interactions (Like, Pass, Match, Block) between them.
+ * 4. Verifies that the Feed, Like, and Match services work correctly with this data.
+ *
+ * DATA PRESERVATION WARNING:
+ * This script DELETE ALL DATA in the database connected via your .env file.
+ * DO NOT RUN THIS AGAINST PRODUCTION.
+ *
+ * USAGE:
+ * - Use this to quickly populate your LOCAL database with users to swipe on.
+ * - Run: `npx tsx scripts/test_matching_engine.ts`
  */
+
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load env to check DATABASE_URL
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+const DB_URL = process.env.DATABASE_URL || "";
+const IS_LOCAL = DB_URL.includes("localhost") || DB_URL.includes("127.0.0.1");
+
+if (!IS_LOCAL) {
+    console.error("\n❌ SAFETY ERROR: This script is for LOCAL DEVELOPMENT ONLY.");
+    console.error(`⚠️  Your DATABASE_URL points to: ${DB_URL}`);
+    console.error("🛑 Aborting to protect potential production data.\n");
+    process.exit(1);
+}
 
 import { prisma } from '../src/lib/prisma.js';
 import { feedService } from '../src/services/feed.service.js';
@@ -121,10 +143,11 @@ async function main() {
     // ==========================================
     LOG("Testing Block (Alice -> David)...");
 
-    // Prerequisite: Must iterate to block? service says "Must have interaction".
-    // Let's create an interaction first. Alice Likes David.
-    await likeService.createLike(A.id, D.id, true, "Hi David! I am liking you so I can block you.");
+    // Prerequisite: Must have interaction to block (Hinge-style: incoming like or match)
+    // David likes Alice first (incoming like for Alice)
+    await likeService.createLike(D.id, A.id, true, "Hi Alice! I like your profile.");
 
+    // Now Alice can block David (she received his like)
     await blockService.blockUser(A.id, D.id);
 
     // David should not see Alice
@@ -134,6 +157,44 @@ async function main() {
     // Alice should not see David
     const feedFinalA = await feedService.getFeed(A.id);
     ASSERT(!feedFinalA.some(u => u.name === "David"), "Alice cannot see David (Blocked)");
+
+    // ==========================================
+    // 7. TEST SECOND CHANCE (Alice -> Eve)
+    // ==========================================
+    LOG("Testing Second Chance (Alice -> Eve)...");
+
+    // Alice passes on Eve
+    await likeService.createLike(A.id, E.id, false);
+    ASSERT(!(await feedService.getFeed(A.id)).some(u => u.name === "Eve"), "Eve removed after Alice passes");
+
+    // Eve likes Alice
+    await likeService.createLike(E.id, A.id, true, "I like you Alice! You have a great profile and I would love to chat.");
+
+    // Alice likes Eve (Second Chance)
+    const secondChanceMatch = await likeService.createLike(A.id, E.id, true, "Actually, I like you too! Your profile is amazing.");
+    ASSERT(!!secondChanceMatch && 'user1Id' in secondChanceMatch, "Instant match on Second Chance");
+
+    const matchesFinalA = await matchService.getMatches(A.id);
+    ASSERT(matchesFinalA.length === 2, "Alice now has 2 matches (Bob and Eve)");
+
+    // ==========================================
+    // 8. TEST UNMATCH (Alice unmatches Bob)
+    // ==========================================
+    LOG("Testing Unmatch (Alice -> Bob)...");
+
+    // Find matching ID between A and B
+    const matchAB = matchesFinalA.find(m => m.user1.name === "Bob" || m.user2.name === "Bob");
+    ASSERT(!!matchAB, "Found match between Alice and Bob");
+
+    await matchService.unmatch(matchAB!.id, A.id);
+
+    const matchesPostUnmatchA = await matchService.getMatches(A.id);
+    ASSERT(matchesPostUnmatchA.length === 1, "Alice has 1 match left after unmatching Bob");
+    ASSERT(!matchesPostUnmatchA.some(m => m.user1.name === "Bob" || m.user2.name === "Bob"), "Bob is gone from matches");
+
+    // Hinge behavior: Unmatched users don't reappear in feed
+    const feedPostUnmatchA = await feedService.getFeed(A.id);
+    ASSERT(!feedPostUnmatchA.some(u => u.name === "Bob"), "Bob does NOT reappear in feed after unmatch");
 
     LOG("🎉 ALL TESTS PASSED!");
 }

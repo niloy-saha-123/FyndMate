@@ -49,18 +49,17 @@ export class BlockService {
             }
         });
 
-        // Check Like (Incoming or Outgoing)
-        const likeExists = await prisma.like.findFirst({
+        // Check INCOMING Like only (Hinge-style: you can only block users who liked YOU)
+        // You cannot block users you liked but haven't matched with (you don't see them again anyway)
+        const incomingLike = await prisma.like.findFirst({
             where: {
-                OR: [
-                    { likerId: blockerId, likedId: blockedId },
-                    { likerId: blockedId, likedId: blockerId },
-                ]
+                likerId: blockedId,    // They liked you
+                likedId: blockerId     // You are the recipient
             }
         });
 
-        if (!matchExists && !likeExists) {
-            throw new Error("You can only block users you have matched with or interacted with.");
+        if (!matchExists && !incomingLike) {
+            throw new Error("You can only block users who have liked you or matched with you.");
         }
 
         // 2. Check if already blocked

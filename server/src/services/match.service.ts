@@ -27,29 +27,20 @@ export class MatchService {
         return await prisma.$transaction(async (tx) => {
             // 1. Get Like
             const like = await tx.like.findUnique({
-                where: { id: likeId },
+                where: { id: likeId }
             });
-            console.log("DEBUG: Processing Like:", JSON.stringify(like, null, 2));
 
             if (!like) throw new Error("Like not found.");
             if (like.status !== 'active') throw new Error("Like is no longer active.");
 
-            // 2. Validate users exist (optional if FK constraints hold, but good for robust erros)
-            // 3. Archive Like
-            await tx.like.update({
-                where: { id: likeId },
-                data: { status: 'archived' },
-            });
+            // Capture IDs immediately to prevent any proxy/reference issues
+            const likerId = String(like.likerId);
+            const likedId = String(like.likedId);
+            const introContent = like.message;
 
-            // 4. Create Match
-            // Sort IDs to ensure consistency (though we store user1/user2, we might often query by OR)
-            // But typically we just store them as is? 
-            // Plan Edge Case #7: "Inconsistent match pair order".
-            // Prevention: "Always sort userIds (low, high)".
-            // Let's do that.
-            const [u1, u2] = [like.likerId, like.likedId].sort();
+            // 2. Create Match
+            const [u1, u2] = [likerId, likedId].sort();
 
-            // Check if match already exists (race condition prevention)
             const existingMatch = await tx.match.findUnique({
                 where: { user1Id_user2Id: { user1Id: u1, user2Id: u2 } }
             });
@@ -58,7 +49,7 @@ export class MatchService {
                 if (existingMatch.status === 'unmatched') {
                     throw new Error("Cannot re-match with this user.");
                 }
-                return existingMatch; // Idempotent success
+                return existingMatch;
             }
 
             const match = await tx.match.create({
@@ -69,27 +60,34 @@ export class MatchService {
                 },
             });
 
-            // 5. Create Initial Messages
-            // Message 1: The Liker's Intro
-            await tx.message.create({
-                data: {
-                    match: { connect: { id: match.id } },
-                    sender: { connect: { id: like.likerId } },
-                    content: like.message!,
-                    readAt: new Date(),
-                },
-            });
+            // 3. Create Initial Messages
+            // Message 1: The Liker's Intro (User B)
+            if (introContent) {
+                await tx.message.create({
+                    data: {
+                        matchId: match.id,
+                        senderId: likerId,
+                        content: introContent,
+                    },
+                });
+            }
 
-            // Message 2: The Accepter's Reply (if exists)
+            // Message 2: The Accepter's Reply (User A)
             if (replyMessage && replyMessage.trim().length > 0) {
                 await tx.message.create({
                     data: {
-                        match: { connect: { id: match.id } },
-                        sender: { connect: { id: like.likedId } }, // The person accepting
+                        matchId: match.id,
+                        senderId: likedId,
                         content: replyMessage,
                     }
                 });
             }
+
+            // 4. Archive Like
+            await tx.like.update({
+                where: { id: likeId },
+                data: { status: 'archived' },
+            });
 
             return match;
         });

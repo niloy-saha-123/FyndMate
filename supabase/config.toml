@@ -105,12 +105,14 @@ enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
 
-# Uncomment to configure local storage buckets
-# [storage.buckets.images]
-# public = false
-# file_size_limit = "50MiB"
-# allowed_mime_types = ["image/png", "image/jpeg"]
-# objects_path = "./images"
+# Profile picture storage bucket (required for upload endpoints)
+# This bucket is auto-created when running `npx supabase start`
+# Configuration ensures consistency between local dev and production
+[storage.buckets.profile-pictures]
+public = true  # Profile pictures must be publicly accessible (like Tinder/social apps)
+file_size_limit = "10MiB"  # Max 10MB per image (reasonable for profile photos)
+allowed_mime_types = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+# Objects will be stored in Docker volume (persists across container restarts)
 
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
