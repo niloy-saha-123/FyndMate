@@ -37,19 +37,20 @@ export function subscribeToMessages(
       }
     )
 
-    // 🗑️ DELETE
-    .on(
-      "postgres_changes",
-      {
-        event: "DELETE",
-        schema: "public",
-        table: "Message",
-        filter: `matchId=eq.${matchId}`,
-      },
-      payload => {
-        onEvent("delete", payload.old);
-      }
-    )
+    // COMMENTED OUT THE DELETE FUNCTION
+    // // 🗑️ DELETE
+    // .on(
+    //   "postgres_changes",
+    //   {
+    //     event: "DELETE",
+    //     schema: "public",
+    //     table: "Message",
+    //     filter: `matchId=eq.${matchId}`,
+    //   },
+    //   payload => {
+    //     onEvent("delete", payload.old);
+    //   }
+    // )
 
     .subscribe();
 

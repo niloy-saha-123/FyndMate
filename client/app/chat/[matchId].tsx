@@ -16,62 +16,80 @@ import {
   getMessages,
   sendMessage,
   editMessage,
-  deleteMessage
+  // deleteMessage
 } from "../../src/chat/chat.service";
 import { subscribeToMessages } from "../../src/chat/chat.realtime";
 
+interface Message {
+  id: string;
+  matchId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  editedAt?: string | null;
+}
+
+type RealtimeEvent = "upsert" | "delete";
 
 // NOTE THIS FILE HANDLES THE DISPLAY FOR THE CHAT MESSAGES
 // ADDITIONAL NOTE: WE ARE UNSURE OF IF WE WANT THE DELETED MESSAGES TO LEAVE A TRACE. IF WE DO WANT IT, ADD THE LOGIC IN THIS FILE
 
 export default function ChatScreen() {
-  const { matchId } = useLocalSearchParams<{ matchId: string }>();
+  const { matchId } = useLocalSearchParams<{ matchId?: string }>();
   const { user } = useAuth();
 
-  const [messages, setMessages] = useState<any[]>([]);
-  const [text, setText] = useState("");
-  const [editingMessage, setEditingMessage] = useState<any | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [text, setText] = useState<string>("");
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
-  const [selectedMessage, setSelectedMessage] = useState<any | null>(null);
-  const [actionModalVisible, setActionModalVisible] = useState(false);
-  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [actionModalVisible, setActionModalVisible] = useState<boolean>(false);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] =
+    useState<boolean>(false);
 
-  const [savingEdit, setSavingEdit] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
+  const [savingEdit, setSavingEdit] = useState<boolean>(false);
+
+  const flatListRef = useRef<FlatList<Message>>(null);
 
   useEffect(() => {
     if (!matchId || !user) return;
 
-    getMessages(matchId).then(setMessages);
-
-    const unsubscribe = subscribeToMessages(matchId, (event, msg) => {
-      setMessages(prev => {
-        if (event === "delete") {
-          return prev.filter(m => m.id !== msg.id);
-        }
-
-        const exists = prev.some(m => m.id === msg.id);
-        if (exists) {
-          return prev.map(m => (m.id === msg.id ? msg : m));
-        }
-
-        return [...prev, msg];
-      });
+    getMessages(matchId).then((data: Message[]) => {
+      setMessages(data);
     });
+
+    const unsubscribe = subscribeToMessages(
+      matchId,
+      (event: RealtimeEvent, msg: Message) => {
+        setMessages(prev => {
+          // if (event === "delete") {
+          //   return prev.filter(m => m.id !== msg.id);
+          // }
+          const exists = prev.some(m => m.id === msg.id);
+          if (exists) {
+            return prev.map(m => (m.id === msg.id ? msg : m));
+          }
+
+          return [...prev, msg];
+        });
+      }
+    );
 
     return unsubscribe;
   }, [matchId, user]);
 
-  function canEditMessage(message: any) {
+  function canEditMessage(message: Message): boolean {
+    if (!user) return false;
+
     const FIVE_MIN = 5 * 60 * 1000;
     return (
-      message.senderId === user?.id &&
+      message.senderId === user.id &&
       Date.now() - new Date(message.createdAt).getTime() < FIVE_MIN
     );
   }
 
-  async function handleSend() {
-    if (!text.trim() || !user) return;
+  async function handleSend(): Promise<void> {
+    if (!text.trim() || !user || !matchId) return;
 
     const content = text.trim();
     setText("");
@@ -83,7 +101,7 @@ export default function ChatScreen() {
         setEditingMessage(null);
         setSavingEdit(false);
       } else {
-        await sendMessage(matchId!, content, user.id);
+        await sendMessage(matchId, content, user.id);
       }
     } catch (err) {
       console.error(err);
@@ -93,23 +111,25 @@ export default function ChatScreen() {
     }
   }
 
-  async function confirmDelete() {
-    if (!selectedMessage) return;
 
-    const msg = selectedMessage;
-    setMessages(prev => prev.filter(m => m.id !== msg.id));
-    setConfirmDeleteVisible(false);
+  //COMMENTED THE DELETE FUNCTION OUT
+  // async function confirmDelete(): Promise<void> {
+  //   if (!selectedMessage) return;
 
-    try {
-      await deleteMessage(msg.id);
-    } catch (err) {
-      console.error("Delete failed:", err);
-      alert("Failed to delete message");
-      setMessages(prev => [...prev, msg]);
-    }
+  //   const msg = selectedMessage;
+  //   setMessages(prev => prev.filter(m => m.id !== msg.id));
+  //   setConfirmDeleteVisible(false);
 
-    setSelectedMessage(null);
-  }
+  //   try {
+  //     await deleteMessage(msg.id);
+  //   } catch (err) {
+  //     console.error("Delete failed:", err);
+  //     alert("Failed to delete message");
+  //     setMessages(prev => [...prev, msg]);
+  //   }
+
+  //   setSelectedMessage(null);
+  // }
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -128,10 +148,10 @@ export default function ChatScreen() {
       keyboardVerticalOffset={80}
     >
       <View style={styles.container}>
-        <FlatList
+        <FlatList<Message>
           ref={flatListRef}
           data={messages}
-          keyExtractor={m => m.id}
+          keyExtractor={item => item.id}
           contentContainerStyle={styles.messageList}
           renderItem={({ item }) => {
             const isMyMessage = item.senderId === user.id;
@@ -151,7 +171,9 @@ export default function ChatScreen() {
                 <Text
                   style={[
                     styles.messageText,
-                    isMyMessage ? styles.myMessageText : styles.theirMessageText
+                    isMyMessage
+                      ? styles.myMessageText
+                      : styles.theirMessageText
                   ]}
                 >
                   {item.content}
@@ -202,6 +224,7 @@ export default function ChatScreen() {
             <View style={styles.modalBox}>
               <Pressable
                 onPress={() => {
+                  if (!selectedMessage) return;
                   setEditingMessage(selectedMessage);
                   setText(selectedMessage.content);
                   setActionModalVisible(false);
@@ -210,7 +233,7 @@ export default function ChatScreen() {
                 <Text style={styles.modalAction}>Edit</Text>
               </Pressable>
 
-              <Pressable
+              {/* <Pressable
                 onPress={() => {
                   setActionModalVisible(false);
                   setConfirmDeleteVisible(true);
@@ -219,7 +242,7 @@ export default function ChatScreen() {
                 <Text style={[styles.modalAction, { color: "red" }]}>
                   Delete
                 </Text>
-              </Pressable>
+              </Pressable> */}
 
               <Pressable onPress={() => setActionModalVisible(false)}>
                 <Text style={styles.modalAction}>Cancel</Text>
@@ -228,12 +251,10 @@ export default function ChatScreen() {
           </Pressable>
         </Modal>
 
-        <Modal transparent animationType="fade" visible={confirmDeleteVisible}>
+        {/* <Modal transparent animationType="fade" visible={confirmDeleteVisible}>
           <View style={styles.modalOverlay}>
             <View style={styles.confirmBox}>
-              <Text style={styles.confirmText}>
-                Delete this message?
-              </Text>
+              <Text style={styles.confirmText}>Delete this message?</Text>
 
               <View style={styles.confirmActions}>
                 <Pressable onPress={() => setConfirmDeleteVisible(false)}>
@@ -246,7 +267,7 @@ export default function ChatScreen() {
               </View>
             </View>
           </View>
-        </Modal>
+        </Modal> */}
       </View>
     </KeyboardAvoidingView>
   );
@@ -341,9 +362,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between"
   },
-  confirmCancel: {
-    fontSize: 16
-  },
+  confirmCancel: { fontSize: 16 },
   confirmDelete: {
     fontSize: 16,
     color: "red",
