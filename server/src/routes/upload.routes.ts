@@ -66,7 +66,7 @@ import {
   type ConfirmUploadInput,
 } from '../schemas/upload.schema.js';
 import { prisma } from '../lib/prisma.js';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { logUploadEvent, AuditAction } from '../services/audit.service.js';
 
 /**

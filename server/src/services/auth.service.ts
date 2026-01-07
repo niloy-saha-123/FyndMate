@@ -1,4 +1,4 @@
-import { supabase } from "../supabaseAdmin.js";
+import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 
 const BLOCKED_NAMES = [
   "admin",
@@ -33,7 +33,7 @@ export async function signupUser({
   }
 
   const { data, error } =
-    await supabase.auth.admin.createUser({
+    await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       user_metadata: {
