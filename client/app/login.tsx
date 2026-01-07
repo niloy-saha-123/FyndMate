@@ -12,6 +12,9 @@ import {
 import { useRouter } from "expo-router";
 import { signIn, signUp } from "../src/auth/emailAuth";
 import { signInWithGoogle } from "../src/auth/googleOAuth";
+import { Redirect, router } from "expo-router";
+import { useAuth } from "../src/auth/AuthProvider";
+
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -27,7 +30,14 @@ export default function Login() {
     password?: string;
     name?: string;
   }>({});
+  const { user, loading } = useAuth();
 
+  if (loading) return null;
+
+  if (user) {
+    return <Redirect href="/(tabs)" />;
+  }
+  
   const isValidEmail = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -54,13 +64,26 @@ export default function Login() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAuth = () => {
+  const handleAuth = async() => {
     if (!validate()) return;
 
+    try {
     if (isSignUp) {
-      signUp(email.trim(), password, name.trim());
-    } else {
-      signIn(email.trim(), password);
+      await signUp(email.trim(), password, name.trim());
+    } 
+    else {
+      const { session, user } = await signIn(email.trim(), password);
+      if (!session) {
+        alert("Sign in failed. Did you confirm your email?");
+        return;
+      }
+      console.log("Signed in user:", user);
+
+      // router.replace("/(tabs)");
+    }
+    } 
+    catch (e: any) {
+      console.error("Auth error:", e.message);
     }
   };
 

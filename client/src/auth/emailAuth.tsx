@@ -25,33 +25,20 @@ export async function signIn(email: string, password: string) {
 }
 
 
-export async function signUp(
-  email: string,
-  password: string,
-  name: string
-) {
-  try {
-    console.log("Signing up with API URL:", API_URL);
-    const res = await fetch(`${API_URL}/auth/signup`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, name }),
-    });
+export async function signUp(email: string, password: string, name: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { full_name: name },
+    },
+  });
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.error || "Signup failed");
-      throw new Error(data.error);
-    }
-
-    alert("Account created! Check your email.");
-    return data;
-  } catch (e: any) {
-    console.error("Sign up error:", e);
-    if (e.message === "Network request failed") {
-      alert("Cannot connect to server. Make sure the server is running.");
-    }
-    throw e;
+  if (error) {
+    alert(error.message);
+    throw error;
   }
+
+  alert("Account created! Check your email.");
+  return data;
 }
