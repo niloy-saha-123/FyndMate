@@ -1,13 +1,13 @@
 {
     "info": {
-        "name": "FyndMate - Profile Picture Upload API",
-        "description": "Complete test suite for profile picture upload with security tests",
+        "name": "FyndMate - API Test Suite",
+        "description": "Complete API test suite: uploads, matching engine, likes, matches, blocks",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "variable": [
         {
             "key": "baseUrl",
-            "value": "http://localhost:8080",
+            "value": "http://localhost:3000",
             "type": "string"
         },
         {
@@ -392,6 +392,165 @@
                         },
                         "description": "Try to confirm upload for a different user's path"
                     }
+                },
+                {
+                    "name": "❌ Expired URL (Should Fail)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status is 403\", function () {",
+                                    "    pm.response.to.have.status(403);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error mentions expired\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.error.toLowerCase()).to.include(\"expir\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"uploadPath\": \"{{uploadPath}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/upload/profile-picture/confirm",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "upload",
+                                "profile-picture",
+                                "confirm"
+                            ]
+                        },
+                        "description": "MANUAL TEST: Request upload URL, wait 2+ minutes, then run this. Should fail with 'expired'."
+                    }
+                },
+                {
+                    "name": "❌ Invalid Session (Should Fail)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status is 403\", function () {",
+                                    "    pm.response.to.have.status(403);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error mentions session\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.error.toLowerCase()).to.include(\"session\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"uploadPath\": \"fake-user-id/123456789-fake.jpg\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/upload/profile-picture/confirm",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "upload",
+                                "profile-picture",
+                                "confirm"
+                            ]
+                        },
+                        "description": "Try to confirm upload that was never requested (no upload session exists)"
+                    }
+                },
+                {
+                    "name": "❌ Invalid File Extension (Should Fail)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status is 400\", function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Error mentions validation\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.error.toLowerCase()).to.include(\"validation\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"fileExtension\": \"exe\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/upload/profile-picture/request",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "upload",
+                                "profile-picture",
+                                "request"
+                            ]
+                        },
+                        "description": "Try to upload .exe file - should be rejected"
+                    }
                 }
             ]
         },
@@ -428,6 +587,267 @@
                             ],
                             "path": [
                                 "health"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "❤️ Matching Engine",
+            "item": [
+                {
+                    "name": "1. Get Discovery Feed",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Status is 200\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test(\"Response has data array\", function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/feed?limit=10",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "feed"
+                            ],
+                            "query": [
+                                {
+                                    "key": "limit",
+                                    "value": "10"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "2. Send Like",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"likedId\": \"TARGET_USER_ID_HERE\",\n    \"liked\": true,\n    \"message\": \"Hey! This is a test message longer than 20 chars.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/likes",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "likes"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "3. Get Received Likes (Inbox)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/likes/received",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "likes",
+                                "received"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "4. Accept Like (Handshake / Match)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"replyMessage\": \"I'd love to chat! Your profile is great.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/likes/LIKE_ID_HERE/accept",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "likes",
+                                "LIKE_ID_HERE",
+                                "accept"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "5. Decline Like",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/likes/LIKE_ID_HERE/decline",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "likes",
+                                "LIKE_ID_HERE",
+                                "decline"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "6. Get Active Matches",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/matches",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "matches"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "7. Unmatch User",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/matches/MATCH_ID_HERE/unmatch",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "matches",
+                                "MATCH_ID_HERE",
+                                "unmatch"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "8. Block User",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{jwtToken}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"userId\": \"TARGET_USER_ID_HERE\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/block",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "users",
+                                "block"
                             ]
                         }
                     }

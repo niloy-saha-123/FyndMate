@@ -1,7 +1,40 @@
-# FyndMate
-Tinder for finding project partners
+# FyndMate 🚀
+**Tinder for finding project partners**
 
-## Architecture Overview
+---
+
+## 🚀 Quick Start for Friends
+
+If you just joined and want to see the app running on your phone, follow these steps:
+
+### 1. Prerequesites
+- Install **Docker Desktop** (Required for the local database).
+- Install **Node.js** (v18+).
+- Install **Expo Go** on your phone (Available on iOS/Android).
+
+### 2. Setup the Server (Local DB)
+```bash
+cd server
+npm install
+npx supabase start      # Starts the local database
+npm run test:setup      # Creates .env.test and pushes schema
+npm run db:local:seed   # Creates Alice, Bob, and other test users
+npm run dev             # Starts the API server
+```
+
+### 3. Setup the Client
+```bash
+cd client
+npm install
+npx expo start --go     # Scans the QR code with your phone!
+```
+
+> [!IMPORTANT]
+> Make sure your phone and laptop are on the same Wi-Fi network so the app can talk to the server!
+
+---
+
+## 🏗 Architecture Overview
 
 FyndMate uses a **Supabase + Fastify Hybrid** architecture designed for rapid MVP development while maintaining flexibility for future scaling (e.g., migrating to Go).
 

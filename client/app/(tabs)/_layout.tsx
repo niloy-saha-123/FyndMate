@@ -39,13 +39,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="likesPage"
+        name="likes"
         options={{
           title: 'Likes',
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="matches"
         options={{
           title: 'Chat',
         }}

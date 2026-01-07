@@ -1,22 +1,20 @@
-import { Router } from "express";
+import { FastifyInstance } from 'fastify';
 import { signupUser } from "../services/auth.service.js";
 
-const router = Router();
+export default async function authRoutes(app: FastifyInstance) {
+  app.post("/signup", async (request, reply) => {
+    try {
+      const { email, password, name } = request.body as any;
 
-router.post("/signup", async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
+      if (!email || !password || !name) {
+        return reply.status(400).send({ error: "Missing fields" });
+      }
 
-    if (!email || !password || !name) {
-      return res.status(400).json({ error: "Missing fields" });
+      await signupUser({ email, password, name });
+
+      return reply.status(201).send({ success: true });
+    } catch (e: any) {
+      return reply.status(400).send({ error: e.message });
     }
-
-    await signupUser({ email, password, name });
-
-    res.status(201).json({ success: true });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message });
-  }
-});
-
-export default router;
+  });
+}

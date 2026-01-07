@@ -12,6 +12,8 @@ import multipart from '@fastify/multipart';
 import { prisma } from './lib/prisma.js';
 import uploadRoutes from './routes/upload.routes.js';
 import authRoutes from './routes/auth.js';
+import feedRoutes from './routes/feed.routes.js';
+import matchingRoutes from './routes/matching.routes.js';
 
 /**
  * ============================================
@@ -148,11 +150,12 @@ export async function buildApp() {
   await app.register(uploadRoutes, { prefix: '/api/upload' });
 
   // Auth routes (signup, etc.)
-  // Endpoints:
-  //   POST /auth/signup - Create new user account
   await app.register(authRoutes, { prefix: '/auth' });
+
+  // Matching Engine Routes
+  await app.register(feedRoutes, { prefix: '/api/feed' });
+  await app.register(matchingRoutes, { prefix: '/api' });
   // await app.register(userRoutes, { prefix: '/api/users' });
-  // await app.register(matchRoutes, { prefix: '/api/matches' });
   // await app.register(messageRoutes, { prefix: '/api/messages' });
 
   return app;
