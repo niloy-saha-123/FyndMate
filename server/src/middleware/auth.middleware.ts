@@ -10,7 +10,7 @@
  */
 
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { prisma } from '../lib/prisma.js';
 
 // Extend FastifyRequest to include user

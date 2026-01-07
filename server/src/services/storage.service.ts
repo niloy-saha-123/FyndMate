@@ -65,7 +65,7 @@
  * No backend code changes needed - just add URL parameters in frontend!
  */
 
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { withCircuitBreaker } from '../utils/circuit-breaker.js';
 
 const BUCKET_NAME = 'profile-pictures';
