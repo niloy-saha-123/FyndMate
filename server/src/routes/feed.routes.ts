@@ -11,6 +11,7 @@
 import { FastifyInstance } from 'fastify';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { feedService } from '../services/feed.service.js';
+import { feedQuerySchema } from '../schemas/matching.schema.js';
 
 export default async function feedRoutes(app: FastifyInstance) {
     // GET /api/feed
@@ -18,12 +19,22 @@ export default async function feedRoutes(app: FastifyInstance) {
         preHandler: [authMiddleware],
     }, async (request, reply) => {
         const user = request.user!;
-        const { limit, cursor } = request.query as { limit?: string; cursor?: string };
 
-        const parsedLimit = limit ? parseInt(limit, 10) : 20;
+        // Validate query params
+        const parseResult = feedQuerySchema.safeParse(request.query);
+        if (!parseResult.success) {
+            const firstIssue = parseResult.error.issues[0];
+            return reply.status(400).send({
+                error: 'Validation failed',
+                message: firstIssue?.message || 'Invalid query parameters',
+                field: firstIssue?.path.join('.') || 'unknown',
+            });
+        }
+
+        const { limit, cursor } = parseResult.data;
 
         try {
-            const users = await feedService.getFeed(user.id, parsedLimit, cursor);
+            const users = await feedService.getFeed(user.id, limit, cursor);
             return reply.send({ data: users });
         } catch (error) {
             request.log.error(error);

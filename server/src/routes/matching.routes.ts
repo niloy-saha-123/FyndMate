@@ -21,6 +21,13 @@ import { authMiddleware } from '../middleware/auth.middleware.js';
 import { likeService } from '../services/like.service.js';
 import { matchService } from '../services/match.service.js';
 import { blockService } from '../services/block.service.js';
+import {
+    createLikeSchema,
+    acceptLikeSchema,
+    likeIdParamSchema,
+    matchIdParamSchema,
+    blockUserSchema,
+} from '../schemas/matching.schema.js';
 
 export default async function matchingRoutes(app: FastifyInstance) {
     // Shared Auth Middleware
@@ -33,10 +40,19 @@ export default async function matchingRoutes(app: FastifyInstance) {
     // POST /api/likes (Create Like/Pass)
     app.post('/likes', async (request, reply) => {
         const user = request.user!;
-        const { likedId, liked, message } = request.body as { likedId: string; liked: boolean; message?: string };
 
-        if (!likedId) return reply.status(400).send({ error: 'likedId is required' });
-        if (typeof liked !== 'boolean') return reply.status(400).send({ error: 'liked must be boolean' });
+        // Validate request body
+        const parseResult = createLikeSchema.safeParse(request.body);
+        if (!parseResult.success) {
+            const firstIssue = parseResult.error.issues[0];
+            return reply.status(400).send({
+                error: 'Validation failed',
+                message: firstIssue?.message || 'Invalid request',
+                field: firstIssue?.path.join('.') || 'unknown',
+            });
+        }
+
+        const { likedId, liked, message } = parseResult.data;
 
         try {
             const result = await likeService.createLike(user.id, likedId, liked, message);
@@ -65,8 +81,29 @@ export default async function matchingRoutes(app: FastifyInstance) {
     // POST /api/likes/:likeId/accept
     app.post('/likes/:likeId/accept', async (request, reply) => {
         const user = request.user!;
-        const { likeId } = request.params as { likeId: string };
-        const { replyMessage } = request.body as { replyMessage?: string } || {};
+
+        // Validate params
+        const paramsResult = likeIdParamSchema.safeParse(request.params);
+        if (!paramsResult.success) {
+            const firstIssue = paramsResult.error.issues[0];
+            return reply.status(400).send({
+                error: 'Validation failed',
+                message: firstIssue?.message || 'Invalid like ID',
+            });
+        }
+
+        // Validate body
+        const bodyResult = acceptLikeSchema.safeParse(request.body || {});
+        if (!bodyResult.success) {
+            const firstIssue = bodyResult.error.issues[0];
+            return reply.status(400).send({
+                error: 'Validation failed',
+                message: firstIssue?.message || 'Invalid request body',
+            });
+        }
+
+        const { likeId } = paramsResult.data;
+        const { replyMessage } = bodyResult.data;
 
         try {
             // Verify ownership (security check) - The Like must be FOR me
@@ -85,7 +122,18 @@ export default async function matchingRoutes(app: FastifyInstance) {
     // POST /api/likes/:likeId/decline
     app.post('/likes/:likeId/decline', async (request, reply) => {
         const user = request.user!;
-        const { likeId } = request.params as { likeId: string };
+
+        // Validate params
+        const paramsResult = likeIdParamSchema.safeParse(request.params);
+        if (!paramsResult.success) {
+            const firstIssue = paramsResult.error.issues[0];
+            return reply.status(400).send({
+                error: 'Validation failed',
+                message: firstIssue?.message || 'Invalid like ID',
+            });
+        }
+
+        const { likeId } = paramsResult.data;
 
         try {
             const like = await likeService.getLike(likeId);
@@ -119,7 +167,18 @@ export default async function matchingRoutes(app: FastifyInstance) {
     // POST /api/matches/:matchId/unmatch
     app.post('/matches/:matchId/unmatch', async (request, reply) => {
         const user = request.user!;
-        const { matchId } = request.params as { matchId: string };
+
+        // Validate params
+        const paramsResult = matchIdParamSchema.safeParse(request.params);
+        if (!paramsResult.success) {
+            const firstIssue = paramsResult.error.issues[0];
+            return reply.status(400).send({
+                error: 'Validation failed',
+                message: firstIssue?.message || 'Invalid match ID',
+            });
+        }
+
+        const { matchId } = paramsResult.data;
 
         try {
             await matchService.unmatch(matchId, user.id);
@@ -137,9 +196,19 @@ export default async function matchingRoutes(app: FastifyInstance) {
     // POST /api/users/block
     app.post('/users/block', async (request, reply) => {
         const user = request.user!;
-        const { userId: blockedId } = request.body as { userId: string };
 
-        if (!blockedId) return reply.status(400).send({ error: 'userId is required' });
+        // Validate body
+        const parseResult = blockUserSchema.safeParse(request.body);
+        if (!parseResult.success) {
+            const firstIssue = parseResult.error.issues[0];
+            return reply.status(400).send({
+                error: 'Validation failed',
+                message: firstIssue?.message || 'Invalid request',
+                field: firstIssue?.path.join('.') || 'unknown',
+            });
+        }
+
+        const { userId: blockedId } = parseResult.data;
 
         try {
             await blockService.blockUser(user.id, blockedId);
