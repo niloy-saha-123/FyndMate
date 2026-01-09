@@ -62,23 +62,27 @@ export class MatchService {
 
             // 3. Create Initial Messages
             // Message 1: The Liker's Intro (User B)
+            const now = new Date();
             if (introContent) {
                 await tx.message.create({
                     data: {
                         matchId: match.id,
                         senderId: likerId,
                         content: introContent,
+                        createdAt: now,  // Explicit timestamp
                     },
                 });
             }
 
             // Message 2: The Accepter's Reply (User A)
+            // Add 1ms to ensure it's always newer than intro
             if (replyMessage && replyMessage.trim().length > 0) {
                 await tx.message.create({
                     data: {
                         matchId: match.id,
                         senderId: likedId,
                         content: replyMessage,
+                        createdAt: new Date(now.getTime() + 1),  // 1ms later
                     }
                 });
             }
@@ -99,6 +103,11 @@ export class MatchService {
     async unmatch(matchId: string, requestingUserId: string) {
         const match = await prisma.match.findUnique({ where: { id: matchId } });
         if (!match) throw new Error("Match not found.");
+
+        // Prevent unmatching already-unmatched matches
+        if (match.status === 'unmatched') {
+            throw new Error("Match is already unmatched.");
+        }
 
         if (match.user1Id !== requestingUserId && match.user2Id !== requestingUserId) {
             throw new Error("Not authorized.");

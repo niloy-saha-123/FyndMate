@@ -20,10 +20,29 @@ export class FeedService {
      * Aggregates all exclusions to return fresh profiles.
      */
     async getFeed(userId: string, limit = 20, cursor?: string) {
-        // 1. Safeguard: Limit Cap
+        // 1. Validation: ID Format Check
+        // CUID format: starts with 'c', followed by alphanumeric characters
+        // Length can vary, but typically 8+ characters minimum
+        // This catches obviously invalid formats like 'invalid-id-format' with dashes or special chars
+        const cuidRegex = /^c[a-z0-9]{7,}$/i;
+        if (!cuidRegex.test(userId)) {
+            throw new Error("Invalid user ID format.");
+        }
+
+        // 2. Validation: User Existence Check
+        // Return empty array if user doesn't exist (graceful handling)
+        const userExists = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true }
+        });
+        if (!userExists) {
+            return [];
+        }
+
+        // 3. Safeguard: Limit Cap
         const TAKE_LIMIT = Math.min(limit, 50);
 
-        // 2. Fetch Exclusions (The "NOT IN" Strategy)
+        // 4. Fetch Exclusions (The "NOT IN" Strategy)
         // A. My Interactions (I liked/passed them)
         const myInteractions = await prisma.like.findMany({
             where: { likerId: userId },
@@ -57,7 +76,7 @@ export class FeedService {
             select: { blockerId: true, blockedId: true },
         });
 
-        // 3. Flatten IDs
+        // 5. Flatten IDs
         const excludedIds = new Set<string>();
 
         excludedIds.add(userId); // Exclude self

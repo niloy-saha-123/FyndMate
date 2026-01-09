@@ -36,7 +36,12 @@ export class BlockService {
      * Also ensures any existing match/like logic is handled (e.g. unmatch).
      */
     async blockUser(blockerId: string, blockedId: string) {
-        // 1. Validation: Must have Interaction (Match or Like) to block
+        // 1. Validation: Self-Block Prevention
+        if (blockerId === blockedId) {
+            throw new Error("Cannot block yourself.");
+        }
+
+        // 2. Validation: Must have Interaction (Match or Like) to block
         // We strictly disallow generic blocking from Feed to prevent abuse/confusion.
 
         // Check Match
@@ -62,7 +67,7 @@ export class BlockService {
             throw new Error("You can only block users who have liked you or matched with you.");
         }
 
-        // 2. Check if already blocked
+        // 3. Check if already blocked (idempotent early return)
         const existing = await prisma.block.findUnique({
             where: {
                 blockerId_blockedId: { blockerId, blockedId },
@@ -71,40 +76,55 @@ export class BlockService {
 
         if (existing) return existing;
 
-        // 3. Create Block and auto-resolve any conflicts
+        // 4. Create Block and auto-resolve any conflicts
         // We use a transaction to ensure we clean up matches/likes if they exist
-        return await prisma.$transaction(async (tx) => {
-            // Create block
-            const block = await tx.block.create({
-                data: { blockerId, blockedId },
-            });
+        // Wrap in try-catch to handle concurrent block creation gracefully
+        try {
+            return await prisma.$transaction(async (tx) => {
+                // Create block
+                const block = await tx.block.create({
+                    data: { blockerId, blockedId },
+                });
 
-            // Validations: Remove any existing Match
-            await tx.match.deleteMany({
-                where: {
-                    OR: [
-                        { user1Id: blockerId, user2Id: blockedId },
-                        { user1Id: blockedId, user2Id: blockerId },
-                    ],
-                },
-            });
+                // Validations: Remove any existing Match
+                await tx.match.deleteMany({
+                    where: {
+                        OR: [
+                            { user1Id: blockerId, user2Id: blockedId },
+                            { user1Id: blockedId, user2Id: blockerId },
+                        ],
+                    },
+                });
 
-            // Remove any existing active Likes (keep archived for history? or hard delete? 
-            // Plan says: "Blocked after match -> Auto-unmatch".
-            // We also hide them from feed, so deleting/archiving likes is good hygiene.
-            // Let's archive them to be safe.
-            await tx.like.updateMany({
-                where: {
-                    OR: [
-                        { likerId: blockerId, likedId: blockedId },
-                        { likerId: blockedId, likedId: blockerId },
-                    ],
-                },
-                data: { status: 'archived' }, // Soft hide
-            });
+                // Remove any existing active Likes (keep archived for history? or hard delete? 
+                // Plan says: "Blocked after match -> Auto-unmatch".
+                // We also hide them from feed, so deleting/archiving likes is good hygiene.
+                // Let's archive them to be safe.
+                await tx.like.updateMany({
+                    where: {
+                        OR: [
+                            { likerId: blockerId, likedId: blockedId },
+                            { likerId: blockedId, likedId: blockerId },
+                        ],
+                    },
+                    data: { status: 'archived' }, // Soft hide
+                });
 
-            return block;
-        });
+                return block;
+            });
+        } catch (error: any) {
+            // If unique constraint violation due to concurrent block creation, fetch and return existing
+            if (error.code === 'P2002') {
+                const existingBlock = await prisma.block.findUnique({
+                    where: {
+                        blockerId_blockedId: { blockerId, blockedId },
+                    },
+                });
+                if (existingBlock) return existingBlock;
+            }
+            // Re-throw other errors
+            throw error;
+        }
     }
 
     /**

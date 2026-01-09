@@ -71,6 +71,7 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^20.19.27",
+    "cuid": "^3.0.0",
     "dotenv": "^17.2.3",
     "dotenv-cli": "^11.0.0",
     "prisma": "5.22.0",
