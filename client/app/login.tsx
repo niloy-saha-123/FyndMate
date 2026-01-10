@@ -17,6 +17,7 @@ import { useAuth } from "../src/auth/AuthProvider";
 
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import LottieView from "lottie-react-native";
 
 export default function Login() {
   const router = useRouter();
@@ -92,14 +93,12 @@ export default function Login() {
     return (
       <View style={styles.container}>
         <View style={styles.logoContainer}>
-          <View style={styles.logoWrapper}>
-            <LinearGradient
-              colors={["#F97316", "#EC4899", "#8B5CF6"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.logoGradient}
-            />
-          </View>
+          <LottieView
+            source={require("../assets/animation.json")}
+            autoPlay
+            loop
+            style={styles.logoAnimation}
+          />
         </View>
 
         <Text style={styles.title}>Sign up to continue</Text>
@@ -291,15 +290,9 @@ const styles = StyleSheet.create({
     marginTop: 80,
     marginBottom: 40,
   },
-  logoWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    overflow: "hidden",
-  },
-  logoGradient: {
-    width: "100%",
-    height: "100%",
+  logoAnimation: {
+    width: 220,
+    height: 220,
   },
   title: {
     fontSize: 24,
