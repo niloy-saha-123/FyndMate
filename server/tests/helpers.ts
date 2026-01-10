@@ -42,6 +42,26 @@ export async function createDummyUser(name: string, overrides: any = {}) {
  * Deletion order respects Foreign Key constraints.
  */
 export async function clearDatabase() {
+    // SAFETY: Prevent production database wipe
+    const dbUrl = process.env.DATABASE_URL || '';
+    const supabaseUrl = process.env.SUPABASE_URL || '';
+
+    if (!dbUrl.includes('127.0.0.1') && !dbUrl.includes('localhost')) {
+        throw new Error(
+            '🚨 SECURITY: clearDatabase() blocked - DATABASE_URL points to non-local database!\n' +
+            `DATABASE_URL: ${dbUrl.substring(0, 50)}...\n` +
+            'Tests must only run against local Docker (127.0.0.1 or localhost).'
+        );
+    }
+
+    if (!supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('localhost')) {
+        throw new Error(
+            '🚨 SECURITY: clearDatabase() blocked - SUPABASE_URL points to non-local instance!\n' +
+            `SUPABASE_URL: ${supabaseUrl}\n` +
+            'Tests must only run against local Docker (127.0.0.1 or localhost).'
+        );
+    }
+
     // Order matters due to foreign keys
     await prisma.message.deleteMany();
     await prisma.match.deleteMany();
