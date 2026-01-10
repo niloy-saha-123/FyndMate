@@ -1,1 +1,49 @@
-.env.test
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.cache/
+
+# Environment files
+.env*
+!.env.example
+!.env.vault
+
+# Dotenv Vault (CRITICAL - personal decryption key, never commit)
+.env.me
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Prisma
+migrations/*.sql
+!migrations/migration_lock.toml
+
+# Temporary files
+*.tmp
+.temp/
+.flaskenv*
+!.env.project
