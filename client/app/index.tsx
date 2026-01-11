@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,10 @@ import {
   FlatList,
   Animated,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Redirect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { useAuth } from "../src/auth/AuthProvider";
+import { LoadingGate } from "../src/components/LoadingGate";
 
 const { width, height } = Dimensions.get("window");
 
@@ -36,9 +38,25 @@ const onboardingData: OnboardingSlide[] = [
 
 export default function Welcome() {
   const router = useRouter();
+  const { user, loading, profile, profileLoading } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
+
+  if (loading || profileLoading) {
+    return <LoadingGate message="Checking your account" />;
+  }
+
+  if (user && profile) {
+    const destination = profile.onboardingCompleted
+      ? "/(tabs)"
+      : !profile.fullName
+      ? "/onboarding/name"
+      : !profile.birthDate
+      ? "/onboarding/birthdate"
+      : "/onboarding/gender";
+    return <Redirect href={destination} />;
+  }
 
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],

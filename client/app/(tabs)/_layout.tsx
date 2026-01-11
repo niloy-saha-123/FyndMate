@@ -7,6 +7,7 @@ import {
 import { StyleSheet } from 'react-native';
 import {TabBar} from "../../src/components/TabBar"
 import { useAuth } from '../../src/auth/AuthProvider';
+import { LoadingGate } from "../../src/components/LoadingGate";
 
 configureReanimatedLogger({
   level: ReanimatedLogLevel.warn, 
@@ -15,10 +16,19 @@ configureReanimatedLogger({
 
 export default function TabLayout() {
 
-  const { user, loading } = useAuth();
-  if (loading) return null;
+  const { user, loading, profile, profileLoading } = useAuth();
+  if (loading || profileLoading) return <LoadingGate message="Loading your profile" />;
 
   if (!user) return <Redirect href="/login" />;
+
+  if (profile && !profile.onboardingCompleted) {
+    const destination = !profile.fullName
+      ? "/onboarding/name"
+      : !profile.birthDate
+      ? "/onboarding/birthdate"
+      : "/onboarding/gender";
+    return <Redirect href={destination} />;
+  }
   
   return (
     <Tabs

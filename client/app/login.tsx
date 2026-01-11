@@ -14,6 +14,7 @@ import { signIn, signUp } from "../src/auth/emailAuth";
 import { signInWithGoogle } from "../src/auth/googleOAuth";
 import { Redirect, router } from "expo-router";
 import { useAuth } from "../src/auth/AuthProvider";
+import { LoadingGate } from "../src/components/LoadingGate";
 
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,12 +32,21 @@ export default function Login() {
     password?: string;
     name?: string;
   }>({});
-  const { user, loading } = useAuth();
+  const { user, loading, profile, profileLoading } = useAuth();
 
-  if (loading) return null;
+  if (loading || profileLoading) {
+    return <LoadingGate message="Checking your session" />;
+  }
 
-  if (user) {
-    return <Redirect href="/(tabs)" />;
+  if (user && profile) {
+    const destination = profile.onboardingCompleted
+      ? "/(tabs)"
+      : !profile.fullName
+      ? "/onboarding/name"
+      : !profile.birthDate
+      ? "/onboarding/birthdate"
+      : "/onboarding/gender";
+    return <Redirect href={destination} />;
   }
   
   const isValidEmail = (value: string) =>
@@ -79,8 +89,7 @@ export default function Login() {
         return;
       }
       console.log("Signed in user:", user);
-
-      // router.replace("/(tabs)");
+      router.replace("/app-gate");
     }
     } 
     catch (e: any) {
