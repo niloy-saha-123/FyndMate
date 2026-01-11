@@ -2,6 +2,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { supabase } from "./supabaseClient";
 import { makeRedirectUri } from "expo-auth-session";
+import { router } from "expo-router";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -76,6 +77,7 @@ export async function signInWithGoogle() {
           }
 
           console.log("Session set successfully!");
+          router.replace("/app-gate");
         } else {
           throw new Error("No tokens received from OAuth");
         }
