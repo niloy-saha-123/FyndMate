@@ -9,8 +9,10 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
 import { prisma } from './lib/prisma.js';
 import uploadRoutes from './routes/upload.routes.js';
+import { locationRoutes } from './routes/location.js';
 import authRoutes from './routes/auth.js';
 import feedRoutes from './routes/feed.routes.js';
 import matchingRoutes from './routes/matching.routes.js';
@@ -92,7 +94,7 @@ export async function buildApp() {
    * - origin: true → Allows requests from ANY domain
    * - Good for development (works with localhost, Expo dev server, etc.)
    * 
-   * ⚠️ TODO: PRODUCTION SETUP (When you deploy with a domain)
+   * ⚠️ TODO: PRODUCTION SETUP (When we deploy with a domain)
    * 
    * Step 1: Add to .env file:
    *   ALLOWED_ORIGINS=https://fyndmate.com,https://www.fyndmate.com,https://app.fyndmate.com
@@ -118,6 +120,51 @@ export async function buildApp() {
 
   // Multipart - File uploads
   await app.register(multipart);
+
+  /**
+   * Rate Limiting
+   * 
+   * CURRENT: In-memory store (good for single server)
+   * Limits: 100 requests per 15 minutes per IP
+   * 
+   * ⚠️ TODO: USE REDIS FOR PRODUCTION (Multiple Servers)
+   * 
+   * PROBLEM: In-memory rate limiting breaks with load balancers.
+   * If you have 2+ servers, each tracks limits separately, so a user
+   * could make 100 requests to Server A and 100 to Server B = 200 total.
+   * 
+   * SOLUTION: Use Redis as shared rate limit store
+   * 
+   * Example Redis rate limiting:
+   * ```typescript
+   * import Redis from 'ioredis';
+   * 
+   * const redis = new Redis({
+   *   host: process.env.REDIS_HOST || 'localhost',
+   *   port: parseInt(process.env.REDIS_PORT || '6379'),
+   *   password: process.env.REDIS_PASSWORD
+   * });
+   * 
+   * await app.register(rateLimit, {
+   *   global: true,
+   *   max: 100,
+   *   timeWindow: '15 minutes',
+   *   redis: redis, // ← Shared store across all servers
+   *   nameSpace: 'fyndmate-rl:',
+   *   continueExceeding: true,
+   *   skipOnError: false
+   * });
+   * ```
+   * 
+   * Cost: Same Redis instance as nonce storage ($5/month)
+   * Timeline: Implement before deploying multiple server instances
+   */
+  await app.register(rateLimit, {
+    global: true,
+    max: 100, // 100 requests
+    timeWindow: '15 minutes', // per 15 minutes
+    // Per-IP tracking (prevents single user from spamming)
+  });
 
   // ============================================
   // AUTH NOTE
@@ -155,6 +202,8 @@ export async function buildApp() {
   // Matching Engine Routes
   await app.register(feedRoutes, { prefix: '/api/feed' });
   await app.register(matchingRoutes, { prefix: '/api' });
+  // Register location update endpoint
+  await app.register(locationRoutes, { prefix: '/api' });
   // await app.register(userRoutes, { prefix: '/api/users' });
   // await app.register(messageRoutes, { prefix: '/api/messages' });
 

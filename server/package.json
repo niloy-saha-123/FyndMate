@@ -56,11 +56,13 @@
   "dependencies": {
     "@fastify/cors": "^8.4.0",
     "@fastify/multipart": "^8.0.0",
+    "@fastify/rate-limit": "^10.3.0",
     "@fastify/websocket": "^8.3.0",
     "@octokit/graphql": "^7.0.1",
     "@prisma/adapter-pg": "^5.22.0",
     "@prisma/client": "5.22.0",
     "@supabase/supabase-js": "^2.89.0",
+    "axios": "^1.13.2",
     "express": "^5.2.1",
     "fastify": "^4.24.3",
     "pg": "^8.13.0",

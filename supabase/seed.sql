@@ -1,11 +1,11 @@
 -- ============================================
 -- STORAGE BUCKET SETUP
 -- ============================================
--- This file runs automatically when you start local Supabase:
+-- This file runs automatically when we start local Supabase:
 --   npx supabase start
 --
 -- It creates the storage bucket needed for profile picture uploads.
--- The bucket will be created every time you reset/restart Supabase.
+-- The bucket will be created every time we reset/restart Supabase.
 -- ============================================
 
 -- Create profile-pictures storage bucket
