@@ -40,13 +40,23 @@ export class LikeService {
             }
         }
 
-        // 3. Validation: Block Check
+        // 3. Validation: User Existence Check
+        // Verify the target user exists before attempting to create a like
+        const targetUser = await prisma.user.findUnique({
+            where: { id: likedId },
+            select: { id: true }
+        });
+        if (!targetUser) {
+            throw new Error("User not found or does not exist.");
+        }
+
+        // 4. Validation: Block Check
         const isBlocked = await blockService.hasBlock(likerId, likedId);
         if (isBlocked) {
             throw new Error("Cannot interact with this user.");
         }
 
-        // 4. Validation: Check for existing interactions to prevent unique constraint errors
+        // 5. Validation: Check for existing interactions to prevent unique constraint errors
         // If we already passed/liked them, we check specifically.
         // However, Plan Edge Case #54 says "Retry a like (not pass) -> Only allow retry on liked=false".
         // For now, let's just use upsert or check-then-create.
@@ -58,10 +68,6 @@ export class LikeService {
                 likerId_likedId: { likerId, likedId },
             },
         });
-
-        if (existing) {
-            // ... existing checks ...
-        }
 
         // HINGE-STYLE "INSTANT MATCH" CHECK
         // If we are LIKING them (liked: true), check if they ALREADY liked us.
@@ -90,13 +96,17 @@ export class LikeService {
                     data: { liked: true, message, status: 'active', createdAt: new Date() },
                 });
             }
-            // Otherwise, idempotent return or error
-            if (existing.liked === liked) return existing;
 
+            // Reject duplicate likes - if trying to like again when already liked
+            if (existing.liked && liked) {
+                throw new Error("You have already liked this user.");
+            }
+
+            // For other cases (like -> pass, pass -> pass), throw generic error
             throw new Error("Interaction already exists.");
         }
 
-        // 5. Check if they are already matched?
+        // 6. Check if they are already matched?
         // If they are matched, we shouldn't be creating a like.
         const matchExists = await prisma.match.findFirst({
             where: {
@@ -112,7 +122,7 @@ export class LikeService {
             throw new Error("You are already matched with this user.");
         }
 
-        // 6. Create the Like/Pass
+        // 7. Create the Like/Pass
         return await prisma.like.create({
             data: {
                 likerId,
