@@ -17,6 +17,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { reverseGeocode } from '../services/geocoding.service.js';
 import { verifySignature, isNonceUsed, markNonceUsed } from '../utils/locationSecurity.js';
+import { auditLog, AuditAction } from '../services/auditLog.service.js';
 
 /**
  * PATCH /users/me/location
@@ -116,6 +117,20 @@ export async function updateLocationHandler(req: FastifyRequest, reply: FastifyR
             lastLocationAt: new Date(timestamp),
             ...(locationSharing ? { locationSharing } : {}),
         },
+    });
+
+    // ---- Audit log (security tracking) ----
+    await auditLog({
+        userId,
+        action: AuditAction.LOCATION_UPDATE,
+        metadata: {
+            city,
+            country,
+            locationSharing: locationSharing || 'unchanged',
+            source: 'gps',
+        },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
     });
 
     return reply.send({ success: true, city, country, locationSharing });

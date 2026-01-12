@@ -10,6 +10,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
+import { sanitizeLocationResponse } from './middleware/sanitizeLocation.js';
 import { prisma } from './lib/prisma.js';
 import uploadRoutes from './routes/upload.routes.js';
 import { locationRoutes } from './routes/location.js';
@@ -29,7 +30,7 @@ import matchingRoutes from './routes/matching.routes.js';
  *   npm install @sentry/node @sentry/profiling-node
  * 
  * Step 2: Add to .env:
- *   SENTRY_DSN=https://your-key@sentry.io/your-project-id
+ *   SENTRY_DSN=https://our-key@sentry.io/our-project-id
  *   NODE_ENV=production
  * 
  * Step 3: Initialize Sentry (add BEFORE buildApp):
@@ -60,7 +61,7 @@ import matchingRoutes from './routes/matching.routes.js';
  *     reply.status(500).send({ error: 'Internal server error' });
  *   });
  * 
- * What you get:
+ * What we get:
  * - Email/Slack alerts when errors occur
  * - Stack traces with exact line numbers
  * - User context (who hit the error)
@@ -104,12 +105,12 @@ export async function buildApp() {
    *   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
    *   
    *   origin: process.env.NODE_ENV === 'production' 
-   *     ? allowedOrigins  // Production: whitelist only your domains
+   *     ? allowedOrigins  // Production: whitelist only our domains
    *     : true,           // Development: allow all (for testing)
    * 
    * Why this matters:
-   * - Without whitelist: evil-site.com can make requests to your API
-   * - With whitelist: Only YOUR domains can make requests
+   * - Without whitelist: evil-site.com can make requests to our API
+   * - With whitelist: Only our domains can make requests
    * 
    * Security: Prevents CSRF attacks where malicious sites try to use
    * the user's logged-in session to upload malware or steal data.
@@ -130,7 +131,7 @@ export async function buildApp() {
    * ⚠️ TODO: USE REDIS FOR PRODUCTION (Multiple Servers)
    * 
    * PROBLEM: In-memory rate limiting breaks with load balancers.
-   * If you have 2+ servers, each tracks limits separately, so a user
+   * If we have 2+ servers, each tracks limits separately, so a user
    * could make 100 requests to Server A and 100 to Server B = 200 total.
    * 
    * SOLUTION: Use Redis as shared rate limit store
@@ -165,6 +166,21 @@ export async function buildApp() {
     timeWindow: '15 minutes', // per 15 minutes
     // Per-IP tracking (prevents single user from spamming)
   });
+
+  /**
+   * Response Sanitization (Security)
+   * 
+   * CRITICAL: This middleware strips sensitive location fields from ALL responses.
+   * Even if a developer accidentally selects latitude/longitude, this will remove it.
+   * 
+   * Protected fields:
+   * - latitude (never exposed to clients)
+   * - longitude (never exposed to clients)
+   * - locationSecret (HMAC secret, never exposed)
+   * 
+   * This runs on EVERY response, adding ~1-2ms overhead.
+   */
+  app.addHook('onSend', sanitizeLocationResponse);
 
   // ============================================
   // AUTH NOTE
