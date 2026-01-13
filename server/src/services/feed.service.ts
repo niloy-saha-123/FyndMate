@@ -13,6 +13,7 @@
  * Used by: feed.routes.ts
  */
 import { prisma } from '../lib/prisma.js';
+import { filterLocationArrayByPrivacy } from '../utils/locationPrivacy.js';
 
 export class FeedService {
     /**
@@ -114,8 +115,11 @@ export class FeedService {
                 experience: true,
                 skills: true,
                 interests: true,
-                location: true,
-                // Don't leak private data
+                // Location fields (will be filtered based on locationSharing)
+                city: true,
+                country: true,
+                locationSharing: true,
+                // Don't leak private data (never expose lat/lon)
             },
             orderBy: {
                 // Randomize? Prisma doesn't support RAND() easily.
@@ -125,7 +129,8 @@ export class FeedService {
             },
         });
 
-        return users;
+        // Apply location privacy filter before returning
+        return filterLocationArrayByPrivacy(users);
     }
 }
 
