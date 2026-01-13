@@ -31,12 +31,21 @@ export async function locationRoutes(app: FastifyInstance) {
                 type: 'object',
                 required: ['latitude', 'longitude', 'timestamp', 'nonce', 'signature'],
                 properties: {
-                    latitude: { type: 'number' },
-                    longitude: { type: 'number' },
+                    latitude: {
+                        type: 'number',
+                        minimum: -90,
+                        maximum: 90
+                    },
+                    longitude: {
+                        type: 'number',
+                        minimum: -180,
+                        maximum: 180
+                    },
                     timestamp: { type: 'string', format: 'date-time' },
-                    nonce: { type: 'string' },
-                    signature: { type: 'string' },
-                    locationSharing: { type: 'string', enum: ['always', 'whileOpen', 'never'] }
+                    nonce: { type: 'string', minLength: 1 },
+                    signature: { type: 'string', minLength: 1 },
+                    locationSharing: { type: 'string', enum: ['on', 'off'] },
+                    locationPermission: { type: 'string', enum: ['always', 'whileUsing', 'denied'] }
                 }
             }
         }

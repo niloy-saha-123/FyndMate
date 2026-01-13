@@ -44,6 +44,7 @@ export async function updateLocationHandler(req: FastifyRequest, reply: FastifyR
         nonce,
         signature,
         locationSharing,
+        locationPermission,
     } = req.body as any;
 
     // ---- Basic sanity checks ----
@@ -59,11 +60,17 @@ export async function updateLocationHandler(req: FastifyRequest, reply: FastifyR
         return reply.status(400).send({ error: 'longitude must be between -180 and 180' });
     }
 
-    // ---- Verify timestamp (must be within 5 minutes) ----
+    // ---- Verify timestamp (allow 15 minutes for clock skew) ----
+    // Mobile devices may have clock drift or network delays
+    // 15 minutes is industry standard (AWS, OAuth 2.0)
+    const TIMESTAMP_WINDOW_MS = 15 * 60 * 1000;  // 15 minutes
     const now = Date.now();
     const payloadTime = new Date(timestamp).getTime();
-    if (Math.abs(now - payloadTime) > 5 * 60 * 1000) {
-        return reply.status(400).send({ error: 'timestamp out of range' });
+
+    if (Number.isNaN(payloadTime) || Math.abs(now - payloadTime) > TIMESTAMP_WINDOW_MS) {
+        return reply.status(400).send({
+            error: 'Timestamp out of range. Please check your device time.'
+        });
     }
 
     // ---- Verify nonce uniqueness ----
@@ -74,19 +81,23 @@ export async function updateLocationHandler(req: FastifyRequest, reply: FastifyR
     // ---- SERVER-SIDE GEOCODING (Security Fix) ----
     // Moved from client to prevent:
     // - Fake city/country submissions
-    // - Client-side rate limit exhaustion
-    // - API key exposure
-    let city = '';
-    let country = '';
+    // ---- Reverse geocode (server-side) ----
+    // Convert lat/lon to city/country using OpenStreetMap Nominatim
+    // This prevents clients from faking city names
+    const { city, country, success, error: geocodingError } = await reverseGeocode(latitude, longitude);
 
-    try {
-        const geocoded = await reverseGeocode(latitude, longitude);
-        city = geocoded.city;
-        country = geocoded.country;
-    } catch (error) {
-        req.log.error(error, 'Geocoding failed');
-        // Continue with empty city/country (graceful degradation)
-        // Location update still succeeds, just without readable address
+    // Monitor geocoding failures for alerting
+    if (!success) {
+        req.log.warn({
+            userId,
+            latitude,
+            longitude,
+            error: geocodingError
+        }, 'Geocoding API failed - location will be saved without city/country');
+
+        // TODO: Add metrics for monitoring
+        // If failure rate > 50%, consider switching to Mapbox
+        // Example: metrics.increment('geocoding.failures');
     }
 
     // ---- Verify signature (HMAC with per‑user secret) ----
@@ -116,6 +127,7 @@ export async function updateLocationHandler(req: FastifyRequest, reply: FastifyR
             longitude,
             lastLocationAt: new Date(timestamp),
             ...(locationSharing ? { locationSharing } : {}),
+            ...(locationPermission ? { locationPermission } : {}),
         },
     });
 

@@ -12,16 +12,57 @@
 
 import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
+import * as Crypto from 'expo-crypto';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// TODO: Import your API client
+// TODO: Import the API client
 // import { api } from '@/src/services/api';
 
-// TODO: Import your auth context to get current user ID
-// import { useAuth } from '@/src/contexts/AuthContext';
+// ─────────────────────────────────────────────────────────────────────
+// LOCATION SHARING OPTIONS (for UI Developer)
+// ─────────────────────────────────────────────────────────────────────
+// 
+// SIMPLIFIED UX: Just an ON/OFF toggle
+// 
+// What user sees in Settings:
+// ┌────────────────────────────────────────┐
+// │ Location                                │
+// │ ────────────────────────────────────    │
+// │ Share your location                     │
+// │                                         │
+// │ ○ OFF                                   │
+// │ ● ON                                    │
+// │                                         │
+// │ Permission: While Using App ✓           │
+// │ Current Location: San Francisco, USA    │
+// │ Last updated: 2 hours ago              │
+// │                                         │
+// │ [Update Location Now]                  │
+// └────────────────────────────────────────┘
+// 
+// How it works:
+// 1. First time: OS asks "Allow location?"
+//    - User chooses: "Always" or "While Using App" or "Don't Allow"
+//    - We detect and save what they chose
+// 
+// 2. In app: Simple ON/OFF toggle
+//    - ON: Use whatever permission OS granted (Always or While Using)
+//    - OFF: Stop updating location (doesn't revoke OS permission)
+// 
+// 3. Background updates:
+//    - If OS permission = "Always" → Register background task
+//    - If OS permission = "While Using" → Only update when app open
+//    - If OS permission = "Denied" → Show error message
+// 
+// To change "Always" ↔ "While Using":
+// User must go to: iPhone Settings → FyndMate → Location
+// 
+// See: LocationSettingsScreen.tsx for the UI implementation
+// ─────────────────────────────────────────────────────────────────────
 
-type LocationSharing = 'never' | 'whileOpen' | 'always';
+type LocationSharing = 'on' | 'off';  // Simple toggle
+type LocationPermission = 'always' | 'whileUsing' | 'denied';  // What OS granted
 
 interface LastLocation {
     latitude: number;
@@ -29,8 +70,9 @@ interface LastLocation {
     timestamp: number;
 }
 
-export const useLocation = () => {
-    const [preference, setPreference] = useState<LocationSharing>('whileOpen');
+export function useLocation() {
+    const [preference, setPreference] = useState<LocationSharing>('off');
+    const [permission, setPermission] = useState<LocationPermission | null>(null);
     const [loading, setLoading] = useState(false);
     const [currentLocation, setCurrentLocation] = useState<string | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -39,27 +81,24 @@ export const useLocation = () => {
     // const { user } = useAuth();
 
     // ─────────────────────────────────────────────────────────────────────
-    // Load preference from local storage on mount
+    // Load preference and permission from storage on mount
     // ─────────────────────────────────────────────────────────────────────
     useEffect(() => {
-        loadPreference();
+        Promise.all([
+            AsyncStorage.getItem('locationSharing'),
+            AsyncStorage.getItem('locationPermission')
+        ]).then(([sharing, perm]) => {
+            if (sharing) setPreference(sharing as LocationSharing);
+            if (perm) setPermission(perm as LocationPermission);
+        });
     }, []);
-
-    async function loadPreference() {
-        try {
-            const saved = await AsyncStorage.getItem('locationSharing');
-            if (saved) {
-                setPreference(saved as LocationSharing);
-            }
-        } catch (error) {
-            console.error('Failed to load location preference:', error);
-        }
-    }
 
     // ─────────────────────────────────────────────────────────────────────
     // Check if we should update location (debouncing logic)
     // ─────────────────────────────────────────────────────────────────────
-    async function shouldUpdateLocation(): Promise<boolean> {
+    async function shouldUpdateLocation(
+        currentPosition: Location.LocationObject  // Accept position 
+    ): Promise<boolean> {
         try {
             const lastLocationStr = await AsyncStorage.getItem('lastLocation');
             if (!lastLocationStr) return true; // First time, always update
@@ -81,14 +120,12 @@ export const useLocation = () => {
             }
 
             // RULE 3: Update if user moved > 50km
-            const currentPos = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-            });
+            // Use the position we already have (no second GPS call!)
             const distance = calculateDistance(
                 lastLocation.latitude,
                 lastLocation.longitude,
-                currentPos.coords.latitude,
-                currentPos.coords.longitude
+                currentPosition.coords.latitude,
+                currentPosition.coords.longitude
             );
 
             if (distance > 50) {
@@ -160,7 +197,7 @@ export const useLocation = () => {
         timestamp: string;
         nonce: string;
     }): Promise<string> {
-        // TODO: Implement HMAC-SHA256 signature generation
+        // TODO: Implement HMAC-SHA256 signature generation for @mohdfaraz
         // 
         // 1. Get the per-install secret from secure storage:
         //    const secret = await SecureStore.getItemAsync('locationSecret');
@@ -186,18 +223,11 @@ export const useLocation = () => {
     // Update location now (main function)
     // ─────────────────────────────────────────────────────────────────────
     async function updateLocationNow() {
-        if (preference === 'never') {
+        if (preference === 'off') {
             Alert.alert(
                 'Location Disabled',
                 'Enable location sharing in Settings to update your location.'
             );
-            return;
-        }
-
-        // Check if we should update (debouncing)
-        const shouldUpdate = await shouldUpdateLocation();
-        if (!shouldUpdate) {
-            console.log('Location update skipped (debounced)');
             return;
         }
 
@@ -210,38 +240,59 @@ export const useLocation = () => {
                 return;
             }
 
-            // 2. Get GPS coordinates
+            // 2. Get GPS coordinates ONCE (battery optimization)
             const location = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced,
             });
 
+            // 3. Check if we should update (using the position we just got)
+            const shouldUpdate = await shouldUpdateLocation(location);
+            if (!shouldUpdate) {
+                console.log('Location update skipped (debounced)');
+                setLoading(false);
+                return;
+            }
+
             const { latitude, longitude } = location.coords;
 
-            // 3. Build signed payload
-            // TODO: Get current user ID from auth context
-            const userId = 'REPLACE_WITH_ACTUAL_USER_ID'; // user.id
-            const timestamp = new Date().toISOString();
-            const nonce = crypto.randomUUID();
-            const signature = await generateSignature({
-                userId,
-                latitude,
-                longitude,
-                timestamp,
-                nonce,
-            });
+            // 4. Detect OS permission level
+            const backgroundPerm = await Location.getBackgroundPermissionsAsync();
+            const osPermission: LocationPermission = backgroundPerm.granted
+                ? 'always'
+                : 'whileUsing';
 
-            // 4. Send to server
-            // TODO: Replace with your actual API client
+            // Save permission locally
+            await AsyncStorage.setItem('locationPermission', osPermission);
+            setPermission(osPermission);
+
+            // 5. Build signed payload
+            // TODO: Uncomment this when implementing API integration
+            // Get current user ID from auth context:
+            // const { user } = useAuth();
+            // const userId = user.id;
+            // const timestamp = new Date().toISOString();
+            // const nonce = Crypto.randomUUID();
+            // const signature = await generateSignature({
+            //     userId,
+            //     latitude,
+            //     longitude,
+            //     timestamp,
+            //     nonce,
+            // });
+
+            // 6. Send to server
+            // TODO: Replace with the actual API client and uncomment
             // await api.patch('/users/me/location', {
             //     latitude,
             //     longitude,
             //     timestamp,
             //     nonce,
             //     signature,
-            //     locationSharing: preference,
+            //     locationSharing: preference,  // 'on' or 'off'
+            //     locationPermission: osPermission,  // 'always' or 'whileUsing'
             // });
 
-            // 5. Save last location locally (for debouncing)
+            // 7. Save last location locally (for debouncing)
             await AsyncStorage.setItem(
                 'lastLocation',
                 JSON.stringify({
@@ -251,7 +302,7 @@ export const useLocation = () => {
                 })
             );
 
-            // 6. Update UI state
+            // 8. Update UI state
             // TODO: The server returns { city, country } - update local state
             // setCurrentLocation(`${response.city}, ${response.country}`);
             setLastUpdated(new Date());
@@ -269,51 +320,63 @@ export const useLocation = () => {
     // Change location sharing preference
     // ─────────────────────────────────────────────────────────────────────
     async function changePreference(newPref: LocationSharing) {
-        try {
-            // 1. Save locally
-            await AsyncStorage.setItem('locationSharing', newPref);
-            setPreference(newPref);
+        // 1. Save to local storage
+        await AsyncStorage.setItem('locationSharing', newPref);
+        setPreference(newPref);
 
-            // 2. Send to server (just the preference, no location data)
-            // TODO: Replace with your actual API client
-            // await api.patch('/users/me/location', {
-            //     locationSharing: newPref,
+        // 2. If user just enabled location, update immediately
+        if (newPref === 'on') {
+            // This will detect OS permission and update location
+            await updateLocationNow();
+        } else {
+            // User disabled location - clear current location display
+            setCurrentLocation(null);
+            setLastUpdated(null);
+
+            // Send to server (just the preference, no location data)
+            // TODO: Replace with the actual API client
+            // await api.patch('/users/me/location-settings', {
+            //     locationSharing: 'off',
             // });
-
-            // 3. If user just enabled location (from "never" to something else)
-            if (newPref !== 'never') {
-                // Immediately update location
-                await updateLocationNow();
-            }
-
-            // 4. TODO: If user chose "always", register background task
-            // if (newPref === 'always') {
-            //     await registerBackgroundLocationTask();
-            // } else {
-            //     await unregisterBackgroundLocationTask();
-            // }
-        } catch (error) {
-            console.error('Error changing preference:', error);
-            Alert.alert('Error', 'Failed to update preference');
         }
+        // 4. TODO: If user chose "always", register background task
+        // if (newPref === 'always') {
+        //     await registerBackgroundLocationTask();
+        // } else {
+        //     await unregisterBackgroundLocationTask();
+        // }
     }
 
     // ─────────────────────────────────────────────────────────────────────
-    // Auto-update on app launch (if preference allows)
+    // Auto-update location on app launch (one-time check)
     // ─────────────────────────────────────────────────────────────────────
+    // 
+    // This effect runs ONLY ONCE when the app opens (empty dependency array).
+    // 
+    // Why not re-run when preference changes?
+    // - The changePreference() function already handles location updates
+    // - Re-running on every preference change would waste battery
+    // - Users toggling settings shouldn't trigger GPS calls
+    // 
+    // When does location update?
+    // 1. On app launch (this effect) - if preference allows
+    // 2. When user changes preference to "whileOpen" or "always" (changePreference)
+    // 3. When user manually taps "Update Location Now" button (updateLocationNow)
+    // 
     useEffect(() => {
-        if (preference !== 'never') {
+        if (preference === 'on') {
             // Auto-update on app launch (respects debouncing)
             updateLocationNow();
         }
-    }, []); // Run once on mount
+    }, []); // Run once on mount (preference changes handled in changePreference)
 
     return {
         preference,
-        changePreference,
-        updateLocationNow,
+        permission,
         loading,
         currentLocation,
         lastUpdated,
+        updateLocationNow,
+        changePreference,
     };
 };

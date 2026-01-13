@@ -25,11 +25,12 @@ model User {
   // New location fields
   city             String?        // e.g. "San Francisco"
   country          String?        // e.g. "USA"
-  latitude         Float?         // optional, kept for internal verification
-  longitude        Float?         // optional, kept for internal verification
-  locationSharing  String         @default("whileOpen") // "always" | "whileOpen" | "never"
+  latitude         Float?         // Location & Privacy
+  longitude        Float?
+  locationSharing  String         @default("off")  // "on" | "off" - User's choice in app
+  locationPermission String?      // "always" | "whileUsing" | "denied" - What OS granted
   lastLocationAt   DateTime?      // timestamp of last successful location update
-  locationSecret   String?        @default(cuid()) // Random secret for HMAC signature verification
+  locationSecret   String?        @default(cuid()) // Per-user HMAC secret
   timezone         String
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt

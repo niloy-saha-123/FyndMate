@@ -41,13 +41,25 @@ export class LikeService {
         }
 
         // 3. Validation: User Existence Check
-        // Verify the target user exists before attempting to create a like
+        // Verify the target user exists        // 3. Validation: Target User Exists
         const targetUser = await prisma.user.findUnique({
             where: { id: likedId },
             select: { id: true }
         });
         if (!targetUser) {
-            throw new Error("User not found or does not exist.");
+            // Log internally for debugging (helps detect abuse)
+            console.warn('Like attempt on non-existent user', {
+                likerId,
+                likedId,
+                timestamp: new Date().toISOString()
+            });
+
+            // Return generic error to prevent user enumeration
+            // Attacker cannot distinguish between:
+            // - User doesn't exist
+            // - User is blocked
+            // - Other validation failures
+            throw new Error("Cannot interact with this user.");
         }
 
         // 4. Validation: Block Check

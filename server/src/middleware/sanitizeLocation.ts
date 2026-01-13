@@ -58,7 +58,7 @@ function sanitizeObject(obj: any): any {
 /**
  * Fastify hook to sanitize response payloads.
  * 
- * This runs AFTER your route handler but BEFORE sending the response to the client.
+ * This runs AFTER our route handler but BEFORE sending the response to the client.
  * It strips out any sensitive location fields from the response.
  * 
  * Usage:
@@ -76,12 +76,33 @@ export async function sanitizeLocationResponse(
     const contentType = reply.getHeader('content-type');
     if (typeof contentType === 'string' && contentType.includes('application/json')) {
         try {
-            const data = JSON.parse(payload);
+            let data: any;
+
+            // Handle different payload types (Fastify can send string, Buffer, or object)
+            if (typeof payload === 'string') {
+                // Already stringified JSON
+                data = JSON.parse(payload);
+            } else if (Buffer.isBuffer(payload)) {
+                // Buffer (convert to string first)
+                data = JSON.parse(payload.toString('utf-8'));
+            } else if (typeof payload === 'object' && payload !== null) {
+                // Plain object (not yet serialized)
+                data = payload;
+            } else {
+                // Unknown type, return as-is
+                return payload;
+            }
+
+            // Sanitize the data
             const sanitized = sanitizeObject(data);
-            return JSON.stringify(sanitized);
+
+            // Return in the same format as input
+            return typeof payload === 'string' || Buffer.isBuffer(payload)
+                ? JSON.stringify(sanitized)  // Return as string if input was string/Buffer
+                : sanitized;                  // Return as object if input was object
         } catch (error) {
-            // If parsing fails, return original payload
-            request.log.error(error, 'Failed to sanitize location response');
+            // If anything fails, return original payload
+            request.log.warn({ error, payloadType: typeof payload }, 'Failed to sanitize location response');
             return payload;
         }
     }
@@ -91,7 +112,7 @@ export async function sanitizeLocationResponse(
 
 /**
  * Helper function to manually sanitize a user object.
- * Use this when you want to explicitly sanitize before sending.
+ * Use this when we want to explicitly sanitize before sending.
  * 
  * @param user - User object to sanitize
  * @returns Sanitized user object

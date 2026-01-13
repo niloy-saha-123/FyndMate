@@ -85,11 +85,21 @@ export async function markNonceUsed(nonce: string): Promise<void> {
 async function getUserSecret(userId: string): Promise<Buffer> {
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { locationSecret: true }
+        select: { locationSecret: true },
     });
 
     if (!user || !user.locationSecret) {
-        throw new Error('User location secret not found');
+        // Log detailed error internally for debugging
+        console.error('Critical: missing locationSecret during signature verification', {
+            userId,
+            hasUserRecord: !!user,
+            hasLocationSecret: !!user?.locationSecret,
+            timestamp: new Date().toISOString()
+        });
+
+        // Return generic error to client (same as invalid signature)
+        // This prevents information leakage about database structure
+        throw new Error('Invalid signature');
     }
 
     // Convert the cuid string to a Buffer for HMAC
