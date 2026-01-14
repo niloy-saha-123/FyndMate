@@ -197,26 +197,72 @@ export function useLocation() {
         timestamp: string;
         nonce: string;
     }): Promise<string> {
-        // TODO: Implement HMAC-SHA256 signature generation for @mohdfaraz
+        // ═════════════════════════════════════════════════════════════════
+        // TODO: CRITICAL - IMPLEMENT HMAC SIGNATURE (@mohdfaraz)
+        // ═════════════════════════════════════════════════════════════════
         // 
-        // 1. Get the per-install secret from secure storage:
-        //    const secret = await SecureStore.getItemAsync('locationSecret');
-        //    if (!secret) {
-        //      const newSecret = crypto.randomUUID();
-        //      await SecureStore.setItemAsync('locationSecret', newSecret);
-        //      return newSecret;
-        //    }
-        //
-        // 2. Build the data string:
-        //    const data = `${userId}|${latitude}|${longitude}|${timestamp}|${nonce}`;
-        //
-        // 3. Compute HMAC-SHA256:
-        //    Use expo-crypto or react-native-crypto
-        //    const signature = crypto.createHmac('sha256', secret).update(data).digest('hex');
-        //
-        // 4. Return the hex string
+        // CURRENT STATUS: Location updates will FAIL until this is implemented
+        // Server rejects all requests with 'invalid signature' error
+        // 
+        // WHAT THIS DOES:
+        // Creates a cryptographic signature to prove the location data
+        // came from the legitimate app and wasn't tampered with.
+        // 
+        // IMPLEMENTATION STEPS:
+        // 
+        // Step 1: Install required package
+        // ─────────────────────────────────
+        // npm install expo-crypto
+        // 
+        // Step 2: Import at top of file
+        // ─────────────────────────────────
+        // import * as Crypto from 'expo-crypto';
+        // import * as SecureStore from 'expo-secure-store';
+        // 
+        // Step 3: Get or create per-device secret
+        // ─────────────────────────────────────────
+        // const secret = await SecureStore.getItemAsync('locationSecret');
+        // if (!secret) {
+        //   const newSecret = Crypto.randomUUID();
+        //   await SecureStore.setItemAsync('locationSecret', newSecret);
+        //   // Use newSecret for this request
+        // }
+        // 
+        // Step 4: Build the data string (EXACT format required by server)
+        // ─────────────────────────────────────────────────────────────────
+        // const { userId, latitude, longitude, timestamp, nonce } = payload;
+        // const data = `${userId}|${latitude}|${longitude}|${timestamp}|${nonce}`;
+        // 
+        // CRITICAL: Order matters! Server expects: userId|lat|lon|timestamp|nonce
+        // 
+        // Step 5: Compute HMAC-SHA256 signature
+        // ──────────────────────────────────────
+        // const signature = await Crypto.digestStringAsync(
+        //   Crypto.CryptoDigestAlgorithm.SHA256,
+        //   data + secret,  // Concatenate data with secret
+        //   { encoding: Crypto.CryptoEncoding.HEX }
+        // );
+        // 
+        // Step 6: Return the hex signature
+        // ─────────────────────────────────
+        // return signature;
+        // 
+        // SECURITY NOTES:
+        // - The secret MUST be stored in SecureStore (encrypted storage)
+        // - NEVER hardcode the secret or store in AsyncStorage
+        // - Each device should have a unique secret
+        // - Server validates this signature to prevent location spoofing
+        // 
+        // TESTING:
+        // After implementation, test with:
+        // 1. Enable location sharing in app
+        // 2. Tap "Update Location Now"
+        // 3. Check server logs - should see "Location updated successfully"
+        // 4. If you see "invalid signature", the data string format is wrong
+        // 
+        // ═════════════════════════════════════════════════════════════════
 
-        return 'PLACEHOLDER_SIGNATURE'; // Replace with actual implementation
+        return 'PLACEHOLDER_SIGNATURE'; // ← REPLACE THIS ENTIRE RETURN STATEMENT
     }
 
     // ─────────────────────────────────────────────────────────────────────
