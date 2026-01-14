@@ -1,5 +1,5 @@
 /**
- * @file client/src/screens/LocationSettingsScreen.tsx
+ * @file client/src/screens/LocationSettingsScreen.tsx (ETA PROFILE PAGE EO DITE PARISH, whereveer you want the location settings)
  * @description Settings screen for managing location sharing preferences.
  * 
  * This screen allows users to:
@@ -8,7 +8,7 @@
  * - Manually update their location
  * - See when location was last updated
  * 
- * TODO FOR UI DEVELOPER:
+ * TODO FOR Kabbo: also eita tui profile page eo dite parish since amra setting ar profile edit page same rakbo
  * 1. Import the useLocation hook
  * 2. Create the UI with 3 radio buttons for preferences
  * 3. Add "Update Location Now" button

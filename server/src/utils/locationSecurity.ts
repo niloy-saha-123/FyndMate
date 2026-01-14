@@ -128,5 +128,13 @@ export async function verifySignature(payload: {
     const secret = await getUserSecret(userId);
     const data = `${userId}|${latitude}|${longitude}|${timestamp}|${nonce}`;
     const expected = crypto.createHmac('sha256', secret).update(data).digest('hex');
+
+    // Check length before timingSafeEqual to prevent crash
+    // timingSafeEqual throws if buffers have different lengths
+    // This prevents DoS attacks with malformed signatures
+    if (expected.length !== signature.length) {
+        return false;
+    }
+
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }
