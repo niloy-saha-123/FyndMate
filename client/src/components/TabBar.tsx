@@ -1,14 +1,14 @@
 import { View, Platform, StyleSheet } from 'react-native';
 import { useLinkBuilder, useTheme } from '@react-navigation/native';
 import { Text, PlatformPressable } from '@react-navigation/elements';
-import { BottomTabBarProps} from '@react-navigation/bottom-tabs';
+import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
-export function TabBar({ state, descriptors, navigation } : BottomTabBarProps) {
+export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { colors } = useTheme();
   const { buildHref } = useLinkBuilder();
 
   return (
-    <View style={styles.Navbar }>
+    <View style={styles.Navbar}>
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const label =
@@ -49,11 +49,28 @@ export function TabBar({ state, descriptors, navigation } : BottomTabBarProps) {
             style={styles.TabItem}
           >
             <Text style={[
-                styles.TabText,
-                { color: isFocused ? 'red' : '#222' },
-              ]}>
+              styles.TabText,
+              { color: isFocused ? 'red' : '#222' },
+            ]}>
               {label}
             </Text>
+
+            {/* 
+              TODO: BADGE RENDERER
+              Check options.tabBarBadge
+              If present, render an Orange Dot (8x8px, rounded)
+              Position: Absolute, top-right of the icon/text
+              Style:
+              {
+                position: 'absolute',
+                top: 0,
+                right: 10,
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: 'orange' // Theme color
+              }
+            */}
           </PlatformPressable>
         );
       })}
@@ -74,7 +91,7 @@ const styles = StyleSheet.create({
   },
 
   TabItem: {
-    flex: 1,           
+    flex: 1,
     alignItems: 'center',
   },
 
