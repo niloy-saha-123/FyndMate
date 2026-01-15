@@ -1,17 +1,57 @@
 import { supabase } from "../auth/supabaseClient";
 
-export async function getMyMatches() {
+export async function getMyMatches(userId: string) {
   const { data, error } = await supabase
     .from("Match")
     .select(`
       id,
       createdAt,
+      status,
+      blockedBy,
       user1Id,
       user2Id,
       User1:User!Match_user1Id_fkey(id, name, profilePicture),
-      User2:User!Match_user2Id_fkey(id, name, profilePicture)
+      User2:User!Match_user2Id_fkey(id, name, profilePicture),
+      messages:Message(
+        id,
+        content,
+        senderId,
+        createdAt,
+        readAt
+      )
     `)
-    .order("createdAt", { ascending: false });
+    .or(`user1Id.eq.${userId},user2Id.eq.${userId}`)
+    .in("status", ["active", "blocked"]) // Include blocked matches
+    .order("createdAt", { ascending: false })
+    .order("createdAt", { foreignTable: "messages", ascending: false });
+
+  if (error) throw error;
+
+  return data.map(match => {
+    const lastMessage = match.messages?.[0] ?? null;
+
+    const unreadCount =
+      match.messages?.filter(
+        m => m.readAt === null && m.senderId !== userId
+      ).length ?? 0;
+
+    return {
+      ...match,
+      lastMessage,
+      unreadCount
+    };
+  });
+}
+
+export async function unblockMatch(matchId: string) {
+  const { data, error } = await supabase
+    .from("Match")
+    .update({
+      status: "active",
+      blockedBy: null
+    })
+    .eq("id", matchId)
+    .select();
 
   if (error) throw error;
   return data;
@@ -28,7 +68,35 @@ export async function getMessages(matchId: string) {
   return data;
 }
 
-export async function editMessage(messageId: string, content: string) {
+export async function sendMessage(
+    matchId: string,
+    content: string,
+    senderId: string
+  ){
+
+  const { data: match, error: matchError } = await supabase
+    .from("Match")
+    .select("status, blockedBy")
+    .eq("id", matchId)
+    .single();
+
+  if (matchError) throw matchError;
+  
+  if (match.status !== "active") {
+    throw new Error("Cannot send message - match is not active");
+  }
+
+  const { data, error } = await supabase
+    .from("Message")
+    .insert({ matchId, content, senderId })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function editMessage(messageId: string, content: string){
   const { data, error } = await supabase
     .from("Message")
     .update({
@@ -43,23 +111,37 @@ export async function editMessage(messageId: string, content: string) {
   return data;
 }
 
-// COMMENTED OUT THE DELETE FUNCTION
-// export async function deleteMessage(messageId: string) {
-//   const { error } = await supabase
-//     .from("Message")
-//     .delete()
-//     .eq("id", messageId);
-
-//   if (error) throw error;
-// }
-
-export async function sendMessage(matchId: string, content: string, senderId: string) {
-  const { data, error } = await supabase
-    .from("Message")
-    .insert({ matchId, content, senderId })
-    .select()
-    .single();
+export async function hideMatch(matchId: string) {
+  const { error } = await supabase
+    .from("Match")
+    .update({ status: "hidden" })
+    .eq("id", matchId);
 
   if (error) throw error;
+}
+
+export async function blockMatch(matchId: string, userId: string) {
+  console.log("Attempting to block match:", matchId, "by user:", userId);
+  
+  const { data, error } = await supabase
+    .from("Match")
+    .update({
+      status: "blocked",
+      blockedBy: userId
+    })
+    .eq("id", String(matchId)) 
+    .select();
+
+  if (error) {
+    console.error("Block error:", error);
+    throw error;
+  }
+  
+  console.log("Block result:", data);
+  
+  if (!data || data.length === 0) {
+    console.warn("No match was updated - check if match exists and RLS allows access");
+  }
+  
   return data;
 }

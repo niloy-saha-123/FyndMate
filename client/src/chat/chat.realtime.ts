@@ -1,15 +1,15 @@
 import { supabase } from "../auth/supabaseClient";
 
+type MessageEvent = "upsert" | "delete" | "match_inactive";
+
 export function subscribeToMessages(
   matchId: string,
-  onEvent: (event: "upsert" | "delete", msg: any) => void
+  onEvent: (event: MessageEvent, payload: any) => void
 ) {
-  console.log("🎧 Realtime for match:", matchId);
+  console.log("Realtime for match:", matchId);
 
   const channel = supabase
     .channel(`match:${matchId}`)
-
-    // 📨 INSERT
     .on(
       "postgres_changes",
       {
@@ -22,8 +22,6 @@ export function subscribeToMessages(
         onEvent("upsert", payload.new);
       }
     )
-
-    // ✏️ UPDATE
     .on(
       "postgres_changes",
       {
@@ -36,25 +34,40 @@ export function subscribeToMessages(
         onEvent("upsert", payload.new);
       }
     )
+    .on(
+      "postgres_changes",
+      {
+        event: "DELETE",
+        schema: "public",
+        table: "Message",
+        filter: `matchId=eq.${matchId}`,
+      },
+      payload => {
+        onEvent("delete", payload.old);
+      }
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "Match",
+        filter: `id=eq.${matchId}`,
+      },
+      payload => {
+        const updated = payload.new;
 
-    // COMMENTED OUT THE DELETE FUNCTION
-    // // 🗑️ DELETE
-    // .on(
-    //   "postgres_changes",
-    //   {
-    //     event: "DELETE",
-    //     schema: "public",
-    //     table: "Message",
-    //     filter: `matchId=eq.${matchId}`,
-    //   },
-    //   payload => {
-    //     onEvent("delete", payload.old);
-    //   }
-    // )
+        if (updated.status !== "active") {
+          console.log("🚫 Match became inactive:", updated.status);
+          onEvent("match_inactive", updated);
+        }
+      }
+    )
 
     .subscribe();
 
   return () => {
+    console.log("🔌 Unsubscribing from match:", matchId);
     supabase.removeChannel(channel);
   };
 }
