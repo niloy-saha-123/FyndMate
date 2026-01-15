@@ -30,8 +30,26 @@ export class MatchService {
                 where: { id: likeId }
             });
 
-            if (!like) throw new Error("Like not found.");
-            if (like.status !== 'active') throw new Error("Like is no longer active.");
+            if (!like) {
+                // Log internally for debugging
+                console.warn('Accept attempt on non-existent like', {
+                    likeId,
+                    timestamp: new Date().toISOString()
+                });
+                // Generic error prevents like ID enumeration
+                throw new Error("Not authorized.");
+            }
+
+            if (like.status !== 'active') {
+                // Log internally for debugging
+                console.warn('Accept attempt on inactive like', {
+                    likeId,
+                    status: like.status,
+                    timestamp: new Date().toISOString()
+                });
+                // Generic error prevents status leakage
+                throw new Error("Not authorized.");
+            }
 
             // Capture IDs immediately to prevent any proxy/reference issues
             const likerId = String(like.likerId);
@@ -102,14 +120,23 @@ export class MatchService {
      */
     async unmatch(matchId: string, requestingUserId: string) {
         const match = await prisma.match.findUnique({ where: { id: matchId } });
-        if (!match) throw new Error("Match not found.");
 
-        // Prevent unmatching already-unmatched matches
-        if (match.status === 'unmatched') {
-            throw new Error("Match is already unmatched.");
-        }
+        // Combine all authorization checks into one generic error
+        // This prevents match ID enumeration and status leakage
+        if (!match ||
+            match.status === 'unmatched' ||
+            (match.user1Id !== requestingUserId && match.user2Id !== requestingUserId)) {
 
-        if (match.user1Id !== requestingUserId && match.user2Id !== requestingUserId) {
+            // Log internally for debugging
+            console.warn('Unauthorized unmatch attempt', {
+                matchId,
+                requestingUserId,
+                matchExists: !!match,
+                matchStatus: match?.status,
+                timestamp: new Date().toISOString()
+            });
+
+            // Generic error for all failure cases
             throw new Error("Not authorized.");
         }
 
