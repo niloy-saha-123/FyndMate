@@ -43,6 +43,17 @@ export default function Welcome() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
 
+  // These refs MUST be declared before any early returns (Rules of Hooks)
+  const handleViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) {
+      setCurrentIndex(viewableItems[0].index || 0);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 50,
+  }).current;
+
   if (loading || profileLoading) {
     return <LoadingGate message="Checking your account" />;
   }
@@ -62,16 +73,6 @@ export default function Welcome() {
     [{ nativeEvent: { contentOffset: { x: scrollX } } }],
     { useNativeDriver: false }
   );
-
-  const handleViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) {
-      setCurrentIndex(viewableItems[0].index || 0);
-    }
-  }).current;
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-  }).current;
 
   const renderSlide = ({ item, index }: { item: OnboardingSlide; index: number }) => {
     return (

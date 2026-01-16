@@ -17,12 +17,11 @@
  * - POST /api/matches
  * - POST /api/users/block
  * 
- * TODO (DEV):
- * - Add caching (TanStack Query) for Feed Performance?
- * - Add error monitoring (Sentry).
+ * NOTE: All functions use the centralized apiClient which automatically
+ * attaches the Authorization header from the auth context.
  */
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+import { apiClient } from '../lib/apiClient';
 
 export interface UserProfile {
     id: string;
@@ -49,182 +48,72 @@ export interface Match {
 
 /**
  * FETCH DISCOVERY FEED
- * @param token JWT Auth Token
  * @param limit Max profiles to fetch (default 20, max 50)
  * @param cursor Pagination cursor (optional)
  */
-export async function getDiscoveryFeed(token: string, limit = 20, cursor?: string): Promise<UserProfile[]> {
+export async function getDiscoveryFeed(limit = 20, cursor?: string): Promise<UserProfile[]> {
     const params = new URLSearchParams({ limit: limit.toString() });
     if (cursor) params.append('cursor', cursor);
 
-    const response = await fetch(`${API_BASE_URL}/feed?${params}`, {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to fetch feed');
-    }
-
-    // Backend returns { data: [...] }
-    const json = await response.json();
+    const json = await apiClient.get<{ data: UserProfile[] }>(`/api/feed?${params}`);
     return json.data;
 }
 
 /**
  * SEND LIKE (OR PASS)
- * @param token JWT Auth Token
  * @param likedId ID of user to like/pass
  * @param liked true = LIKE, false = PASS
  * @param message Optional Intro Message (Required if liked=true)
  */
-export async function sendLike(token: string, likedId: string, liked: boolean, message?: string) {
-    const response = await fetch(`${API_BASE_URL}/likes`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ likedId, liked, message }),
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to send like');
-    }
-
-    return await response.json(); // Returns created Like object OR Match object (if instant match)
+export async function sendLike(likedId: string, liked: boolean, message?: string) {
+    return apiClient.post('/api/likes', { likedId, liked, message });
 }
 
 /**
  * GET RECEIVED LIKES (LIKES SECTION/INBOX)
- * @param token JWT Auth Token
  */
-export async function getReceivedLikes(token: string): Promise<Like[]> {
-    const response = await fetch(`${API_BASE_URL}/likes/received`, {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to fetch likes');
-    }
-
-    const json = await response.json();
-    return json.data; // Route returns { data: [...] }
+export async function getReceivedLikes(): Promise<Like[]> {
+    const json = await apiClient.get<{ data: Like[] }>('/api/likes/received');
+    return json.data;
 }
 
 /**
  * ACCEPT A LIKE (CREATE MATCH)
- * @param token JWT Auth Token
  * @param likeId The ID of the Like to accept
  * @param replyMessage Optional reply to start conversation
  */
-export async function acceptLike(token: string, likeId: string, replyMessage?: string) {
-    const response = await fetch(`${API_BASE_URL}/likes/${likeId}/accept`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ replyMessage }),
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to accept like');
-    }
-
-    return await response.json(); // Returns Match object
+export async function acceptLike(likeId: string, replyMessage?: string) {
+    return apiClient.post(`/api/likes/${likeId}/accept`, { replyMessage });
 }
 
 /**
  * DECLINE A LIKE (REMOVE FROM INBOX)
- * @param token JWT Auth Token
  * @param likeId The ID of the Like to decline
  */
-export async function declineLike(token: string, likeId: string) {
-    const response = await fetch(`${API_BASE_URL}/likes/${likeId}/decline`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to decline like');
-    }
+export async function declineLike(likeId: string) {
+    return apiClient.post(`/api/likes/${likeId}/decline`);
 }
 
 /**
  * GET ACTIVE MATCHES (CHATS)
- * @param token JWT Auth Token
  */
-export async function getMatches(token: string): Promise<Match[]> {
-    const response = await fetch(`${API_BASE_URL}/matches`, {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to fetch matches');
-    }
-
-    const json = await response.json();
-    return json.data; // Route returns { data: [...] }
+export async function getMatches(): Promise<Match[]> {
+    const json = await apiClient.get<{ data: Match[] }>('/api/matches');
+    return json.data;
 }
 
 /**
  * UNMATCH A USER
- * @param token JWT Auth Token
  * @param matchId ID of the match to break
  */
-export async function unmatchUser(token: string, matchId: string) {
-    const response = await fetch(`${API_BASE_URL}/matches/${matchId}/unmatch`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to unmatch');
-    }
+export async function unmatchUser(matchId: string) {
+    return apiClient.post(`/api/matches/${matchId}/unmatch`);
 }
 
 /**
  * BLOCK A USER
- * @param token JWT Auth Token
  * @param userId ID of the user to block
  */
-export async function blockUser(token: string, userId: string) {
-    const response = await fetch(`${API_BASE_URL}/users/block`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId }),
-    });
-
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to block user');
-    }
+export async function blockUser(userId: string) {
+    return apiClient.post('/api/users/block', { userId });
 }

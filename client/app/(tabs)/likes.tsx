@@ -22,10 +22,11 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Button, StyleSheet, FlatList, ActivityIndicator, TextInput, Modal, TouchableOpacity } from 'react-native';
 import { useLikes } from '@/src/hooks/useLikes';
 import { Like } from '@/src/services/matchingService';
+import { useAuth } from '@/src/auth/AuthProvider';
 
 export default function LikesScreen() {
-    const token = "debug-token"; // TODO: Auth
-    const { likes, loading, error, fetchLikes, onAccept, onDecline } = useLikes(token);
+    const { isAuthenticated } = useAuth();
+    const { likes, loading, error, fetchLikes, onAccept, onDecline } = useLikes();
 
     // Local state for replying
     const [selectedLike, setSelectedLike] = useState<Like | null>(null);

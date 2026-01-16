@@ -10,11 +10,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
-<<<<<<< HEAD
-    "@react-native-community/datetimepicker": "^8.6.0",
-=======
-    "@react-native-async-storage/async-storage": "^2.2.0",
->>>>>>> 2f6b0fc08edccd7022573fd4f318d66276a73378
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-google-signin/google-signin": "^16.1.1",
     "@supabase/supabase-js": "^2.89.0",
     "expo": "~54.0.30",

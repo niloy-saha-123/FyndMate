@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { supabase } from "./supabaseClient";
 import { Session } from "@supabase/supabase-js";
 import { getOrCreateProfile, UserProfile } from "../services/profileService";
@@ -17,6 +17,10 @@ type AuthContextType = {
   profileError: string | null;
   refreshProfile: () => Promise<void>;
   setProfileLocally: (profile: UserProfile | null) => void;
+  // For API client
+  accessToken: string | null;
+  supabaseUserId: string | null;
+  isAuthenticated: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -61,6 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     await loadProfile(session);
   }, [loadProfile, session]);
+
+  // Derived values for API client
+  const accessToken = useMemo(() => session?.access_token ?? null, [session]);
+  const supabaseUserId = useMemo(() => session?.user?.id ?? null, [session]);
+  const isAuthenticated = useMemo(() => !!session?.access_token, [session]);
 
   const loadUser = useCallback(
     async (currentSession: Session | null) => {
@@ -128,6 +137,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileError,
         refreshProfile,
         setProfileLocally: setProfile,
+        accessToken,
+        supabaseUserId,
+        isAuthenticated,
       }}
     >
       {children}

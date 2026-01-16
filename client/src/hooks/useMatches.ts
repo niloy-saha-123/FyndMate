@@ -6,12 +6,14 @@
  * 1. Fetching Active Matches.
  * 2. Unmatching users.
  * 3. Blocking users (optional, usually done in chat settings).
+ * 
+ * NOTE: Token is automatically attached via apiClient from auth context.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { getMatches, unmatchUser, blockUser, Match } from '../services/matchingService';
 
-export function useMatches(token: string) {
+export function useMatches() {
     const [matches, setMatches] = useState<Match[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -21,14 +23,14 @@ export function useMatches(token: string) {
         setLoading(true);
         setError(null);
         try {
-            const data = await getMatches(token);
+            const data = await getMatches();
             setMatches(data);
         } catch (err: any) {
             setError(err.message || 'Failed to load matches');
         } finally {
             setLoading(false);
         }
-    }, [token]);
+    }, []);
 
     // Unmatch Action
     const onUnmatch = async (matchId: string) => {
@@ -37,7 +39,7 @@ export function useMatches(token: string) {
 
         try {
             // 2. API Call
-            await unmatchUser(token, matchId);
+            await unmatchUser(matchId);
         } catch (err) {
             console.error("Failed to unmatch:", err);
             setError("Failed to unmatch");
@@ -52,7 +54,7 @@ export function useMatches(token: string) {
         // Simplified: Just re-fetch or filter if we know the matchId too.
 
         try {
-            await blockUser(token, userId);
+            await blockUser(userId);
             // Refresh list to be safe
             fetchMatches();
         } catch (err) {

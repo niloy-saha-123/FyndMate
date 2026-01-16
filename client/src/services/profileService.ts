@@ -8,7 +8,8 @@ export type UserProfile = {
   onboardingCompleted: boolean;
 };
 
-const PROFILE_TABLE = "profiles";
+// Your table is called "User", not "profiles"
+const PROFILE_TABLE = "User";
 
 function normalizeProfile(row: any): UserProfile {
   return {
@@ -24,10 +25,11 @@ export async function getOrCreateProfile(
   supabaseId: string,
   defaults?: Partial<UserProfile>
 ): Promise<UserProfile> {
+  // Query by supabaseId, not id
   const { data, error } = await supabase
     .from(PROFILE_TABLE)
-    .select("id, fullName, birthDate, gender, onboardingCompleted")
-    .eq("id", supabaseId)
+    .select("id, name, fullName, birthDate, gender, onboardingCompleted")
+    .eq("supabaseId", supabaseId)
     .maybeSingle();
 
   if (error && error.code !== "PGRST116") {
@@ -38,36 +40,34 @@ export async function getOrCreateProfile(
     return normalizeProfile(data);
   }
 
-  const { data: inserted, error: insertError } = await supabase
-    .from(PROFILE_TABLE)
-    .upsert(
-      {
-        id: supabaseId,
-        fullName: defaults?.fullName ?? "",
-        birthDate: defaults?.birthDate ?? null,
-        gender: defaults?.gender ?? null,
-        onboardingCompleted: defaults?.onboardingCompleted ?? false,
-      },
-      { onConflict: "id" }
-    )
-    .select("id, fullName, birthDate, gender, onboardingCompleted")
-    .single();
-
-  if (insertError) {
-    throw insertError;
-  }
-
-  return normalizeProfile(inserted);
+  // If no User row exists, the auth trigger should have created it
+  // Return a default profile - the user will complete onboarding
+  console.log("No User row found for supabaseId:", supabaseId);
+  return {
+    id: supabaseId,
+    fullName: defaults?.fullName ?? "",
+    birthDate: null,
+    gender: null,
+    onboardingCompleted: false,
+  };
 }
 
 export async function updateProfile(
   supabaseId: string,
   payload: Partial<UserProfile>
 ): Promise<UserProfile> {
+  // Map fullName to name if needed (your DB uses "name")
+  const dbPayload: any = { ...payload };
+  if (payload.fullName !== undefined) {
+    dbPayload.name = payload.fullName;
+    dbPayload.fullName = payload.fullName;
+  }
+
   const { data, error } = await supabase
     .from(PROFILE_TABLE)
-    .upsert({ id: supabaseId, ...payload }, { onConflict: "id" })
-    .select("id, fullName, birthDate, gender, onboardingCompleted")
+    .update(dbPayload)
+    .eq("supabaseId", supabaseId)
+    .select("id, name, fullName, birthDate, gender, onboardingCompleted")
     .single();
 
   if (error) {
