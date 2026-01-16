@@ -46,6 +46,7 @@ export default function TabLayout() {
         name="communityPage"
         options={{
           title: 'Communities',
+          href: null, // Hide from tab bar
         }}
       />
       <Tabs.Screen
