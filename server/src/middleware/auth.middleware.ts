@@ -101,23 +101,68 @@ export async function authMiddleware(
       select: { id: true, email: true },     // Only fetch what we need
     });
 
+    // ============================================
+    // AUTO-CREATE USER IF NOT EXISTS
+    // ============================================
+    // User exists in Supabase Auth but not in database.
+    // This can happen on first login. Auto-create the user row
+    // with data from the JWT to ensure a seamless experience.
+    let finalUser = dbUser;
+    
     if (!dbUser) {
-      // User exists in Supabase Auth but not in database
-      // This shouldn't happen in normal flow (users are created in both)
-      // If this fires, check user creation logic or run data migration
-      return reply.status(401).send({
-        error: 'User not found in database',
-        details: 'Your account exists in auth but not in the database. Please contact support.'
-      });
+      request.log.info({ supabaseId: data.user.id }, 'Auto-creating user row for new Supabase user');
+      
+      try {
+        // Extract user metadata from Supabase JWT
+        const email = data.user.email || `${data.user.id}@placeholder.local`;
+        const name = data.user.user_metadata?.full_name || 
+                     data.user.user_metadata?.name || 
+                     email.split('@')[0];
+        
+        // Detect timezone from request or use default
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        
+        // Create user row with minimal required fields
+        finalUser = await prisma.user.create({
+          data: {
+            supabaseId: data.user.id,
+            email: email,
+            name: name,
+            timezone: timezone,
+            // All other fields have defaults or are optional
+          },
+          select: { id: true, email: true },
+        });
+        
+        request.log.info({ userId: finalUser.id, supabaseId: data.user.id }, 'Successfully auto-created user');
+      } catch (createError: any) {
+        // Handle race condition: user might have been created between findUnique and create
+        if (createError.code === 'P2002') {
+          // Unique constraint violation - user was created by another request
+          request.log.info({ supabaseId: data.user.id }, 'User already created by concurrent request, fetching...');
+          finalUser = await prisma.user.findUnique({
+            where: { supabaseId: data.user.id },
+            select: { id: true, email: true },
+          });
+          
+          if (!finalUser) {
+            request.log.error({ supabaseId: data.user.id }, 'Failed to find or create user');
+            return reply.status(500).send({ error: 'Failed to create user account' });
+          }
+        } else {
+          request.log.error(createError, 'Failed to auto-create user');
+          return reply.status(500).send({ error: 'Failed to create user account' });
+        }
+      }
     }
 
     // Attach user to request for use in handlers
     // IMPORTANT: request.user.id is the DATABASE id (for foreign keys)
     // NOT the Supabase Auth ID - this enables proper referential integrity
     request.user = {
-      id: dbUser.id,            // Database primary key (use this for foreign keys)
+      id: finalUser.id,            // Database primary key (use this for foreign keys)
       supabaseId: data.user.id, // Supabase Auth UUID (for reference/logging)
-      email: dbUser.email,
+      email: finalUser.email,
     };
   } catch (err) {
     request.log.error(err, 'Auth middleware error');

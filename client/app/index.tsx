@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,10 @@ import {
   FlatList,
   Animated,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Redirect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { useAuth } from "../src/auth/AuthProvider";
+import { LoadingGate } from "../src/components/LoadingGate";
 
 const { width, height } = Dimensions.get("window");
 
@@ -24,7 +26,7 @@ const onboardingData: OnboardingSlide[] = [
   {
     id: "1",
     description: "Users going through a vetting process to ensure you never match with bots.",
-    gradientColors: ["#FDE68A", "#F59E0B"],
+    gradientColors: ["#C4C1E0", "#8B85C2"],
   },
   {
     id: "2",
@@ -36,15 +38,12 @@ const onboardingData: OnboardingSlide[] = [
 
 export default function Welcome() {
   const router = useRouter();
+  const { user, loading, profile, profileLoading } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
 
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { useNativeDriver: false }
-  );
-
+  // These refs MUST be declared before any early returns (Rules of Hooks)
   const handleViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
       setCurrentIndex(viewableItems[0].index || 0);
@@ -54,6 +53,26 @@ export default function Welcome() {
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 50,
   }).current;
+
+  if (loading || profileLoading) {
+    return <LoadingGate message="Checking your account" />;
+  }
+
+  if (user && profile) {
+    const destination = profile.onboardingCompleted
+      ? "/(tabs)"
+      : !profile.fullName
+      ? "/onboarding/name"
+      : !profile.birthDate
+      ? "/onboarding/birthdate"
+      : "/onboarding/gender";
+    return <Redirect href={destination} />;
+  }
+
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+    { useNativeDriver: false }
+  );
 
   const renderSlide = ({ item, index }: { item: OnboardingSlide; index: number }) => {
     return (
@@ -122,7 +141,7 @@ export default function Welcome() {
 
           const backgroundColor = scrollX.interpolate({
             inputRange,
-            outputRange: ["#D1D5DB", "#E77C02", "#D1D5DB"],
+            outputRange: ["#D1D5DB", "#6058AE", "#D1D5DB"],
             extrapolate: "clamp",
           });
 
@@ -168,7 +187,7 @@ export default function Welcome() {
           onPress={() => router.push("/login")}
         >
           <LinearGradient
-            colors={["#F59E0B", "#E77C02"]}
+            colors={["#8B85C2", "#6058AE"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.gradientButton}
@@ -246,7 +265,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#E77C02",
+    color: "#6058AE",
     marginBottom: 12,
     textAlign: "center",
   },
@@ -276,7 +295,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     marginBottom: 20,
-    shadowColor: "#E77C02",
+    shadowColor: "#6058AE",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -303,7 +322,7 @@ const styles = StyleSheet.create({
   },
   signInLink: {
     fontSize: 14,
-    color: "#E77C02",
+    color: "#6058AE",
     fontWeight: "700",
   },
 });

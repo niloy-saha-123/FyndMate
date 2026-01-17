@@ -14,9 +14,11 @@ import { signIn, signUp } from "../src/auth/emailAuth";
 import { signInWithGoogle } from "../src/auth/googleOAuth";
 import { Redirect, router } from "expo-router";
 import { useAuth } from "../src/auth/AuthProvider";
+import { LoadingGate } from "../src/components/LoadingGate";
 
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import LottieView from "lottie-react-native";
 
 export default function Login() {
   const router = useRouter();
@@ -30,12 +32,21 @@ export default function Login() {
     password?: string;
     name?: string;
   }>({});
-  const { user, loading } = useAuth();
+  const { user, loading, profile, profileLoading } = useAuth();
 
-  if (loading) return null;
+  if (loading || profileLoading) {
+    return <LoadingGate message="Checking your session" />;
+  }
 
-  if (user) {
-    return <Redirect href="/(tabs)" />;
+  if (user && profile) {
+    const destination = profile.onboardingCompleted
+      ? "/(tabs)"
+      : !profile.fullName
+      ? "/onboarding/name"
+      : !profile.birthDate
+      ? "/onboarding/birthdate"
+      : "/onboarding/gender";
+    return <Redirect href={destination} />;
   }
   
   const isValidEmail = (value: string) =>
@@ -78,8 +89,7 @@ export default function Login() {
         return;
       }
       console.log("Signed in user:", user);
-
-      // router.replace("/(tabs)");
+      router.replace("/app-gate");
     }
     } 
     catch (e: any) {
@@ -92,14 +102,12 @@ export default function Login() {
     return (
       <View style={styles.container}>
         <View style={styles.logoContainer}>
-          <View style={styles.logoWrapper}>
-            <LinearGradient
-              colors={["#F97316", "#EC4899", "#8B5CF6"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.logoGradient}
-            />
-          </View>
+          <LottieView
+            source={require("../assets/animation.json")}
+            autoPlay
+            loop
+            style={styles.logoAnimation}
+          />
         </View>
 
         <Text style={styles.title}>Sign up to continue</Text>
@@ -110,7 +118,7 @@ export default function Login() {
             onPress={() => setShowEmailForm(true)}
           >
             <LinearGradient
-              colors={["#F59E0B", "#E77C02"]}
+              colors={["#8B85C2", "#6058AE"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -247,7 +255,7 @@ export default function Login() {
             onPress={handleAuth}
           >
             <LinearGradient
-              colors={["#F59E0B", "#E77C02"]}
+              colors={["#8B85C2", "#6058AE"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -291,15 +299,9 @@ const styles = StyleSheet.create({
     marginTop: 80,
     marginBottom: 40,
   },
-  logoWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    overflow: "hidden",
-  },
-  logoGradient: {
-    width: "100%",
-    height: "100%",
+  logoAnimation: {
+    width: 220,
+    height: 220,
   },
   title: {
     fontSize: 24,
@@ -315,7 +317,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     marginBottom: 16,
-    shadowColor: "#E77C02",
+    shadowColor: "#6058AE",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -371,7 +373,7 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     fontSize: 14,
-    color: "#E77C02",
+    color: "#6058AE",
     fontWeight: "600",
   },
   backButton: {
@@ -432,14 +434,14 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: "#E77C02",
+    color: "#6058AE",
     fontWeight: "600",
   },
   submitButton: {
     borderRadius: 30,
     overflow: "hidden",
     marginBottom: 24,
-    shadowColor: "#E77C02",
+    shadowColor: "#6058AE",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -457,7 +459,7 @@ const styles = StyleSheet.create({
   },
   toggleLink: {
     fontSize: 14,
-    color: "#E77C02",
+    color: "#6058AE",
     fontWeight: "700",
   },
 });

@@ -56,7 +56,7 @@ export default function AuthRedirect() {
         }
 
         console.log("Session set successfully!");
-        if (mounted) router.replace("/(tabs)");
+        if (mounted) router.replace("/app-gate");
       }
     };
 
@@ -86,7 +86,7 @@ export default function AuthRedirect() {
             
             if (session) {
               console.log("Session found!");
-              router.replace("/(tabs)");
+              router.replace("/app-gate");
             } else {
               console.log("No session, redirecting to login");
               router.replace("/login");

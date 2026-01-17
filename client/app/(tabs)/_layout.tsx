@@ -7,6 +7,7 @@ import {
 import { StyleSheet } from 'react-native';
 import { TabBar } from "../../src/components/TabBar"
 import { useAuth } from '../../src/auth/AuthProvider';
+import { LoadingGate } from "../../src/components/LoadingGate";
 
 configureReanimatedLogger({
   level: ReanimatedLogLevel.warn,
@@ -15,22 +16,20 @@ configureReanimatedLogger({
 
 export default function TabLayout() {
 
-  /* 
-   TODO: PARALLEL DATA FETCHING & BADGES
-   1. Use the 'usePrefetchData' hook here (see parallel_loading_strategy.md).
-      const { feed, likes, matches } = usePrefetchData(token);
-   
-   2. Determine Badge State:
-      const hasNewLikes = likes.length > 0;
-      const hasNewMatches = matches.some(m => m.hasUnreadMessages);
-
-   3. Pass to Tabs via options (see below).
-  */
-  const { user, loading } = useAuth();
-  if (loading) return null;
+  const { user, loading, profile, profileLoading } = useAuth();
+  if (loading || profileLoading) return <LoadingGate message="Loading your profile" />;
 
   if (!user) return <Redirect href="/login" />;
 
+  if (profile && !profile.onboardingCompleted) {
+    const destination = !profile.fullName
+      ? "/onboarding/name"
+      : !profile.birthDate
+      ? "/onboarding/birthdate"
+      : "/onboarding/gender";
+    return <Redirect href={destination} />;
+  }
+  
   return (
     <Tabs
       screenOptions={{
@@ -47,6 +46,7 @@ export default function TabLayout() {
         name="communityPage"
         options={{
           title: 'Communities',
+          href: null, // Hide from tab bar
         }}
       />
       <Tabs.Screen

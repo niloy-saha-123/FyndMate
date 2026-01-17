@@ -8,15 +8,13 @@
  * 3. Handling "End of Feed" state.
  * 4. Error states.
  * 
- * TODO (DEV): 
- * - Implement "Optimistic Updates" (remove card before server confirms).
- * - Add "Undo" functionality (if allowed).
+ * NOTE: Token is automatically attached via apiClient from auth context.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { getDiscoveryFeed, sendLike, UserProfile } from '../services/matchingService';
 
-export function useFeed(token: string) {
+export function useFeed() {
     const [profiles, setProfiles] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -33,7 +31,7 @@ export function useFeed(token: string) {
         try {
             // If resetting, clear cursor
             const currentCursor = reset ? undefined : cursor;
-            const data = await getDiscoveryFeed(token, 20, currentCursor);
+            const data = await getDiscoveryFeed(20, currentCursor);
 
             if (data.length < 20) {
                 setHasMore(false); // No more to fetch
@@ -56,7 +54,7 @@ export function useFeed(token: string) {
         } finally {
             setLoading(false);
         }
-    }, [token, cursor, loading, hasMore]);
+    }, [cursor, loading, hasMore]);
 
     // Swipe Action (Like or Pass)
     const swipe = async (likedId: string, liked: boolean, message?: string) => {
@@ -70,7 +68,7 @@ export function useFeed(token: string) {
 
         try {
             // 3. API Call
-            const result = await sendLike(token, likedId, liked, message);
+            const result = await sendLike(likedId, liked, message);
 
             // 4. Check for Instant Match
             if (result.matched) {
