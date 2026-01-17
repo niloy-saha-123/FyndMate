@@ -27,7 +27,7 @@ const COLORS = {
     background: '#121212',
     surface: '#1E1E1E',
     card: '#2A2A2A',
-    primary: '#EE8B44',
+    primary: '#6058AE',
     text: '#FFFFFF',
     textSecondary: '#AAAAAA',
     border: '#333333',

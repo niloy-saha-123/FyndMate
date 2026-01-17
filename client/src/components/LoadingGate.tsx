@@ -9,7 +9,7 @@ export function LoadingGate({
 }) {
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#E77C02" />
+      <ActivityIndicator size="large" color="#6058AE" />
       <Text style={styles.message}>{message}</Text>
       {subtext ? <Text style={styles.subtext}>{subtext}</Text> : null}
     </View>

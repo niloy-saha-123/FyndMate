@@ -14,12 +14,21 @@ export type UserProfile = {
   commitment: string | null;
   githubUsername: string | null;
   location: string | null;
+  // GPS-based location fields
+  city: string | null;
+  country: string | null;
+  locationSharing: string | null;
 };
 
 // Your table is called "User", not "profiles"
 const PROFILE_TABLE = "User";
 
 function normalizeProfile(row: any): UserProfile {
+  // Build display location from city/country if available
+  const displayLocation = row.city && row.country 
+    ? `${row.city}, ${row.country}` 
+    : row.location ?? null;
+
   return {
     id: row.id,
     fullName: row.fullName ?? row.name ?? "",
@@ -33,7 +42,10 @@ function normalizeProfile(row: any): UserProfile {
     experience: row.experience ?? null,
     commitment: row.commitment ?? null,
     githubUsername: row.githubUsername ?? null,
-    location: row.location ?? null,
+    location: displayLocation,
+    city: row.city ?? null,
+    country: row.country ?? null,
+    locationSharing: row.locationSharing ?? null,
   };
 }
 
@@ -44,7 +56,7 @@ export async function getOrCreateProfile(
   // Query by supabaseId, not id
   const { data, error } = await supabase
     .from(PROFILE_TABLE)
-    .select("id, name, fullName, birthDate, gender, onboardingCompleted, profilePicture, bio, skills, interests, experience, commitment, githubUsername, location")
+    .select("id, name, fullName, birthDate, gender, onboardingCompleted, profilePicture, bio, skills, interests, experience, commitment, githubUsername, location, city, country, locationSharing")
     .eq("supabaseId", supabaseId)
     .maybeSingle();
 
@@ -73,6 +85,9 @@ export async function getOrCreateProfile(
     commitment: null,
     githubUsername: null,
     location: null,
+    city: null,
+    country: null,
+    locationSharing: null,
   };
 }
 
@@ -91,7 +106,7 @@ export async function updateProfile(
     .from(PROFILE_TABLE)
     .update(dbPayload)
     .eq("supabaseId", supabaseId)
-    .select("id, name, fullName, birthDate, gender, onboardingCompleted, profilePicture, bio, skills, interests, experience, commitment, githubUsername, location")
+    .select("id, name, fullName, birthDate, gender, onboardingCompleted, profilePicture, bio, skills, interests, experience, commitment, githubUsername, location, city, country, locationSharing")
     .single();
 
   if (error) {

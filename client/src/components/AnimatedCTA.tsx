@@ -2,8 +2,8 @@ import { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
-const PRIMARY = "#E77C02";
-const SECONDARY = "#F59E0B";
+const PRIMARY = "#6058AE";
+const SECONDARY = "#8B85C2";
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export function AnimatedCTA({

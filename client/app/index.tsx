@@ -26,7 +26,7 @@ const onboardingData: OnboardingSlide[] = [
   {
     id: "1",
     description: "Users going through a vetting process to ensure you never match with bots.",
-    gradientColors: ["#FDE68A", "#F59E0B"],
+    gradientColors: ["#C4C1E0", "#8B85C2"],
   },
   {
     id: "2",
@@ -141,7 +141,7 @@ export default function Welcome() {
 
           const backgroundColor = scrollX.interpolate({
             inputRange,
-            outputRange: ["#D1D5DB", "#E77C02", "#D1D5DB"],
+            outputRange: ["#D1D5DB", "#6058AE", "#D1D5DB"],
             extrapolate: "clamp",
           });
 
@@ -187,7 +187,7 @@ export default function Welcome() {
           onPress={() => router.push("/login")}
         >
           <LinearGradient
-            colors={["#F59E0B", "#E77C02"]}
+            colors={["#8B85C2", "#6058AE"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.gradientButton}
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#E77C02",
+    color: "#6058AE",
     marginBottom: 12,
     textAlign: "center",
   },
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     marginBottom: 20,
-    shadowColor: "#E77C02",
+    shadowColor: "#6058AE",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
   },
   signInLink: {
     fontSize: 14,
-    color: "#E77C02",
+    color: "#6058AE",
     fontWeight: "700",
   },
 });

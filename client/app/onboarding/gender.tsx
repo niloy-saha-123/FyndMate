@@ -7,7 +7,7 @@ import { useOnboardingForm } from "../../src/hooks/useOnboardingForm";
 import { updateProfile } from "../../src/services/profileService";
 import { useAuth } from "../../src/auth/AuthProvider";
 
-const PRIMARY = "#E77C02";
+const PRIMARY = "#6058AE";
 
 const options = [
   "Female",

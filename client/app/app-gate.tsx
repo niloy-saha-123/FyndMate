@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
-    backgroundColor: "#E77C02",
+    backgroundColor: "#6058AE",
   },
   retryLabel: {
     color: "#FFF",

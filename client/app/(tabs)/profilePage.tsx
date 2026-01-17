@@ -25,8 +25,8 @@ import { getOptimizedImageUrl, ImageSizes } from '../../src/utils/imageOptimizat
 
 // Colors - Dark theme with orange accents
 const COLORS = {
-  primary: '#EE8B44',
-  primaryLight: '#F8C89E',
+  primary: '#6058AE',
+  primaryLight: '#8B85C2',
   background: '#121212',
   surface: '#1E1E1E',
   card: '#2A2A2A',
@@ -74,11 +74,8 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   
-  // Photo slots (6 slots for profile pictures)
-  const [photos, setPhotos] = useState<(string | null)[]>([
-    profile?.profilePicture ?? null,
-    null, null, null, null, null
-  ]);
+  // Photo slot (single profile picture)
+  const [photo, setPhoto] = useState<string | null>(profile?.profilePicture ?? null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -105,7 +102,7 @@ export default function ProfilePage() {
         commitment: profile?.commitment ?? '',
         githubUsername: profile?.githubUsername ?? '',
       });
-      setPhotos([profile?.profilePicture ?? null, null, null, null, null, null]);
+      setPhoto(profile?.profilePicture ?? null);
     }
     setIsEditing(!isEditing);
   }, [isEditing, profile]);
@@ -144,7 +141,7 @@ export default function ProfilePage() {
     }));
   }, []);
 
-  const handlePickImage = useCallback((slotIndex: number) => {
+  const handlePickImage = useCallback(() => {
     // Note: Image picker requires a development build, not Expo Go
     Alert.alert(
       'Development Build Required',
@@ -152,21 +149,17 @@ export default function ProfilePage() {
     );
   }, []);
 
-  const handleDeletePhoto = useCallback((slotIndex: number) => {
+  const handleDeletePhoto = useCallback(() => {
     Alert.alert(
       'Delete Photo',
-      'Are you sure you want to delete this photo?',
+      'Are you sure you want to delete your profile photo?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            setPhotos(prev => {
-              const newPhotos = [...prev];
-              newPhotos[slotIndex] = null;
-              return newPhotos;
-            });
+            setPhoto(null);
           },
         },
       ]
@@ -224,55 +217,45 @@ export default function ProfilePage() {
         contentContainerStyle={[styles.content, { paddingBottom: bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Photo Grid - 3x2 */}
-        <View style={styles.photoGridSection}>
-          <Text style={styles.sectionLabel}>Photos</Text>
-          <View style={styles.photoGrid}>
-            {photos.map((photo, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.photoSlot,
-                  index === 0 && styles.photoSlotMain,
-                ]}
-                onPress={() => isEditing && handlePickImage(index)}
-                disabled={!isEditing}
-              >
-                {photo ? (
+        {/* Profile Picture - Single Photo */}
+        <View style={styles.profilePhotoSection}>
+          <Text style={styles.sectionLabel}>Profile Picture</Text>
+          <TouchableOpacity
+            style={styles.profilePhotoContainer}
+            onPress={isEditing ? handlePickImage : undefined}
+            disabled={!isEditing}
+          >
+            {photo ? (
+              <>
+                <Image 
+                  source={{ uri: getOptimizedImageUrl(photo, ImageSizes.CARD.width, ImageSizes.CARD.quality) }} 
+                  style={styles.profilePhoto} 
+                />
+                {isEditing && (
+                  <TouchableOpacity
+                    style={styles.deletePhotoButton}
+                    onPress={handleDeletePhoto}
+                  >
+                    <Ionicons name="close-circle" size={28} color={COLORS.danger} />
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              <View style={styles.emptyProfilePhoto}>
+                {isEditing ? (
                   <>
-                    <Image 
-                      source={{ uri: getOptimizedImageUrl(photo, ImageSizes.CARD.width, ImageSizes.CARD.quality) }} 
-                      style={styles.photoImage} 
-                    />
-                    {isEditing && (
-                      <TouchableOpacity
-                        style={styles.deletePhotoButton}
-                        onPress={() => handleDeletePhoto(index)}
-                      >
-                        <Ionicons name="close-circle" size={24} color={COLORS.danger} />
-                      </TouchableOpacity>
-                    )}
+                    <Ionicons name="camera" size={40} color={COLORS.primary} />
+                    <Text style={styles.addPhotoText}>Add Photo</Text>
                   </>
                 ) : (
-                  <View style={styles.emptySlot}>
-                    {isEditing ? (
-                      <>
-                        <Ionicons name="add" size={32} color={COLORS.primary} />
-                        <Text style={styles.addPhotoText}>Add</Text>
-                      </>
-                    ) : (
-                      <Ionicons name="image-outline" size={32} color={COLORS.border} />
-                    )}
-                  </View>
+                  <>
+                    <Ionicons name="person-circle-outline" size={60} color={COLORS.border} />
+                    <Text style={styles.noPhotoText}>No photo</Text>
+                  </>
                 )}
-                {index === 0 && (
-                  <View style={styles.mainPhotoBadge}>
-                    <Text style={styles.mainPhotoBadgeText}>Main</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Name & Basic Info */}
@@ -292,12 +275,43 @@ export default function ProfilePage() {
               {age && <Text style={styles.ageText}>, {age}</Text>}
             </Text>
           )}
-          {!isEditing && profile?.location && (
-            <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={16} color={COLORS.textLight} />
-              <Text style={styles.locationText}>{profile.location}</Text>
+        </View>
+
+        {/* Location Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Location</Text>
+          <View style={styles.locationCard}>
+            <View style={styles.locationInfo}>
+              <Ionicons name="location" size={24} color={COLORS.primary} />
+              <View style={styles.locationDetails}>
+                {profile?.city && profile?.country ? (
+                  <>
+                    <Text style={styles.locationCity}>{profile.city}, {profile.country}</Text>
+                    <Text style={styles.locationStatus}>
+                      {profile.locationSharing === 'on' ? '📍 Location sharing on' : '🔒 Location sharing off'}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.locationCity}>Location not set</Text>
+                    <Text style={styles.locationStatus}>Enable location to show your city</Text>
+                  </>
+                )}
+              </View>
             </View>
-          )}
+            <TouchableOpacity 
+              style={styles.updateLocationButton}
+              onPress={() => {
+                Alert.alert(
+                  'Update Location',
+                  'Go to Settings to enable GPS location sharing.',
+                  [{ text: 'OK' }]
+                );
+              }}
+            >
+              <Text style={styles.updateLocationText}>Update</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Bio Section */}
@@ -562,62 +576,48 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   
-  // Photo Grid Styles
-  photoGridSection: {
+  // Profile Picture Styles (Single Photo)
+  profilePhotoSection: {
     marginBottom: 24,
+    alignItems: 'center',
   },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  photoSlot: {
-    width: '31%',
-    aspectRatio: 3 / 4,
+  profilePhotoContainer: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
     backgroundColor: COLORS.card,
-    borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
-  },
-  photoSlotMain: {
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: COLORS.primary,
   },
-  photoImage: {
+  profilePhoto: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
   },
-  emptySlot: {
+  emptyProfilePhoto: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   addPhotoText: {
-    fontSize: 12,
+    fontSize: 14,
     color: COLORS.primary,
+    marginTop: 8,
+    fontWeight: '600',
+  },
+  noPhotoText: {
+    fontSize: 12,
+    color: COLORS.textLight,
     marginTop: 4,
   },
   deletePhotoButton: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: 8,
+    right: 8,
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
-  },
-  mainPhotoBadge: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  mainPhotoBadgeText: {
-    fontSize: 10,
-    color: COLORS.white,
-    fontWeight: '600',
+    borderRadius: 14,
   },
   
   // Section Styles
@@ -673,6 +673,45 @@ const styles = StyleSheet.create({
   locationText: {
     fontSize: 14,
     color: COLORS.textSecondary,
+  },
+  // Location Card Styles
+  locationCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  locationDetails: {
+    flex: 1,
+  },
+  locationCity: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  locationStatus: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  updateLocationButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  updateLocationText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.white,
   },
   bioText: {
     fontSize: 16,

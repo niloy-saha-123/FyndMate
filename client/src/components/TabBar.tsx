@@ -11,10 +11,10 @@ import { getOptimizedImageUrl, ImageSizes } from '../utils/imageOptimization';
 // Brofist icon
 const BrofistIcon = require('../../assets/icons/brofist.png');
 
-// Color constants - Dark theme with orange accents
+// Color constants - Dark theme with purple accents
 const NAV_BG = "#1E1E1E";      // navbar background (dark)
 const INACTIVE = "#666666";    // gray (not selected)
-const ACTIVE = "#EE8B44";      // orange (selected)
+const ACTIVE = "#6058AE";      // purple (selected)
 
 // Map route names to Ionicons icon names (likes uses custom image, profilePage uses user's avatar)
 const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {

@@ -8,7 +8,7 @@ import { useOnboardingForm } from "../../src/hooks/useOnboardingForm";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { updateProfile } from "../../src/services/profileService";
 
-const PRIMARY = "#E77C02";
+const PRIMARY = "#6058AE";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);

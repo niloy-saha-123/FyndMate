@@ -1,8 +1,8 @@
 import { ReactNode, useEffect, useMemo, useRef } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
 
-const PRIMARY = "#E77C02";
-const ACCENT = "#F59E0B";
+const PRIMARY = "#6058AE";
+const ACCENT = "#8B85C2";
 
 export function OnboardingScaffold({
   step,

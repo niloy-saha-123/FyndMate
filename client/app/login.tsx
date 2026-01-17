@@ -118,7 +118,7 @@ export default function Login() {
             onPress={() => setShowEmailForm(true)}
           >
             <LinearGradient
-              colors={["#F59E0B", "#E77C02"]}
+              colors={["#8B85C2", "#6058AE"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -255,7 +255,7 @@ export default function Login() {
             onPress={handleAuth}
           >
             <LinearGradient
-              colors={["#F59E0B", "#E77C02"]}
+              colors={["#8B85C2", "#6058AE"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     marginBottom: 16,
-    shadowColor: "#E77C02",
+    shadowColor: "#6058AE",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     fontSize: 14,
-    color: "#E77C02",
+    color: "#6058AE",
     fontWeight: "600",
   },
   backButton: {
@@ -434,14 +434,14 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: "#E77C02",
+    color: "#6058AE",
     fontWeight: "600",
   },
   submitButton: {
     borderRadius: 30,
     overflow: "hidden",
     marginBottom: 24,
-    shadowColor: "#E77C02",
+    shadowColor: "#6058AE",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   },
   toggleLink: {
     fontSize: 14,
-    color: "#E77C02",
+    color: "#6058AE",
     fontWeight: "700",
   },
 });
