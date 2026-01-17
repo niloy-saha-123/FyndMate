@@ -10,123 +10,26 @@
  * Uses fetch API for server communication and direct upload to Supabase.
  * Includes automatic retry logic for network failures.
  * 
- * IMPORTANT - HEIC CONVERSION (FOR UI DEVELOPERS):
+ * IMAGE OPTIMIZATION:
+ * Use the helper functions in src/utils/imageOptimization.ts to optimize
+ * image URLs before displaying them. This uses Supabase Image Transformations
+ * for automatic resizing and compression.
+ * 
+ * HEIC CONVERSION:
  * iPhones save photos as .heic by default, but our backend only accepts jpg/png/webp.
- * YOU MUST convert HEIC to JPEG before calling this service:
+ * Convert HEIC to JPEG before calling this service using expo-image-manipulator.
  * 
- * Example implementation in image picker:
- * ```typescript
- * import * as ImageManipulator from 'expo-image-manipulator';
- * 
- * const handleImagePick = async (pickedUri: string) => {
- *   let uri = pickedUri;
- *   
- *   // Auto-convert HEIC to JPEG
- *   if (uri.toLowerCase().endsWith('.heic')) {
- *     const result = await ImageManipulator.manipulateAsync(
- *       uri,
- *       [], // no transformations, just format conversion
- *       { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
- *     );
- *     uri = result.uri;
- *   }
- *   
- *   // Now upload the JPEG
- *   await uploadProfilePicture(uri, authToken);
- * };
- * ```
- * 
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * For @Mohdfaraz - IMAGE OPTIMIZATION IMPLEMENTATION
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 
- * STEP 1: Create Helper File
- * ─────────────────────────────
- * Create: client/src/utils/imageOptimization.ts
- * 
- * ```typescript
- * 
- * Optimize image URLs using Supabase Image Transformations
- * Add this to any profile picture URL before displaying
- * 
- * export const getOptimizedImageUrl = (
- * url: string | null | undefined,
- * width = 500,
- * quality = 85
-  * ): string => {
- *   if (!url) return ''; // Return empty string if no URL
- *   return `${url}?width=${width}&quality=${quality}`;
- * };
- * ```
- * 
- * STEP 2: Use This Helper Everywhere You Display Profile Pictures
- * ─────────────────────────────────────────────────────────────────
- * Import and use in these files (when you create them):
- * 
- * 1. Profile Screen (app/(tabs)/profilePage.tsx)
- * ```tsx
-  * import { getOptimizedImageUrl } from '@/utils/imageOptimization';
- * 
- * <Image 
- * source={ { uri: getOptimizedImageUrl(user.profilePicture) } } 
- * style={ styles.profilePicture }
- * />
-  * ```
- * 
- * 2. Match/Swipe Cards (wherever you show user cards for swiping)
- * ```tsx
-  * import { getOptimizedImageUrl } from '@/utils/imageOptimization';
- * 
- * <Image 
- * source={ { uri: getOptimizedImageUrl(matchedUser.profilePicture) } } 
- * style={ styles.cardImage }
- * />
-  * ```
- * 
- * 3. Chat Screen (showing matched users in chat list)
- * ```tsx
-  * import { getOptimizedImageUrl } from '@/utils/imageOptimization';
- * 
- * <Image 
- * source={ { uri: getOptimizedImageUrl(chatUser.profilePicture) } } 
- * style={ styles.avatar }
- * />
-  * ```
- * 
- * 4. Likes Page (showing users who liked you)
- * ```tsx
-  * import { getOptimizedImageUrl } from '@/utils/imageOptimization';
- * 
- * <Image 
- * source={ { uri: getOptimizedImageUrl(liker.profilePicture) } } 
- * style={ styles.thumbnail }
- * />
-  * ```
- * 
- * DIFFERENT SIZES FOR DIFFERENT CONTEXTS:
- * You can pass different sizes for different use cases:
- * 
- * - Large profile view: getOptimizedImageUrl(url, 800, 90)
- * - Normal card: getOptimizedImageUrl(url, 500, 85)
- * - Small thumbnail: getOptimizedImageUrl(url, 200, 80)
- * 
- * BENEFITS:
- * - Automatic resizing (perfect for mobile screens)
- * - Compression (85% quality = visually identical, 50-70% smaller file)
- * - CDN caching (faster subsequent loads)
- * - Original preserved (can get high-res if needed)
- * - Saves bandwidth & improves app performance
- * 
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 
- *  PROFILE PICTURE REQUIREMENTS:
+ * PROFILE PICTURE REQUIREMENTS:
  * - Profile pictures are MANDATORY for all users (enforce during signup)
- * - Users can REPLACE their picture anytime (like Tinder)
+ * - Users can REPLACE their picture anytime
  * - Users CANNOT delete their picture without replacing it
  * - UI should only show "Change Profile Picture" button, NOT "Delete"
  */
 
 import pRetry from 'p-retry';
+
+// API base URL from environment
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
 
 export interface UploadRequestResponse {
   signedUrl: string;
@@ -181,10 +84,10 @@ export async function requestUploadUrl(
   // This handles temporary network issues (WiFi drops, 4G->WiFi switches, etc.)
   return await pRetry(
     async () => {
-      const response = await fetch('/api/upload/profile-picture/request', {
+      const response = await fetch(`${API_BASE_URL}/api/upload/profile-picture/request`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${authToken} `,
+          'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ fileExtension }),
@@ -269,10 +172,10 @@ export async function confirmUpload(
   // Retry confirmation request up to 3 times
   return await pRetry(
     async () => {
-      const response = await fetch('/api/upload/profile-picture/confirm', {
+      const response = await fetch(`${API_BASE_URL}/api/upload/profile-picture/confirm`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${authToken} `,
+          'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ uploadPath }),
@@ -303,86 +206,24 @@ export async function confirmUpload(
  *
  * @param imageUri - Image URI from image picker (e.g., from Expo ImagePicker)
  * @param authToken - User's JWT token
- * @param onProgress - Optional progress callback (DEPRECATED - see comments below)
+ * @param onProgress - Optional progress callback for tracking upload steps
  * @returns Public URL of uploaded profile picture
  *
  * @throws Error with descriptive message if any step fails
  * 
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * For @Mohdfaraz
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- * 
- * The onProgress callback is available but currently NOT CALLED because
- * we removed the fake progress tracking. Here's what you should implement:
- * 
- * OPTION 1: Simple Loading Spinner (RECOMMENDED for MVP)
- * ─────────────────────────────────────────────────────────
- * Just show a spinner with "Uploading..." text. Simple and clean.
- * 
- * Example:
+ * Usage with useProfilePictureUpload hook (recommended):
  * ```tsx
-  * const [uploading, setUploading] = useState(false);
+ * const { upload, uploading, error } = useProfilePictureUpload();
  * 
- * const handleUpload = async (uri) => {
- * setUploading(true);
+ * const handleUpload = async (uri: string) => {
  *   try {
- * await uploadProfilePicture(uri, token);
- *     // Success!
- *   } finally {
- * setUploading(false);
+ *     const publicUrl = await upload(uri);
+ *     console.log('Uploaded:', publicUrl);
+ *   } catch (err) {
+ *     console.error('Upload failed:', err);
  *   }
  * };
- * 
- * return (
- * { uploading && <ActivityIndicator size= "large" />}
- * { uploading && <Text>Uploading your photo...</Text>}
- * );
  * ```
- * 
- * OPTION 2: Real Progress Bar (ADVANCED - do this later if you want)
- * ───────────────────────────────────────────────────────────────────
- * To show actual upload progress (10%, 20%, 30%...), you'll need to:
- * 
- * 1. Replace the fetch() calls in uploadToSupabase() with XMLHttpRequest
- * 2. Use xhr.upload.onprogress to track upload bytes
- * 3. Calculate percentage: (loaded / total) * 100
- * 
- * Example implementation (advanced):
- * ```typescript
-  * // Inside uploadToSupabase function:
- * const xhr = new XMLHttpRequest();
- * 
- * xhr.upload.onprogress = (event) => {
- *   if (event.lengthComputable) {
- *     const percentComplete = (event.loaded / event.total) * 100;
- * onProgress?.('uploading', percentComplete);
- *   }
- * };
- * 
- * return new Promise((resolve, reject) => {
- * xhr.onload = () => resolve();
- * xhr.onerror = () => reject(new Error('Upload failed'));
- * xhr.open('PUT', signedUrl);
- * xhr.send(blob);
- * });
- * ```
- * 
- * Then in your UI:
- * ```tsx
-  * const { upload } = useProfilePictureUpload(token);
- * const [progress, setProgress] = useState(0);
- * 
- * await upload(uri, (step, percent) => setProgress(percent));
- * 
- * return <ProgressBar progress={ progress } />;
- * ```
- * 
- * MY RECOMMENDATION (Kabbo):
- * Start with Option 1 (simple spinner). It's clean, works great, and
- * users don't really care about exact percentages. Add Option 2 later
- * if you feel fancy.
- * 
- * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
  */
 export async function uploadProfilePicture(
   imageUri: string,

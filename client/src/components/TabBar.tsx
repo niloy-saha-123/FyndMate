@@ -1,33 +1,33 @@
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, Image } from 'react-native';
 import { useLinkBuilder } from '@react-navigation/native';
 import { PlatformPressable } from '@react-navigation/elements';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../auth/AuthProvider';
+import { getOptimizedImageUrl, ImageSizes } from '../utils/imageOptimization';
 
-import HomeIcon from '../../assets/icons/home.svg';
-import BrofistIcon from '../../assets/icons/brofist.svg';
-import ChatIcon from '../../assets/icons/chat.svg';
-import ProfileIcon from '../../assets/icons/profile.svg';
+// Brofist icon
+const BrofistIcon = require('../../assets/icons/brofist.png');
 
-// Color constants - Hinge-style behavior
-const NAV_BG = "#F6F7E7";      // navbar background (off-white)
-const INACTIVE = "#F8C89E";    // light orange (not selected)
-const ACTIVE = "#EE8B44";      // dark orange (selected)
+// Color constants - Dark theme with orange accents
+const NAV_BG = "#1E1E1E";      // navbar background (dark)
+const INACTIVE = "#666666";    // gray (not selected)
+const ACTIVE = "#EE8B44";      // orange (selected)
 
-// Map route names to their SVG components
-const ICON_MAP = {
-  index: HomeIcon,
-  likes: BrofistIcon,
-  matches: ChatIcon,
-  profilePage: ProfileIcon,
-} as const;
+// Map route names to Ionicons icon names (likes uses custom image, profilePage uses user's avatar)
+const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
+  index: 'home-outline',
+  matches: 'chatbubble-outline',
+};
 
 type TabKey = keyof typeof ICON_MAP;
 
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { buildHref } = useLinkBuilder();
   const { bottom } = useSafeAreaInsets();
+  const { profile } = useAuth();
 
   const bottomInset = Math.max(bottom, 12); // keep room for gesture areas
 
@@ -62,8 +62,41 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           });
         };
 
-        const Icon = ICON_MAP[route.name as TabKey];
-        if (!Icon) return null; // Skip routes without icons (like communities)
+        const iconName = ICON_MAP[route.name as TabKey];
+        const isLikesTab = route.name === 'likes';
+        const isProfileTab = route.name === 'profilePage';
+        
+        // Skip routes without icons (like communities), but allow likes and profile tabs
+        if (!iconName && !isLikesTab && !isProfileTab) return null;
+
+        const renderIcon = () => {
+          if (isLikesTab) {
+            return (
+              <Image 
+                source={BrofistIcon} 
+                style={{ width: 28, height: 28, tintColor: color }} 
+              />
+            );
+          }
+          if (isProfileTab) {
+            // Show user's profile picture or fallback to person icon
+            if (profile?.profilePicture) {
+              return (
+                <View style={[
+                  styles.ProfileAvatar,
+                  { borderColor: isFocused ? ACTIVE : 'transparent' }
+                ]}>
+                  <Image 
+                    source={{ uri: getOptimizedImageUrl(profile.profilePicture, ImageSizes.AVATAR_SMALL.width, ImageSizes.AVATAR_SMALL.quality) }} 
+                    style={styles.ProfileAvatarImage}
+                  />
+                </View>
+              );
+            }
+            return <Ionicons name="person-outline" size={28} color={color} />;
+          }
+          return <Ionicons name={iconName!} size={28} color={color} />;
+        };
 
         return (
           <PlatformPressable
@@ -78,7 +111,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           >
             <View style={styles.IconContainer}>
               <View style={{ transform: [{ scale: isFocused ? 1.08 : 1 }] }}>
-                <Icon width={30} height={30} color={color} />
+                {renderIcon()}
               </View>
 
               <Text style={[styles.Label, { color }]} numberOfLines={1}>
@@ -109,11 +142,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     backgroundColor: NAV_BG,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.08)',
+    borderTopColor: '#2A2A2A',
     paddingTop: 10,
     // Shadow for iOS
     shadowColor: '#000',
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: -3 },
     // Shadow for Android
@@ -147,5 +180,19 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: ACTIVE,
+  },
+
+  ProfileAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    overflow: 'hidden',
+  },
+
+  ProfileAvatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
   },
 });

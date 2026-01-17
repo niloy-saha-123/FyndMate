@@ -6,6 +6,14 @@ export type UserProfile = {
   birthDate: string | null;
   gender: string | null;
   onboardingCompleted: boolean;
+  profilePicture: string | null;
+  bio: string | null;
+  skills: string[];
+  interests: string[];
+  experience: string | null;
+  commitment: string | null;
+  githubUsername: string | null;
+  location: string | null;
 };
 
 // Your table is called "User", not "profiles"
@@ -18,6 +26,14 @@ function normalizeProfile(row: any): UserProfile {
     birthDate: row.birthDate ?? null,
     gender: row.gender ?? null,
     onboardingCompleted: Boolean(row.onboardingCompleted),
+    profilePicture: row.profilePicture ?? null,
+    bio: row.bio ?? null,
+    skills: row.skills ?? [],
+    interests: row.interests ?? [],
+    experience: row.experience ?? null,
+    commitment: row.commitment ?? null,
+    githubUsername: row.githubUsername ?? null,
+    location: row.location ?? null,
   };
 }
 
@@ -28,7 +44,7 @@ export async function getOrCreateProfile(
   // Query by supabaseId, not id
   const { data, error } = await supabase
     .from(PROFILE_TABLE)
-    .select("id, name, fullName, birthDate, gender, onboardingCompleted")
+    .select("id, name, fullName, birthDate, gender, onboardingCompleted, profilePicture, bio, skills, interests, experience, commitment, githubUsername, location")
     .eq("supabaseId", supabaseId)
     .maybeSingle();
 
@@ -49,6 +65,14 @@ export async function getOrCreateProfile(
     birthDate: null,
     gender: null,
     onboardingCompleted: false,
+    profilePicture: null,
+    bio: null,
+    skills: [],
+    interests: [],
+    experience: null,
+    commitment: null,
+    githubUsername: null,
+    location: null,
   };
 }
 
@@ -67,7 +91,7 @@ export async function updateProfile(
     .from(PROFILE_TABLE)
     .update(dbPayload)
     .eq("supabaseId", supabaseId)
-    .select("id, name, fullName, birthDate, gender, onboardingCompleted")
+    .select("id, name, fullName, birthDate, gender, onboardingCompleted, profilePicture, bio, skills, interests, experience, commitment, githubUsername, location")
     .single();
 
   if (error) {
