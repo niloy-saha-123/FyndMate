@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { View, Text, FlatList, Pressable, Image } from "react-native";
+import { View, Text, FlatList, Pressable, Image, Button } from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { getMyMatches, hideMatch, blockMatch, unblockMatch } from "../../src/chat/chat.service";
 import { supabase } from "../../src/auth/supabaseClient";
 import { Alert } from "react-native";
+import { sendTestNotification } from '@/src/notifications/notification.service';
 
 export default function ChatTab() {
   const { user, loading } = useAuth();
@@ -219,6 +220,13 @@ export default function ChatTab() {
                     : "Start a conversation"}
                 </Text>
               </View>
+              
+              <View>
+      <Button 
+        title="Test Notification" 
+        onPress={() => sendTestNotification()}
+      />
+    </View>
 
               {item.unreadCount > 0 && !isBlocked && (
                 <View

@@ -1,0 +1,121 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.AuditLog (
+  id text NOT NULL,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  userId text NOT NULL,
+  action text NOT NULL,
+  entity text NOT NULL DEFAULT 'profile_picture'::text,
+  oldValue text,
+  newValue text,
+  metadata jsonb,
+  ipAddress text,
+  userAgent text,
+  status text NOT NULL,
+  error text,
+  CONSTRAINT AuditLog_pkey PRIMARY KEY (id),
+  CONSTRAINT AuditLog_userId_fkey FOREIGN KEY (userId) REFERENCES public.User(id)
+);
+CREATE TABLE public.Block (
+  id text NOT NULL,
+  blockerId text NOT NULL,
+  blockedId text NOT NULL,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT Block_pkey PRIMARY KEY (id),
+  CONSTRAINT Block_blockerId_fkey FOREIGN KEY (blockerId) REFERENCES public.User(id),
+  CONSTRAINT Block_blockedId_fkey FOREIGN KEY (blockedId) REFERENCES public.User(id)
+);
+CREATE TABLE public.Like (
+  id text NOT NULL,
+  likerId text NOT NULL,
+  likedId text NOT NULL,
+  liked boolean NOT NULL,
+  message text,
+  status text NOT NULL DEFAULT 'active'::text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT Like_pkey PRIMARY KEY (id),
+  CONSTRAINT Like_likedId_fkey FOREIGN KEY (likedId) REFERENCES public.User(id),
+  CONSTRAINT Like_likerId_fkey FOREIGN KEY (likerId) REFERENCES public.User(id)
+);
+CREATE TABLE public.Match (
+  id text NOT NULL,
+  user1Id text NOT NULL,
+  user2Id text NOT NULL,
+  status text NOT NULL DEFAULT 'active'::text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  blockedBy text,
+  CONSTRAINT Match_pkey PRIMARY KEY (id),
+  CONSTRAINT Match_user1Id_fkey FOREIGN KEY (user1Id) REFERENCES public.User(id),
+  CONSTRAINT Match_user2Id_fkey FOREIGN KEY (user2Id) REFERENCES public.User(id)
+);
+CREATE TABLE public.Message (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  matchId text NOT NULL,
+  senderId text NOT NULL,
+  content text NOT NULL,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  readAt timestamp without time zone,
+  editedAt timestamp without time zone,
+  CONSTRAINT Message_pkey PRIMARY KEY (id),
+  CONSTRAINT Message_matchId_fkey FOREIGN KEY (matchId) REFERENCES public.Match(id),
+  CONSTRAINT Message_senderId_fkey FOREIGN KEY (senderId) REFERENCES public.User(id)
+);
+CREATE TABLE public.Project (
+  id text NOT NULL,
+  userId text NOT NULL,
+  title text NOT NULL,
+  description text NOT NULL,
+  techStack ARRAY,
+  githubUrl text,
+  liveUrl text,
+  imageUrl text,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt timestamp without time zone NOT NULL,
+  CONSTRAINT Project_pkey PRIMARY KEY (id),
+  CONSTRAINT Project_userId_fkey FOREIGN KEY (userId) REFERENCES public.User(id)
+);
+CREATE TABLE public.UploadSession (
+  id text NOT NULL,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expiresAt timestamp without time zone NOT NULL,
+  userId text NOT NULL,
+  uploadPath text NOT NULL,
+  ipAddress text NOT NULL,
+  userAgent text,
+  used boolean NOT NULL DEFAULT false,
+  usedAt timestamp without time zone,
+  confirmedAt timestamp without time zone,
+  CONSTRAINT UploadSession_pkey PRIMARY KEY (id),
+  CONSTRAINT UploadSession_userId_fkey FOREIGN KEY (userId) REFERENCES public.User(id)
+);
+CREATE TABLE public.User (
+  id text NOT NULL,
+  supabaseId text NOT NULL,
+  email text NOT NULL,
+  name text NOT NULL CHECK (upper(name) <> ALL (ARRAY['ADMIN'::text, 'ROOT'::text, 'SUPERUSER'::text, 'SYSTEM'::text])),
+  profilePicture text,
+  bio text,
+  experience text,
+  skills ARRAY,
+  interests ARRAY,
+  commitment text,
+  githubUsername text,
+  githubData jsonb,
+  githubActivity jsonb,
+  timezone text NOT NULL,
+  createdAt timestamp without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt timestamp without time zone NOT NULL,
+  banned boolean NOT NULL DEFAULT false,
+  banReason text,
+  bannedAt timestamp without time zone,
+  city text,
+  country text,
+  lastLocationAt timestamp without time zone,
+  latitude double precision,
+  locationSecret text,
+  locationSharing text NOT NULL DEFAULT 'off'::text,
+  longitude double precision,
+  locationPermission text,
+  CONSTRAINT User_pkey PRIMARY KEY (id)
+);

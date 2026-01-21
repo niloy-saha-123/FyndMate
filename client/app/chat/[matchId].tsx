@@ -20,6 +20,8 @@ import {
 } from "../../src/chat/chat.service";
 import { subscribeToMessages } from "../../src/chat/chat.realtime";
 import { supabase } from "../../src/auth/supabaseClient";
+import { useChatNotificationGuard } from "../../src/notifications/useChatNotificationGuard";
+
 
 interface Message {
   id: string;
@@ -35,6 +37,10 @@ type RealtimeEvent = "upsert" | "delete" | "match_inactive";
 export default function ChatScreen() {
   const { matchId } = useLocalSearchParams<{ matchId?: string }>();
   const { user } = useAuth();
+
+  if (matchId) {
+    useChatNotificationGuard(matchId);
+  }
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
