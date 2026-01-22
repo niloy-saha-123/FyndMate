@@ -78,7 +78,24 @@ export class MatchService {
                 },
             });
 
-            // 3. Create Initial Messages
+            // 3. Create Notification Preferences for both users
+            await tx.matchNotificationPreference.create({
+                data: {
+                    matchId: match.id,
+                    userId: u1,
+                    enabled: true,
+                },
+            });
+
+            await tx.matchNotificationPreference.create({
+                data: {
+                    matchId: match.id,
+                    userId: u2,
+                    enabled: true,
+                },
+            });
+
+            // 4. Create Initial Messages
             // Message 1: The Liker's Intro (User B)
             const now = new Date();
             if (introContent) {
@@ -105,7 +122,7 @@ export class MatchService {
                 });
             }
 
-            // 4. Archive Like
+            // 5. Archive Like
             await tx.like.update({
                 where: { id: likeId },
                 data: { status: 'archived' },

@@ -7,12 +7,31 @@ import { supabase } from '../auth/supabaseClient';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
+    shouldShowBanner: true,      // Show banner at top
+    shouldShowList: true,        // Show in notification list
+    shouldPlaySound: true,       // Play sound
+    shouldSetBadge: true,        // Show app badge
   }),
 });
+
+// Setup listeners for incoming push notifications
+export function setupNotificationListeners() {
+  // Listen for notifications arriving while app is in foreground
+  const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
+    console.log('📬 Notification received:', notification);
+  });
+
+  // Listen for user interactions with notifications
+  const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
+    console.log('👆 Notification clicked:', response.notification.request.content.data);
+  });
+
+  // Return cleanup function
+  return () => {
+    notificationListener.remove();
+    responseListener.remove();
+  };
+}
 
 export async function sendTestNotification() {
   await Notifications.scheduleNotificationAsync({
