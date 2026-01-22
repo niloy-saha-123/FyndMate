@@ -1,14 +1,32 @@
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     console.log("🚀 Notification function triggered");
-    const { record } = await req.json();
+    
+    let record;
+    try {
+      const body = await req.json();
+      record = body.record;
+    } catch (parseError) {
+      console.error("❌ Failed to parse request body:", parseError);
+      return new Response("Invalid JSON body", { status: 400, headers: corsHeaders });
+    }
 
     if (!record) {
       console.log("❌ No record provided");
-      return new Response("No record provided", { status: 400 });
+      return new Response("No record provided", { status: 400, headers: corsHeaders });
     }
 
     const {
@@ -16,6 +34,11 @@ serve(async (req) => {
       senderId,
       content
     } = record;
+
+    if (!matchId || !senderId) {
+      console.log("❌ Missing required fields:", { matchId, senderId });
+      return new Response("Missing matchId or senderId", { status: 400, headers: corsHeaders });
+    }
 
     console.log(`📨 Processing message from ${senderId} in match ${matchId}`);
 
@@ -33,19 +56,19 @@ serve(async (req) => {
 
     if (matchError || !match) {
       console.log("❌ Match not found:", matchError);
-      return new Response("Match not found", { status: 200 });
+      return new Response("Match not found", { status: 200, headers: corsHeaders });
     }
 
     console.log("✅ Match found:", match);
 
     if (match.status !== "active") {
       console.log("❌ Match inactive");
-      return new Response("Match inactive", { status: 200 });
+      return new Response("Match inactive", { status: 200, headers: corsHeaders });
     }
 
     if (match.blockedBy) {
       console.log("❌ Match blocked");
-      return new Response("Match blocked", { status: 200 });
+      return new Response("Match blocked", { status: 200, headers: corsHeaders });
     }
 
     // 4️⃣ Determine receiver
@@ -56,7 +79,7 @@ serve(async (req) => {
 
     if (!receiverId || receiverId === senderId) {
       console.log("❌ Invalid receiver");
-      return new Response("Invalid receiver", { status: 200 });
+      return new Response("Invalid receiver", { status: 200, headers: corsHeaders });
     }
 
     console.log(`👤 Receiver ID: ${receiverId}`);
@@ -70,12 +93,12 @@ serve(async (req) => {
 
     if (pref && pref.enabled === false) {
       console.log("❌ Notifications muted for this user");
-      return new Response("Notifications muted", { status: 200 });
+      return new Response("Notifications muted", { status: 200, headers: corsHeaders });
     }
 
     if (match.blockedBy === receiverId) {
       console.log("❌ Receiver blocked sender");
-      return new Response("Receiver blocked sender", { status: 200 });
+      return new Response("Receiver blocked sender", { status: 200, headers: corsHeaders });
     }
 
     // 6️⃣ Fetch sender name + receiver push token
@@ -94,7 +117,7 @@ serve(async (req) => {
 
     if (!receiver?.pushToken) {
       console.log("❌ No push token for receiver");
-      return new Response("No push token", { status: 200 });
+      return new Response("No push token", { status: 200, headers: corsHeaders });
     }
 
     const senderName = sender?.name ?? "New message";
@@ -104,24 +127,42 @@ serve(async (req) => {
       "https://exp.host/--/api/v2/push/send",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Accept-Encoding": "gzip, deflate"
+        },
         body: JSON.stringify({
           to: receiver.pushToken,
           sound: "default",
           title: senderName,
-          body: content,
-          data: { matchId }
+          body: content ?? "New message",
+          data: { matchId, senderId },
+          priority: "high",
+          channelId: "default"
         })
       }
     );
 
     const result = await response.json();
-    console.log("✅ Expo response:", result);
+    console.log("✅ Expo response:", JSON.stringify(result));
 
-    return new Response("Push sent", { status: 200 });
+    // Check for Expo push errors
+    if (result.data?.status === "error") {
+      console.error("❌ Expo push error:", result.data.message);
+      return new Response(`Push error: ${result.data.message}`, { status: 200, headers: corsHeaders });
+    }
+
+    return new Response(JSON.stringify({ success: true, result }), { 
+      status: 200, 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    });
 
   } catch (error) {
     console.error("❌ Push function error:", error);
-    return new Response("Internal error", { status: 500 });
+    return new Response(JSON.stringify({ error: String(error) }), { 
+      status: 500, 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    });
   }
 });
