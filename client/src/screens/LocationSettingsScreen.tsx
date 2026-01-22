@@ -60,13 +60,25 @@ export const LocationSettingsScreen = () => {
         lastUpdated,
         updateLocationNow,
         changePreference,
+        initialized,
     } = useLocation();
 
     const isEnabled = preference === 'on';
 
     const handleToggle = (value: boolean) => {
+        console.log('📍 Toggle location:', value ? 'ON' : 'OFF');
         changePreference(value ? 'on' : 'off');
     };
+
+    // Show loading state until preferences are loaded
+    if (!initialized) {
+        return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={[styles.headerTitle, { marginTop: 16 }]}>Loading...</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
