@@ -13,7 +13,6 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  // Un-comment this if you want to handle global auth redirects here
   /*
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(

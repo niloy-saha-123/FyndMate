@@ -19,7 +19,7 @@ const ACTIVE = "#6058AE";      // purple (selected)
 // Map route names to Ionicons icon names (likes uses custom image, profilePage uses user's avatar)
 const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
   index: 'home-outline',
-  matches: 'chatbubble-outline',
+  chat: 'chatbubble-outline',
 };
 
 type TabKey = keyof typeof ICON_MAP;
