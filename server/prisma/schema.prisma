@@ -9,39 +9,51 @@ datasource db {
 }
 
 model User {
-  id             String          @id @default(cuid())
-  supabaseId     String          @unique
-  email          String          @unique
-  name           String
-  profilePicture String?
-  bio            String?
-  experience     String?
-  skills         String[]
-  interests      String[]
-  commitment     String?
-  githubUsername String?         @unique
-  githubData     Json?
-  githubActivity Json?
-  location       String
-  timezone       String
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  auditLogs      AuditLog[]      @relation("UserAuditLogs")
-  matchesAsUser1 Match[]         @relation("User1Matches")
-  matchesAsUser2 Match[]         @relation("User2Matches")
-  sentMessages   Message[]       @relation("SentMessages")
-  projects       Project[]
-  likesReceived  Like[]          @relation("LikesReceived")
-  likesMade      Like[]          @relation("LikesMade")
-  blocksMade     Block[]         @relation("BlocksMade")
-  blocksReceived Block[]         @relation("BlocksReceived")
-
-  
-  // Safety & Moderation
-  banned         Boolean         @default(false)
-  banReason      String?
-  bannedAt       DateTime?
-  uploadSessions UploadSession[] @relation("UserUploadSessions")
+  id                          String                        @id @default(cuid())
+  supabaseId                  String                        @unique
+  email                       String                        @unique
+  name                        String
+  profilePicture              String?
+  bio                         String?
+  experience                  String?
+  skills                      String[]
+  interests                   String[]
+  commitment                  String?
+  githubUsername              String?                       @unique
+  githubData                  Json?
+  githubActivity              Json?
+  timezone                    String
+  createdAt                   DateTime                      @default(now())
+  updatedAt                   DateTime                      @updatedAt
+  banned                      Boolean                       @default(false)
+  banReason                   String?
+  bannedAt                    DateTime?
+  city                        String?
+  country                     String?
+  lastLocationAt              DateTime?
+  latitude                    Float?
+  locationSecret              String?                       @default(cuid())
+  locationSharing             String                        @default("off")
+  longitude                   Float?
+  locationPermission          String?
+  pushToken                   String?
+  pushTokenUpdatedAt          DateTime?                     @db.Timestamp(6)
+  location                    String?                       @default("Unknown")
+  fullName                    String?
+  birthDate                   DateTime?                     @db.Date
+  gender                      String?
+  onboardingCompleted         Boolean?                      @default(false)
+  auditLogs                   AuditLog[]                    @relation("UserAuditLogs")
+  blocksReceived              Block[]                       @relation("BlocksReceived")
+  blocksMade                  Block[]                       @relation("BlocksMade")
+  likesReceived               Like[]                        @relation("LikesReceived")
+  likesMade                   Like[]                        @relation("LikesMade")
+  matchesAsUser1              Match[]                       @relation("User1Matches")
+  matchesAsUser2              Match[]                       @relation("User2Matches")
+  MatchNotificationPreference MatchNotificationPreference[]
+  sentMessages                Message[]                     @relation("SentMessages")
+  projects                    Project[]
+  uploadSessions              UploadSession[]               @relation("UserUploadSessions")
 
   @@index([supabaseId])
   @@index([githubUsername])
@@ -68,28 +80,31 @@ model Like {
   id        String   @id @default(cuid())
   likerId   String
   likedId   String
-  liked     Boolean  // true=LIKE, false=PASS
-  message   String?  // Required if liked=true (min 20 chars for Intro)
-  status    String   @default("active")  // 'active', 'archived'
+  liked     Boolean
+  message   String?
+  status    String   @default("active")
   createdAt DateTime @default(now())
-  
   likedUser User     @relation("LikesReceived", fields: [likedId], references: [id], onDelete: Cascade)
   likerUser User     @relation("LikesMade", fields: [likerId], references: [id], onDelete: Cascade)
 
   @@unique([likerId, likedId])
   @@index([likerId, liked])
-  @@index([likedId, status, liked]) // Critical for Likes Section query
+  @@index([likedId, status, liked])
+  @@index([likerId])
+  @@index([likedId])
 }
 
 model Match {
-  id        String    @id @default(cuid())
-  user1Id   String
-  user2Id   String
-  status    String    @default("active") // 'active', 'unmatched'
-  createdAt DateTime  @default(now())
-  user1     User      @relation("User1Matches", fields: [user1Id], references: [id], onDelete: Cascade)
-  user2     User      @relation("User2Matches", fields: [user2Id], references: [id], onDelete: Cascade)
-  messages  Message[]
+  id                          String                        @id @default(cuid())
+  user1Id                     String
+  user2Id                     String
+  status                      String                        @default("active")
+  createdAt                   DateTime                      @default(now())
+  blockedBy                   String?
+  user1                       User                          @relation("User1Matches", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2                       User                          @relation("User2Matches", fields: [user2Id], references: [id], onDelete: Cascade)
+  MatchNotificationPreference MatchNotificationPreference[]
+  messages                    Message[]
 
   @@unique([user1Id, user2Id])
   @@index([user1Id])
@@ -102,22 +117,22 @@ model Block {
   blockerId String
   blockedId String
   createdAt DateTime @default(now())
-  
-  blocker   User @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
-  blocked   User @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocker   User     @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
 
   @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
 }
 
-
-
 model Message {
-  id        String    @id @default(cuid())
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   matchId   String
   senderId  String
   content   String
   createdAt DateTime  @default(now())
   readAt    DateTime?
+  editedAt  DateTime? @db.Timestamp(6)
   match     Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
   sender    User      @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
@@ -165,4 +180,20 @@ model UploadSession {
   @@index([uploadPath])
   @@index([used])
   @@index([expiresAt])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model MatchNotificationPreference {
+  id        String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  matchId   String
+  userId    String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @db.Timestamp(6)
+  Match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([matchId, userId], map: "MatchNotificationPreference_unique")
+  @@index([matchId], map: "idx_match_notification_pref_match")
+  @@index([userId], map: "idx_match_notification_pref_user")
 }

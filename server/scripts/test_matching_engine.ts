@@ -69,7 +69,8 @@ async function main() {
             supabaseId: `auth_${name}`,
             profilePicture: `https://avatar.com/${name}`,
             bio: `I am ${name}`,
-            location: "Test City",
+            city: "San Francisco",
+            country: "USA",
             timezone: "UTC"
         }
     });

@@ -4,6 +4,7 @@
  *
  * Provides upload state management, progress tracking, and error handling.
  * Integrates with uploadService.ts for the actual upload logic.
+ * Token is automatically sourced from AuthProvider context.
  *
  * Usage:
  * ```tsx
@@ -22,6 +23,7 @@
 
 import { useState, useCallback } from 'react';
 import { uploadProfilePicture, validateImage } from '../services/uploadService';
+import { useAuth } from '../auth/AuthProvider';
 
 export interface UploadProgress {
   step: string;
@@ -37,11 +39,13 @@ export interface UploadHookState {
 
 /**
  * Hook for managing profile picture upload state and operations
+ * Token is automatically sourced from AuthProvider - no need to pass it manually.
  *
- * @param authToken - JWT token for authentication (can be from context/store)
  * @returns Upload functions and state
  */
-export function useProfilePictureUpload(authToken?: string) {
+export function useProfilePictureUpload() {
+  const { accessToken } = useAuth();
+  
   const [state, setState] = useState<UploadHookState>({
     uploading: false,
     progress: null,
@@ -80,17 +84,14 @@ export function useProfilePictureUpload(authToken?: string) {
    * Handles the complete upload flow with progress tracking
    *
    * @param imageUri - Image URI from image picker (file:// or blob:)
-   * @param token - Optional auth token override
    * @returns Public URL of uploaded image
    * @throws Error if upload fails
    */
   const upload = useCallback(async (
-    imageUri: string,
-    token?: string
+    imageUri: string
   ): Promise<string> => {
-    const jwtToken = token || authToken;
-    if (!jwtToken) {
-      throw new Error('Authentication token required');
+    if (!accessToken) {
+      throw new Error('Not authenticated. Please login first.');
     }
 
     // Reset state
@@ -117,7 +118,7 @@ export function useProfilePictureUpload(authToken?: string) {
       // Perform upload with progress callback
       const publicUrl = await uploadProfilePicture(
         imageUri,
-        jwtToken,
+        accessToken,
         (step, progress) => {
           setState(prev => ({
             ...prev,
@@ -150,7 +151,7 @@ export function useProfilePictureUpload(authToken?: string) {
 
       throw error;
     }
-  }, [authToken, validateImageFile]);
+  }, [accessToken, validateImageFile]);
 
   /**
    * Retry last upload (if it failed)

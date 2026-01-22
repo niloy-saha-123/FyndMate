@@ -41,13 +41,25 @@ export class LikeService {
         }
 
         // 3. Validation: User Existence Check
-        // Verify the target user exists before attempting to create a like
+        // Verify the target user exists        // 3. Validation: Target User Exists
         const targetUser = await prisma.user.findUnique({
             where: { id: likedId },
             select: { id: true }
         });
         if (!targetUser) {
-            throw new Error("User not found or does not exist.");
+            // Log internally for debugging (helps detect abuse)
+            console.warn('Like attempt on non-existent user', {
+                likerId,
+                likedId,
+                timestamp: new Date().toISOString()
+            });
+
+            // Return generic error to prevent user enumeration
+            // Attacker cannot distinguish between:
+            // - User doesn't exist
+            // - User is blocked
+            // - Other validation failures
+            throw new Error("Cannot interact with this user.");
         }
 
         // 4. Validation: Block Check
@@ -139,36 +151,57 @@ export class LikeService {
      * Logic: Users who liked ME, where status='active'.
      */
     async getReceivedLikes(userId: string, limit = 20, cursor?: string) {
-        return await prisma.like.findMany({
-            take: limit,
-            skip: cursor ? 1 : 0,
-            cursor: cursor ? { id: cursor } : undefined,
-            where: {
-                likedId: userId,
-                liked: true,
-                status: 'active',
-                // Also ensure NO blocks
-                likerUser: {
-                    blocksReceived: { none: { blockerId: userId } }, // I didn't block them
-                    blocksMade: { none: { blockedId: userId } }      // They didn't block me
-                }
-            },
-            include: {
-                likerUser: {
-                    select: {
-                        id: true,
-                        name: true,
-                        profilePicture: true,
-                        bio: true,
-                        skills: true,
-                        // Add other profile fields allowed in card
+        // PERFORMANCE OPTIMIZATION:
+        // 1. Fetch raw likes (fast with index on likedId)
+        // 2. Fetch blocks (fast with indexes)
+        // 3. Filter in memory
+
+        const [likes, blocks] = await Promise.all([
+            prisma.like.findMany({
+                take: limit,
+                skip: cursor ? 1 : 0,
+                cursor: cursor ? { id: cursor } : undefined,
+                where: {
+                    likedId: userId,
+                    liked: true,
+                    status: 'active',
+                },
+                include: {
+                    likerUser: {
+                        select: {
+                            id: true,
+                            name: true,
+                            profilePicture: true,
+                            bio: true,
+                            skills: true,
+                            // Add other profile fields allowed in card
+                        },
                     },
                 },
-            },
-            orderBy: {
-                createdAt: 'desc',
-            },
+                orderBy: {
+                    createdAt: 'desc',
+                },
+            }),
+            prisma.block.findMany({
+                where: {
+                    OR: [
+                        { blockerId: userId },
+                        { blockedId: userId }
+                    ]
+                },
+                select: { blockerId: true, blockedId: true }
+            })
+        ]);
+
+        // Create Set of blocked IDs for O(1) lookup
+        const blockedIds = new Set<string>();
+        blocks.forEach(b => {
+            blockedIds.add(b.blockerId);
+            blockedIds.add(b.blockedId);
         });
+
+        // Filter out blocked users
+        return likes.filter(like => !blockedIds.has(like.likerUser.id));
     }
 
     /**

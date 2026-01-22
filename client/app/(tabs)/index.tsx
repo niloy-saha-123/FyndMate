@@ -24,12 +24,11 @@
 import React, { useEffect } from 'react';
 import { View, Text, Button, StyleSheet, ActivityIndicator, ScrollView, TextInput } from 'react-native';
 import { useFeed } from '@/src/hooks/useFeed';
-// import { useAuth } from '@/src/context/AuthContext'; // Assuming you have this
+import { useAuth } from '@/src/auth/AuthProvider';
 
 export default function FeedScreen() {
-  // TODO: Get real token from AuthContext
-  const token = "debug-token";
-  const { profiles, loading, error, hasMore, fetchFeed, swipe } = useFeed(token);
+  const { isAuthenticated } = useAuth();
+  const { profiles, loading, error, hasMore, fetchFeed, swipe } = useFeed();
 
   const [message, setMessage] = React.useState("");
 

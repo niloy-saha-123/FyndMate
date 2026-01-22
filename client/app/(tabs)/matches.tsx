@@ -24,10 +24,11 @@ import React, { useEffect } from 'react';
 import { View, Text, Button, StyleSheet, FlatList, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { useMatches } from '@/src/hooks/useMatches';
 import { Match } from '@/src/services/matchingService';
+import { useAuth } from '@/src/auth/AuthProvider';
 
 export default function MatchesScreen() {
-    const token = "debug-token"; // TODO: Auth
-    const { matches, loading, error, fetchMatches, onUnmatch, onBlock } = useMatches(token);
+    const { isAuthenticated } = useAuth();
+    const { matches, loading, error, fetchMatches, onUnmatch, onBlock } = useMatches();
 
     useEffect(() => {
         fetchMatches();
