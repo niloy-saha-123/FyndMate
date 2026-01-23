@@ -1,3 +1,8 @@
+/**
+ * @file src/services/auth.service.ts
+ * @description Authentication service handling user signup and validation.
+ */
+
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 
 const BLOCKED_NAMES = [
