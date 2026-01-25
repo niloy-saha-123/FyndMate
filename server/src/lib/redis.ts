@@ -3,6 +3,11 @@
 // Uses the REDIS_URL environment variable (e.g., redis://:password@host:6379/0).
 import Redis from 'ioredis';
 
+// Validate REDIS_URL in production
+if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL) {
+    throw new Error('REDIS_URL environment variable is required in production');
+}
+
 const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
     // Connection timeout: fail fast if Redis is unavailable
     connectTimeout: 5000,
@@ -34,19 +39,20 @@ redis.on('connect', () => {
 
 redis.on('ready', async () => {
     console.info('Redis ready to accept commands');
-    
+
     // Configure Redis persistence and memory policies
+    // TODO: For managed Redis (AWS ElastiCache, Upstash), configure these settings server-side instead
     try {
         // Enable RDB persistence: save snapshot every 5 minutes if at least 1 key changed
         await redis.config('SET', 'save', '300 1');
-        
+
         // Set maxmemory policy: evict least recently used keys when memory limit reached
         await redis.config('SET', 'maxmemory-policy', 'allkeys-lru');
-        
+
         // Optional: Set maxmemory limit (adjust based on your Redis instance)
         // Default: commented out to use Redis server's configured value
         // await redis.config('SET', 'maxmemory', '256mb');
-        
+
         console.info('Redis persistence and memory policies configured');
     } catch (err) {
         console.warn('Could not configure Redis policies (may need elevated permissions):', err);

@@ -9,6 +9,7 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { sanitizeLocationResponse } from './middleware/sanitizeLocation.js';
 import { prisma } from './lib/prisma.js';
+import { redis } from './lib/redis.js';
 import uploadRoutes from './routes/upload.routes.js';
 import { locationRoutes } from './routes/location.js';
 import authRoutes from './routes/auth.js';
@@ -47,6 +48,7 @@ export async function buildApp() {
 
   app.addHook('onClose', async () => {
     await prisma.$disconnect();
+    await redis.quit();
   });
 
   // Health check

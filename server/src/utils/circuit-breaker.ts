@@ -27,22 +27,33 @@ const DEFAULT_OPTIONS: CircuitBreakerOptions = {
 
 /**
  * Check if circuit is open (service is considered down)
+ * Fails open if Redis is unavailable (allows request through)
  */
 export async function isCircuitOpen(serviceName: string): Promise<boolean> {
-    const key = `circuit:${serviceName}:open`;
-    const isOpen = await redis.get(key);
-    return isOpen === '1';
+    try {
+        const key = `circuit:${serviceName}:open`;
+        const isOpen = await redis.get(key);
+        return isOpen === '1';
+    } catch (err) {
+        console.error('Redis error in circuit breaker check, failing open:', err);
+        return false; // Fail open - allow request if Redis is unavailable
+    }
 }
 
 /**
  * Record a successful call (resets failure count)
  */
 export async function recordSuccess(serviceName: string): Promise<void> {
-    const failKey = `circuit:${serviceName}:failures`;
-    const openKey = `circuit:${serviceName}:open`;
+    try {
+        const failKey = `circuit:${serviceName}:failures`;
+        const openKey = `circuit:${serviceName}:open`;
 
-    await redis.del(failKey);
-    await redis.del(openKey);
+        await redis.del(failKey);
+        await redis.del(openKey);
+    } catch (err) {
+        console.error('Redis error in circuit breaker recordSuccess:', err);
+        // Non-critical: circuit may stay open longer than needed
+    }
 }
 
 /**
@@ -52,21 +63,27 @@ export async function recordFailure(
     serviceName: string,
     options: Partial<CircuitBreakerOptions> = {}
 ): Promise<void> {
-    const opts = { ...DEFAULT_OPTIONS, ...options };
-    const failKey = `circuit:${serviceName}:failures`;
-    const openKey = `circuit:${serviceName}:open`;
+    try {
+        const opts = { ...DEFAULT_OPTIONS, ...options };
+        const failKey = `circuit:${serviceName}:failures`;
+        const openKey = `circuit:${serviceName}:open`;
 
-    const failureCount = await redis.incr(failKey);
+        const failureCount = await redis.incr(failKey);
 
-    // Set expiry on first failure
-    if (failureCount === 1) {
-        await redis.expire(failKey, opts.windowSeconds);
-    }
+        // Set expiry on first failure
+        // TODO: Replace INCR+EXPIRE with atomic Lua script to prevent key leaks on server crash
+        if (failureCount === 1) {
+            await redis.expire(failKey, opts.windowSeconds);
+        }
 
-    // Open circuit if threshold exceeded
-    if (failureCount >= opts.failureThreshold) {
-        await redis.set(openKey, '1', 'EX', opts.cooldownSeconds);
-        console.warn(`Circuit breaker opened for ${serviceName} after ${failureCount} failures`);
+        // Open circuit if threshold exceeded
+        if (failureCount >= opts.failureThreshold) {
+            await redis.set(openKey, '1', 'EX', opts.cooldownSeconds);
+            console.warn(`Circuit breaker opened for ${serviceName} after ${failureCount} failures`);
+        }
+    } catch (err) {
+        console.error('Redis error in circuit breaker recordFailure:', err);
+        // Non-critical: circuit won't track failures, but original error still propagates
     }
 }
 

@@ -25,7 +25,11 @@ export class MatchService {
      * 4. Archives the original Like
      */
     async acceptLike(likeId: string, replyMessage?: string): Promise<Match> {
-        return await prisma.$transaction(async (tx) => {
+        // Extract user IDs for cache invalidation after transaction completes
+        let likerId: string;
+        let likedId: string;
+
+        const match = await prisma.$transaction(async (tx) => {
             const like = await tx.like.findUnique({
                 where: { id: likeId }
             });
@@ -47,8 +51,8 @@ export class MatchService {
                 throw new Error("Not authorized.");
             }
 
-            const likerId = String(like.likerId);
-            const likedId = String(like.likedId);
+            likerId = String(like.likerId);
+            likedId = String(like.likedId);
             const introContent = like.message;
 
             const [u1, u2] = [likerId, likedId].sort();
@@ -64,7 +68,7 @@ export class MatchService {
                 return existingMatch;
             }
 
-            const match = await tx.match.create({
+            const newMatch = await tx.match.create({
                 data: {
                     user1Id: u1,
                     user2Id: u2,
@@ -77,7 +81,7 @@ export class MatchService {
             if (introContent) {
                 await tx.message.create({
                     data: {
-                        matchId: match.id,
+                        matchId: newMatch.id,
                         senderId: likerId,
                         content: introContent,
                         createdAt: now,
@@ -89,7 +93,7 @@ export class MatchService {
             if (replyMessage && replyMessage.trim().length > 0) {
                 await tx.message.create({
                     data: {
-                        matchId: match.id,
+                        matchId: newMatch.id,
                         senderId: likedId,
                         content: replyMessage,
                         createdAt: new Date(now.getTime() + 1), // Ensure chronological order
@@ -102,14 +106,16 @@ export class MatchService {
                 data: { status: 'archived' },
             });
 
-            // Invalidate Feed Cache for both users
-            await Promise.all([
-                redis.del(`feed:${likerId}`),
-                redis.del(`feed:${likedId}`)
-            ]);
-
-            return match;
+            return newMatch;
         });
+
+        // Cache invalidation AFTER transaction succeeds (prevents inconsistency on rollback)
+        await Promise.all([
+            redis.del(`feed:${likerId!}`),
+            redis.del(`feed:${likedId!}`)
+        ]);
+
+        return match;
     }
 
     /**
