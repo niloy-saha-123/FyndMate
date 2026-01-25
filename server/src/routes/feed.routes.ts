@@ -1,22 +1,21 @@
 /**
  * @file src/routes/feed.routes.ts
- * @description API Endpoint for the Discovery Feed.
- * 
- * ENDPOINTS:
- * - GET /api/feed
- *   - Fetches a list of compatible users for the swipe deck.
- *   - Params: ?limit=20&cursor=timestamp
- *   - Auth: Protected (Requires JWT)
+ * @description API endpoint for fetching the user discovery feed.
  */
+
 import { FastifyInstance } from 'fastify';
 import { authMiddleware } from '../middleware/auth.middleware.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import { feedService } from '../services/feed.service.js';
 import { feedQuerySchema } from '../schemas/matching.schema.js';
 
 export default async function feedRoutes(app: FastifyInstance) {
     // GET /api/feed
     app.get('/', {
-        preHandler: [authMiddleware],
+        preHandler: [
+            authMiddleware,
+            rateLimit({ limit: 60, windowSec: 60, keyPrefix: 'feed_req' })
+        ],
     }, async (request, reply) => {
         const user = request.user!;
 

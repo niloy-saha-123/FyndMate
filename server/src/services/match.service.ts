@@ -1,62 +1,60 @@
 /**
  * @file src/services/match.service.ts
- * @description Manages active connections, chat initiation, and unmatching.
- * 
- * CORE RESPONSIBILITIES:
- * 1. Transactional Acceptance: Converts a 'Like' into a 'Match' atomically.
- *    - Archives the Like -> Creates Match -> Creates Intro Message.
- *    - This ensures no data is lost during the handshake.
- * 2. Unmatching: Soft-deletes the connection (status='unmatched').
- *    - Prevents users from ever seeing each other again.
- * 3. Match List: Retrieves the user's active matches for the "Chats" screen.
- * 
- * Used by: matching.routes.ts
+ * @description Manages active connections, chat initiation, and unmatching logic.
  */
+
+import { Prisma, Match } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
+import { redis } from '../lib/redis.js';
+
+type MatchWithUsers = Prisma.MatchGetPayload<{
+    include: {
+        user1: { select: { id: true; name: true; profilePicture: true } };
+        user2: { select: { id: true; name: true; profilePicture: true } };
+        messages: true;
+    }
+}>;
 
 export class MatchService {
     /**
      * Accept a Like and create a Match.
-     * Atomic Transaction:
-     * 1. Check/Lock Like.
-     * 2. Archive Like.
-     * 3. Create Match.
-     * 4. Create Initial Messages.
+     * Executes atomically using a transaction:
+     * 1. Verifies/Locks the Like
+     * 2. Creates the Match
+     * 3. Creates initial messages (Intro + Reply)
+     * 4. Archives the original Like
      */
-    async acceptLike(likeId: string, replyMessage?: string) {
-        return await prisma.$transaction(async (tx) => {
-            // 1. Get Like
+    async acceptLike(likeId: string, replyMessage?: string): Promise<Match> {
+        // Extract user IDs for cache invalidation after transaction completes
+        let likerId: string;
+        let likedId: string;
+
+        const match = await prisma.$transaction(async (tx) => {
             const like = await tx.like.findUnique({
                 where: { id: likeId }
             });
 
             if (!like) {
-                // Log internally for debugging
                 console.warn('Accept attempt on non-existent like', {
                     likeId,
                     timestamp: new Date().toISOString()
                 });
-                // Generic error prevents like ID enumeration
                 throw new Error("Not authorized.");
             }
 
             if (like.status !== 'active') {
-                // Log internally for debugging
                 console.warn('Accept attempt on inactive like', {
                     likeId,
                     status: like.status,
                     timestamp: new Date().toISOString()
                 });
-                // Generic error prevents status leakage
                 throw new Error("Not authorized.");
             }
 
-            // Capture IDs immediately to prevent any proxy/reference issues
-            const likerId = String(like.likerId);
-            const likedId = String(like.likedId);
+            likerId = String(like.likerId);
+            likedId = String(like.likedId);
             const introContent = like.message;
 
-            // 2. Create Match
             const [u1, u2] = [likerId, likedId].sort();
 
             const existingMatch = await tx.match.findUnique({
@@ -70,7 +68,7 @@ export class MatchService {
                 return existingMatch;
             }
 
-            const match = await tx.match.create({
+            const newMatch = await tx.match.create({
                 data: {
                     user1Id: u1,
                     user2Id: u2,
@@ -81,7 +79,7 @@ export class MatchService {
             // 3. Create Notification Preferences for both users
             await tx.matchNotificationPreference.create({
                 data: {
-                    matchId: match.id,
+                    matchId: newMatch.id,
                     userId: u1,
                     enabled: true,
                 },
@@ -89,7 +87,7 @@ export class MatchService {
 
             await tx.matchNotificationPreference.create({
                 data: {
-                    matchId: match.id,
+                    matchId: newMatch.id,
                     userId: u2,
                     enabled: true,
                 },
@@ -101,50 +99,55 @@ export class MatchService {
             if (introContent) {
                 await tx.message.create({
                     data: {
-                        matchId: match.id,
+                        matchId: newMatch.id,
                         senderId: likerId,
                         content: introContent,
-                        createdAt: now,  // Explicit timestamp
+                        createdAt: now,
                     },
                 });
             }
 
-            // Message 2: The Accepter's Reply (User A)
-            // Add 1ms to ensure it's always newer than intro
+            // Create Reply Message (from Accepter)
             if (replyMessage && replyMessage.trim().length > 0) {
                 await tx.message.create({
                     data: {
-                        matchId: match.id,
+                        matchId: newMatch.id,
                         senderId: likedId,
                         content: replyMessage,
-                        createdAt: new Date(now.getTime() + 1),  // 1ms later
+                        createdAt: new Date(now.getTime() + 1), // Ensure chronological order
                     }
                 });
             }
 
-            // 5. Archive Like
+            // 4. Archive Like
             await tx.like.update({
                 where: { id: likeId },
                 data: { status: 'archived' },
             });
 
-            return match;
+            return newMatch;
         });
+
+        // Cache invalidation AFTER transaction succeeds (prevents inconsistency on rollback)
+        await Promise.all([
+            redis.del(`feed:${likerId!}`),
+            redis.del(`feed:${likedId!}`)
+        ]);
+
+        return match;
     }
 
     /**
      * Unmatch a user.
+     * Soft-deletes the match by setting status to 'unmatched'.
      */
     async unmatch(matchId: string, requestingUserId: string) {
         const match = await prisma.match.findUnique({ where: { id: matchId } });
 
-        // Combine all authorization checks into one generic error
-        // This prevents match ID enumeration and status leakage
         if (!match ||
             match.status === 'unmatched' ||
             (match.user1Id !== requestingUserId && match.user2Id !== requestingUserId)) {
 
-            // Log internally for debugging
             console.warn('Unauthorized unmatch attempt', {
                 matchId,
                 requestingUserId,
@@ -153,13 +156,9 @@ export class MatchService {
                 timestamp: new Date().toISOString()
             });
 
-            // Generic error for all failure cases
             throw new Error("Not authorized.");
         }
 
-        // Soft delete / Hide
-        // Plan says: "Update Match status -> 'unmatched'. Soft delete chat?"
-        // Let's set status.
         return await prisma.match.update({
             where: { id: matchId },
             data: { status: 'unmatched' }
@@ -167,9 +166,9 @@ export class MatchService {
     }
 
     /**
-     * Get User's Matches (The "Inbox" / Chat List)
+     * Get User's Matches (Active connections).
      */
-    async getMatches(userId: string) {
+    async getMatches(userId: string): Promise<MatchWithUsers[]> {
         return await prisma.match.findMany({
             where: {
                 OR: [
@@ -183,14 +182,16 @@ export class MatchService {
                 user2: { select: { id: true, name: true, profilePicture: true } },
                 messages: {
                     take: 1,
-                    orderBy: { createdAt: 'desc' } // Last message preview
+                    orderBy: { createdAt: 'desc' }
                 }
             },
             orderBy: {
-                createdAt: 'desc', // Or last message time? Future improvement.
+                createdAt: 'desc',
             }
         });
     }
 }
 
 export const matchService = new MatchService();
+
+export type { MatchWithUsers };

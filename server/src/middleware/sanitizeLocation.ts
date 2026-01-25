@@ -1,13 +1,7 @@
 /**
  * @file src/middleware/sanitizeLocation.ts
- * @description Middleware to sanitize location data in API responses.
- * 
- * SECURITY PURPOSE:
- * This middleware ensures that sensitive location fields (latitude, longitude, locationSecret)
- * are NEVER exposed in API responses, even if a developer accidentally selects them.
- * 
- * This is a defense-in-depth measure - even if someone makes a mistake in the code,
- * this middleware will strip sensitive fields before sending to the client.
+ * @description Middleware to strip sensitive location data from API responses.
+ * Ensures fields like latitude/longitude are never exposed to the client.
  */
 
 import { FastifyRequest, FastifyReply } from 'fastify';

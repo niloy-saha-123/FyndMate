@@ -1,200 +1,113 @@
 /**
  * @file src/utils/circuit-breaker.ts
- * @description Circuit Breaker Pattern for Supabase Storage Health Checking
+ * @description Simple circuit breaker for external API calls (e.g., geocoding).
  * 
- * ============================================
- * WHAT IS THIS?
- * ============================================
- * A circuit breaker protects our app when external services (like Supabase) fail.
- * 
- * ============================================
- * THE PROBLEM IT SOLVES
- * ============================================
- * Without a circuit breaker:
- * 1. Supabase Storage goes down
- * 2. Every user request tries to connect to Supabase
- * 3. Each request waits 30+ seconds before timing out
- * 4. Server gets overwhelmed with hanging requests
- * 5. Our entire app becomes unresponsive (cascading failure)
- * 6. Users think our app is broken
- * 
- * With a circuit breaker:
- * 1. Supabase Storage goes down
- * 2. First 3 requests fail (detected quickly)
- * 3. Circuit "opens" - stops sending requests to Supabase
- * 4. All subsequent requests fail immediately with clear error
- * 5. Server stays healthy, users get instant feedback
- * 6. After 30 seconds, automatically tests if Supabase is back
- * 7. If Supabase recovered, resumes normal operation
- * 
- * ============================================
- * WHERE IS THIS USED?
- * ============================================
- * Currently wraps ALL Supabase Storage operations in:
- * - src/services/storage.service.ts
- *   - createSignedUploadUrl() - Generating upload URLs
- *   - (Future: validateUploadedFile, getPublicUrl, deleteFile)
- * 
- * Usage example:
- *   const result = await withCircuitBreaker(
- *     'createSignedUploadUrl',
- *     async () => await supabase.storage.createSignedUploadUrl(path)
- *   );
- * 
- * ============================================
- * HOW IT WORKS (3 States)
- * ============================================
- * CLOSED (Normal):
- *   - All requests go through to Supabase
- *   - Circuit is healthy
- * 
- * OPEN (Failing):
- *   - After 3 consecutive failures, circuit opens
- *   - All requests rejected immediately (no Supabase calls)
- *   - Error: "Service temporarily unavailable"
- *   - Waits 30 seconds before trying again
- * 
- * HALF_OPEN (Testing):
- *   - After 30s timeout, allows ONE test request
- *   - If succeeds → Back to CLOSED (resume normal)
- *   - If fails → Back to OPEN (wait another 30s)
- * 
- * ============================================
- * CONFIGURATION
- * ============================================
- * - failureThreshold: 3 failures → Open circuit
- * - successThreshold: 2 successes → Close circuit
- * - timeout: 30 seconds before retry
- * 
- * Adjust these based on our needs (see constructor below)
+ * Prevents cascading failures when external services are down by:
+ * - Tracking failure rate
+ * - Opening circuit after threshold failures
+ * - Auto-recovering after cooldown period
  */
 
-type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+import { redis } from '../lib/redis.js';
 
-interface CircuitBreakerConfig {
-    failureThreshold: number;    // Open circuit after N failures
-    successThreshold: number;    // Close circuit after N successes
-    timeout: number;             // How long to wait before trying again (ms)
+// TODO [10K Users]: Increase failureThreshold to 10-20 and add half-open state for gradual recovery testing
+// TODO [10K Users]: Add Prometheus metrics for circuit breaker state changes and failure rates
+
+interface CircuitBreakerOptions {
+    failureThreshold: number; // Number of failures before opening circuit
+    cooldownSeconds: number;  // Time to wait before trying again
+    windowSeconds: number;    // Time window for counting failures
 }
 
-class CircuitBreaker {
-    private state: CircuitState = 'CLOSED';
-    private failureCount: number = 0;
-    private successCount: number = 0;
-    private nextAttempt: number = Date.now();
-    private config: CircuitBreakerConfig;
-
-    constructor(config: Partial<CircuitBreakerConfig> = {}) {
-        this.config = {
-            failureThreshold: 3,      // Open after 3 failures
-            successThreshold: 2,      // Close after 2 successes
-            timeout: 30000,           // Wait 30 seconds before retry
-            ...config,
-        };
-    }
-
-    /**
-     * Check if circuit allows request
-     */
-    canRequest(): boolean {
-        if (this.state === 'CLOSED') {
-            return true;
-        }
-
-        if (this.state === 'OPEN') {
-            // Check if timeout expired
-            if (Date.now() >= this.nextAttempt) {
-                this.state = 'HALF_OPEN';
-                return true;
-            }
-            return false; // Circuit still open
-        }
-
-        // HALF_OPEN: Allow one request to test
-        return true;
-    }
-
-    /**
-     * Record successful request
-     */
-    recordSuccess(): void {
-        this.failureCount = 0;
-
-        if (this.state === 'HALF_OPEN') {
-            this.successCount++;
-            if (this.successCount >= this.config.successThreshold) {
-                this.state = 'CLOSED';
-                this.successCount = 0;
-            }
-        }
-    }
-
-    /**
-     * Record failed request
-     */
-    recordFailure(): void {
-        this.failureCount++;
-        this.successCount = 0;
-
-        if (this.failureCount >= this.config.failureThreshold) {
-            this.state = 'OPEN';
-            this.nextAttempt = Date.now() + this.config.timeout;
-        }
-    }
-
-    /**
-     * Get current state
-     */
-    getState(): CircuitState {
-        return this.state;
-    }
-
-    /**
-     * Get failure count
-     */
-    getFailureCount(): number {
-        return this.failureCount;
-    }
-}
-
-// Singleton instance for Supabase Storage
-export const supabaseStorageCircuitBreaker = new CircuitBreaker({
-    failureThreshold: 3,    // Open circuit after 3 Supabase failures
-    successThreshold: 2,    // Close circuit after 2 successes
-    timeout: 30000,         // Wait 30 seconds before retrying
-});
+const DEFAULT_OPTIONS: CircuitBreakerOptions = {
+    failureThreshold: 5,   // Open after 5 failures
+    cooldownSeconds: 60,   // Wait 1 minute before retry
+    windowSeconds: 300,    // Count failures in 5-minute window
+};
 
 /**
- * Wrap Supabase call with circuit breaker
- * 
- * @example
- * const result = await withCircuitBreaker(
- *   'upload',
- *   async () => await supabase.storage.from('bucket').upload(...)
- * );
+ * Check if circuit is open (service is considered down)
+ * Fails open if Redis is unavailable (allows request through)
+ */
+export async function isCircuitOpen(serviceName: string): Promise<boolean> {
+    try {
+        const key = `circuit:${serviceName}:open`;
+        const isOpen = await redis.get(key);
+        return isOpen === '1';
+    } catch (err) {
+        console.error('Redis error in circuit breaker check, failing open:', err);
+        return false; // Fail open - allow request if Redis is unavailable
+    }
+}
+
+/**
+ * Record a successful call (resets failure count)
+ */
+export async function recordSuccess(serviceName: string): Promise<void> {
+    try {
+        const failKey = `circuit:${serviceName}:failures`;
+        const openKey = `circuit:${serviceName}:open`;
+
+        await redis.del(failKey);
+        await redis.del(openKey);
+    } catch (err) {
+        console.error('Redis error in circuit breaker recordSuccess:', err);
+        // Non-critical: circuit may stay open longer than needed
+    }
+}
+
+/**
+ * Record a failed call (increments failure count, may open circuit)
+ */
+export async function recordFailure(
+    serviceName: string,
+    options: Partial<CircuitBreakerOptions> = {}
+): Promise<void> {
+    try {
+        const opts = { ...DEFAULT_OPTIONS, ...options };
+        const failKey = `circuit:${serviceName}:failures`;
+        const openKey = `circuit:${serviceName}:open`;
+
+        const failureCount = await redis.incr(failKey);
+
+        // Set expiry on first failure
+        // TODO: Replace INCR+EXPIRE with atomic Lua script to prevent key leaks on server crash
+        if (failureCount === 1) {
+            await redis.expire(failKey, opts.windowSeconds);
+        }
+
+        // Open circuit if threshold exceeded
+        if (failureCount >= opts.failureThreshold) {
+            await redis.set(openKey, '1', 'EX', opts.cooldownSeconds);
+            console.warn(`Circuit breaker opened for ${serviceName} after ${failureCount} failures`);
+        }
+    } catch (err) {
+        console.error('Redis error in circuit breaker recordFailure:', err);
+        // Non-critical: circuit won't track failures, but original error still propagates
+    }
+}
+
+/**
+ * Execute a function with circuit breaker protection
  */
 export async function withCircuitBreaker<T>(
-    operation: string,
-    fn: () => Promise<T>
+    serviceName: string,
+    fn: () => Promise<T>,
+    fallback: () => T,
+    options?: Partial<CircuitBreakerOptions>
 ): Promise<T> {
-    // Check if circuit allows request
-    if (!supabaseStorageCircuitBreaker.canRequest()) {
-        const state = supabaseStorageCircuitBreaker.getState();
-        const failures = supabaseStorageCircuitBreaker.getFailureCount();
-
-        throw new Error(
-            `Supabase circuit breaker is ${state}. ` +
-            `Service temporarily unavailable after ${failures} failures. ` +
-            `Please try again in a moment.`
-        );
+    // Check if circuit is open
+    if (await isCircuitOpen(serviceName)) {
+        console.warn(`Circuit breaker is open for ${serviceName}, using fallback`);
+        return fallback();
     }
 
     try {
         const result = await fn();
-        supabaseStorageCircuitBreaker.recordSuccess();
+        await recordSuccess(serviceName);
         return result;
     } catch (error) {
-        supabaseStorageCircuitBreaker.recordFailure();
+        await recordFailure(serviceName, options);
         throw error;
     }
 }

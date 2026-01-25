@@ -1,12 +1,7 @@
 /**
  * @file src/services/auditLog.service.ts
- * @description Service for logging security-sensitive actions.
- * 
- * SECURITY PURPOSE:
- * - Track who accessed what location data
- * - Detect suspicious patterns (e.g., someone querying 1000 profiles/hour)
- * - Provide forensics in case of a security incident
- * - Compliance (GDPR requires audit trails for sensitive data access)
+ * @description Specialized audit logging for location and profile view events.
+ * Used for detecting suspicious activity patterns and compliance tracking.
  */
 
 import { prisma } from '../lib/prisma.js';
