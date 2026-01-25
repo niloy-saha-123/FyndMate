@@ -1,6 +1,6 @@
 /**
  * @file scripts/test_matching_engine.ts
- * @description ⚠️ DESTRUCTIVE SCRIPT: Resets the database and seeds it with test data.
+ * @description DESTRUCTIVE SCRIPT: Resets the database and seeds it with test data.
  *
  * PURPOSE:
  * 1. Wipes the database (User, Like, Match, Block tables).
@@ -17,19 +17,19 @@
  * - Run: `npx tsx scripts/test_matching_engine.ts`
  */
 
-import dotenv from 'dotenv';
-import path from 'path';
+import { config } from 'dotenv';
+import * as path from 'path';
 
 // Load env to check DATABASE_URL
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+config({ path: path.resolve(process.cwd(), '.env') });
 
 const DB_URL = process.env.DATABASE_URL || "";
 const IS_LOCAL = DB_URL.includes("localhost") || DB_URL.includes("127.0.0.1");
 
 if (!IS_LOCAL) {
-    console.error("\n❌ SAFETY ERROR: This script is for LOCAL DEVELOPMENT ONLY.");
-    console.error(`⚠️  Your DATABASE_URL points to: ${DB_URL}`);
-    console.error("🛑 Aborting to protect potential production data.\n");
+    console.error("\nSAFETY ERROR: This script is for LOCAL DEVELOPMENT ONLY.");
+    console.error(`WARNING: Your DATABASE_URL points to: ${DB_URL}`);
+    console.error("Aborting to protect potential production data.\n");
     process.exit(1);
 }
 
@@ -39,13 +39,17 @@ import { likeService } from '../src/services/like.service.js';
 import { matchService } from '../src/services/match.service.js';
 import { blockService } from '../src/services/block.service.js';
 
+import type { FeedUser } from '../src/services/feed.service.js';
+import type { MatchWithUsers } from '../src/services/match.service.js';
+import type { ReceivedLike } from '../src/services/like.service.js';
+
 const LOG = (msg: string) => console.log(`[TEST] ${msg}`);
 const ASSERT = (condition: boolean, msg: string) => {
     if (!condition) {
-        console.error(`❌ FAILED: ${msg}`);
+        console.error(`FAILED: ${msg}`);
         process.exit(1);
     }
-    console.log(`✅ PASSED: ${msg}`);
+    console.log(`PASSED: ${msg}`);
 };
 
 async function main() {
@@ -197,7 +201,7 @@ async function main() {
     const feedPostUnmatchA = await feedService.getFeed(A.id);
     ASSERT(!feedPostUnmatchA.some(u => u.name === "Bob"), "Bob does NOT reappear in feed after unmatch");
 
-    LOG("🎉 ALL TESTS PASSED!");
+    LOG("ALL TESTS PASSED!");
 }
 
 main()

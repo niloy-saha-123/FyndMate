@@ -1,21 +1,7 @@
 /**
  * @file src/services/audit.service.ts
- * @description Audit logging service for security and compliance
- * 
- * Records all critical user actions to the AuditLog table.
- * Used for: abuse investigation, GDPR compliance, security monitoring
- * 
- * @example
- * await logAuditEvent({
- *   userId: 'user123',
- *   action: 'PROFILE_PICTURE_UPLOAD',
- *   oldValue: 'https://old-photo.jpg',
- *   newValue: 'https://new-photo.jpg',
- *   ipAddress: request.ip,
- *   userAgent: request.headers['user-agent'],
- *   metadata: { fileSize: 1024000, mimeType: 'image/jpeg' },
- *   status: 'SUCCESS',
- * });
+ * @description Audit logging service for security and compliance.
+ * Records critical user actions for abuse investigation and monitoring.
  */
 
 import { prisma } from '../lib/prisma.js';

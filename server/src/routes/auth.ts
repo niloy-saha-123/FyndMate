@@ -1,3 +1,8 @@
+/**
+ * @file src/routes/auth.ts
+ * @description Authentication routes.
+ */
+
 import { FastifyInstance } from 'fastify';
 import { signupUser } from "../services/auth.service.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
@@ -29,7 +34,7 @@ export default async function authRoutes(app: FastifyInstance) {
     try {
       // request.user is attached by authMiddleware
       const user = request.user!;
-      
+
       // Optionally fetch more user data from DB
       const fullUser = await prisma.user.findUnique({
         where: { id: user.id },
@@ -42,7 +47,7 @@ export default async function authRoutes(app: FastifyInstance) {
           createdAt: true,
         },
       });
-      
+
       return reply.send({
         success: true,
         user: {
