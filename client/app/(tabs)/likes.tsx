@@ -1,159 +1,482 @@
 /**
  * @file client/app/(tabs)/likes.tsx
- * @description SKELETON SCREEN for the "Likes Section" (Inbox).
- * 
- * TODO (DESIGN) - CRITICAL UI INSTRUCTIONS:
- * 1. **Grid vs List**:
- *    - Default to a **Grid Layout (2 columns)** for visual appeal.
- *    - Each cell shows the user's main photo.
- *    - Overlay a small "Message Icon" 💬 if they sent a message.
- * 
- * 2. **Blur Effect (Premium Upgrade)**:
- *    - If the user is NOT a premium subscriber, apply a Blur Effect (10px radius) to the photo.
- *    - Show a "Upgrade to see who likes you" CTA button in the center.
- * 
- * 3. **Interaction**:
- *    - Tapping a user opens a **Modal Profile View** (similar to Feed but static).
- *    - The Modal MUST show the "Liker's Message" prominently at the top.
- *    - Two floating buttons: "Match" (Reply) and "Pass".
+ * @description Requests/Likes Screen with Neo-brutalist design
  */
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, Button, StyleSheet, FlatList, ActivityIndicator, TextInput, Modal, TouchableOpacity } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    FlatList,
+    ActivityIndicator,
+    TextInput,
+    Modal,
+    TouchableOpacity,
+    Image,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useLikes } from '@/src/hooks/useLikes';
 import { Like } from '@/src/services/matchingService';
 import { useAuth } from '@/src/auth/AuthProvider';
+import { COLORS, SHADOWS, BORDERS, RADIUS } from '@/src/theme/colors';
+import { NeoCard } from '@/src/components/NeoCard';
+import { NeoButton } from '@/src/components/NeoButton';
 
 export default function LikesScreen() {
+    const { top, bottom } = useSafeAreaInsets();
     const { isAuthenticated } = useAuth();
     const { likes, loading, error, fetchLikes, onAccept, onDecline } = useLikes();
 
-    // Local state for replying
     const [selectedLike, setSelectedLike] = useState<Like | null>(null);
-    const [replyText, setReplyText] = useState("");
+    const [replyText, setReplyText] = useState('');
 
     useEffect(() => {
         fetchLikes();
-    }, [fetchLikes]); // Fetch on mount
+    }, [fetchLikes]);
 
     const handleAccept = async () => {
         if (!selectedLike) return;
         await onAccept(selectedLike.id, replyText);
         setSelectedLike(null);
-        setReplyText("");
-        alert("It's a Match!");
+        setReplyText('');
     };
 
-    const renderItem = ({ item }: { item: Like }) => (
-        /* 
-           TODO (DESIGN): CARD STYLING
-           - If Grid: Aspect Ratio 3:4.
-           - Image as background.
-           - Gradient overlay at bottom for text readability.
-        */
-        <View style={styles.card}>
-            {/* HEADER: Who Liked Me */}
-            <View style={styles.header}>
-                <Text style={styles.name}>{item.likerUser.name}</Text>
-                <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-            </View>
+    const handleDecline = async (likeId: string) => {
+        await onDecline(likeId);
+    };
 
-            {/* 
-               TODO (DESIGN): MESSAGE BUBBLE
-               - This is the USP (Unique Selling Point) of Hinge/FyndMate.
-               - Make this look like a "Quote" or a "bubble" coming from their photo.
-               - Font: Italic, Serif?
-            */}
-            <View style={styles.messageBox}>
-                <Text style={styles.messageLabel}>They said:</Text>
-                <Text style={styles.messageText}>"{item.message}"</Text>
-            </View>
+    const renderItem = ({ item }: { item: Like }) => {
+        const isOnline = Math.random() > 0.5; // Mock online status
 
-            {/* ACTIONS */}
-            <View style={styles.actions}>
-                <Button title="❌ Remove" onPress={() => onDecline(item.id)} color="gray" />
-                {/* TODO (DESIGN): Highlight this button as the "Happy Path" */}
-                <Button title="💬 Reply & Match" onPress={() => setSelectedLike(item)} />
-            </View>
-        </View>
-    );
+        return (
+            <NeoCard style={styles.requestCard}>
+                {/* Star Badge */}
+                <View style={styles.starBadge}>
+                    <Ionicons name="star" size={12} color={COLORS.textPrimary} />
+                </View>
+
+                {/* Header */}
+                <View style={styles.requestHeader}>
+                    <View style={styles.avatarContainer}>
+                        <Image
+                            source={{ uri: item.likerUser.profilePicture || 'https://i.pravatar.cc/150' }}
+                            style={styles.avatar}
+                        />
+                        {isOnline && <View style={styles.onlineIndicator} />}
+                    </View>
+                    <View style={styles.requestHeaderInfo}>
+                        <Text style={styles.requestName}>{item.likerUser.name}</Text>
+                        <Text style={styles.requestMeta}>
+                            {item.likerUser.role || 'Developer'} · {formatDate(item.createdAt)}
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Message */}
+                <View style={styles.messageBox}>
+                    <Text style={styles.messageLabel}>They said:</Text>
+                    <Text style={styles.messageText}>"{item.message}"</Text>
+                </View>
+
+                {/* Actions */}
+                <View style={styles.requestActions}>
+                    <NeoButton
+                        title="Chat first"
+                        onPress={() => setSelectedLike(item)}
+                        variant="secondary"
+                        size="small"
+                        style={{ flex: 1 }}
+                    />
+                    <NeoButton
+                        title="Accept"
+                        onPress={() => setSelectedLike(item)}
+                        size="small"
+                        style={{ flex: 1, marginLeft: 8 }}
+                    />
+                </View>
+            </NeoCard>
+        );
+    };
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.pageTitle}>Likes You ({likes.length})</Text>
+        <View style={[styles.container, { paddingTop: top }]}>
+            {/* Header */}
+            <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                    <View style={styles.geoCircle} />
+                    <Text style={styles.headerTitle}>Requests</Text>
+                </View>
+            </View>
 
-            {loading && <ActivityIndicator />}
-            {error && <Text style={styles.error}>{error}</Text>}
+            {/* Content */}
+            {loading && likes.length === 0 ? (
+                <View style={styles.centerContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                    <Text style={styles.loadingText}>Loading requests...</Text>
+                </View>
+            ) : error ? (
+                <View style={styles.centerContainer}>
+                    <NeoCard style={styles.errorCard}>
+                        <Ionicons name="alert-circle" size={48} color={COLORS.danger} />
+                        <Text style={styles.errorText}>{error}</Text>
+                        <NeoButton title="Retry" onPress={fetchLikes} />
+                    </NeoCard>
+                </View>
+            ) : (
+                <FlatList
+                    data={likes}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderItem}
+                    refreshing={loading}
+                    onRefresh={fetchLikes}
+                    contentContainerStyle={[
+                        styles.listContent,
+                        { paddingBottom: bottom + 80 },
+                    ]}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <NeoCard style={styles.emptyCard}>
+                                <View style={styles.emptyIconContainer}>
+                                    <Ionicons name="mail-open-outline" size={48} color={COLORS.primary} />
+                                </View>
+                                <Text style={styles.emptyTitle}>No pending requests</Text>
+                                <Text style={styles.emptySubtitle}>
+                                    When someone sends you a collaboration request, it will appear here.
+                                </Text>
+                            </NeoCard>
+                        </View>
+                    }
+                />
+            )}
 
-            <FlatList
-                data={likes}
-                keyExtractor={(item) => item.id}
-                renderItem={renderItem}
-                refreshing={loading}
-                onRefresh={fetchLikes}
-                ListEmptyComponent={<Text style={styles.empty}>No pending likes yet.</Text>}
-            />
+            {/* Reply Modal */}
+            <Modal
+                visible={!!selectedLike}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setSelectedLike(null)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setSelectedLike(null)}
+                >
+                    <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+                        {/* Modal Handle */}
+                        <View style={styles.modalHandle} />
 
-            {/* REPLY MODAL (Designing logic for "Reply to Match") */}
-            <Modal visible={!!selectedLike} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Match with {selectedLike?.likerUser.name}</Text>
-                        <Text>Respond to their message:</Text>
-                        <Text style={styles.quote}>"{selectedLike?.message}"</Text>
+                        {/* Modal Header */}
+                        <Text style={styles.modalTitle}>
+                            Match with {selectedLike?.likerUser.name}
+                        </Text>
+                        <Text style={styles.modalSubtitle}>Respond to their message:</Text>
 
+                        {/* Quote */}
+                        <View style={styles.quoteBox}>
+                            <Text style={styles.quoteText}>"{selectedLike?.message}"</Text>
+                        </View>
+
+                        {/* Reply Input */}
                         <TextInput
-                            style={styles.input}
+                            style={styles.replyInput}
                             placeholder="Send a reply..."
+                            placeholderTextColor={COLORS.textLight}
                             value={replyText}
                             onChangeText={setReplyText}
+                            multiline
+                            textAlignVertical="top"
                             autoFocus
                         />
 
+                        {/* Actions */}
                         <View style={styles.modalActions}>
-                            <Button title="Cancel" onPress={() => setSelectedLike(null)} color="red" />
-                            <Button title="Send & Match" onPress={handleAccept} />
+                            <NeoButton
+                                title="Cancel"
+                                onPress={() => setSelectedLike(null)}
+                                variant="secondary"
+                            />
+                            <NeoButton
+                                title="Send & Match"
+                                onPress={handleAccept}
+                                disabled={replyText.length < 10}
+                                style={{ flex: 1, marginLeft: 12 }}
+                            />
                         </View>
-                    </View>
-                </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
             </Modal>
         </View>
     );
 }
 
+function formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return '1d ago';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+}
+
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20, paddingTop: 60, backgroundColor: '#f9f9f9' },
-    pageTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-    error: { color: 'red' },
-    empty: { textAlign: 'center', marginTop: 50, color: '#999' },
-    card: {
-        backgroundColor: 'white',
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 15,
-        shadowColor: '#000',
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 2
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.background,
     },
-    header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-    name: { fontSize: 18, fontWeight: 'bold' },
-    date: { color: '#999', fontSize: 12 },
-    messageBox: {
-        backgroundColor: '#f0f0f0',
-        padding: 10,
+    centerContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+
+    // Header
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 16,
+        backgroundColor: COLORS.background,
+        borderBottomWidth: BORDERS.thin,
+        borderBottomColor: COLORS.border,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    geoCircle: {
+        width: 16,
+        height: 16,
         borderRadius: 8,
-        marginBottom: 15
+        backgroundColor: COLORS.primary,
+        borderWidth: 2,
+        borderColor: COLORS.border,
+        marginRight: 8,
+        ...SHADOWS.small,
     },
-    messageLabel: { fontSize: 10, color: '#666', marginBottom: 4 },
-    messageText: { fontSize: 16, fontStyle: 'italic' },
-    actions: { flexDirection: 'row', justifyContent: 'space-between' },
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: COLORS.textPrimary,
+    },
+
+    // List
+    listContent: {
+        padding: 16,
+    },
+
+    // Request Card
+    requestCard: {
+        marginBottom: 16,
+        padding: 16,
+        position: 'relative',
+    },
+    starBadge: {
+        position: 'absolute',
+        top: -8,
+        right: -8,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: COLORS.yellow,
+        borderWidth: 2,
+        borderColor: COLORS.border,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+    },
+    requestHeader: {
+        flexDirection: 'row',
+        marginBottom: 12,
+    },
+    avatarContainer: {
+        position: 'relative',
+        marginRight: 12,
+    },
+    avatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        borderWidth: 2,
+        borderColor: COLORS.border,
+    },
+    onlineIndicator: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: COLORS.success,
+        borderWidth: 2,
+        borderColor: COLORS.border,
+    },
+    requestHeaderInfo: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    requestName: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: COLORS.textPrimary,
+        marginBottom: 2,
+    },
+    requestMeta: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: COLORS.skillText,
+    },
+
+    // Message
+    messageBox: {
+        backgroundColor: COLORS.gray100,
+        padding: 12,
+        borderRadius: RADIUS.small,
+        borderWidth: BORDERS.thin,
+        borderColor: COLORS.border,
+        marginBottom: 12,
+    },
+    messageLabel: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: COLORS.textMuted,
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    messageText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: COLORS.textSecondary,
+        fontStyle: 'italic',
+        lineHeight: 20,
+    },
+
+    // Actions
+    requestActions: {
+        flexDirection: 'row',
+    },
+
+    // Loading/Error/Empty
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.textSecondary,
+    },
+    errorCard: {
+        alignItems: 'center',
+        padding: 32,
+        width: '100%',
+    },
+    errorText: {
+        fontSize: 16,
+        color: COLORS.danger,
+        textAlign: 'center',
+        marginVertical: 16,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingTop: 60,
+    },
+    emptyCard: {
+        alignItems: 'center',
+        padding: 32,
+        width: '100%',
+    },
+    emptyIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: COLORS.skillBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: BORDERS.medium,
+        borderColor: COLORS.border,
+        marginBottom: 16,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: COLORS.textPrimary,
+        marginBottom: 8,
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+    },
 
     // Modal
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-    modalContent: { backgroundColor: 'white', padding: 20, borderRadius: 10 },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
-    quote: { fontStyle: 'italic', color: '#666', borderLeftWidth: 2, borderLeftColor: '#ccc', paddingLeft: 10, marginVertical: 10 },
-    input: { borderWidth: 1, borderColor: '#ddd', padding: 10, borderRadius: 5, marginBottom: 20 },
-    modalActions: { flexDirection: 'row', justifyContent: 'space-between' }
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: COLORS.surface,
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        padding: 24,
+        borderTopWidth: BORDERS.medium,
+        borderColor: COLORS.border,
+    },
+    modalHandle: {
+        width: 48,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: COLORS.textPrimary,
+        alignSelf: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        color: COLORS.textPrimary,
+        marginBottom: 8,
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: COLORS.textMuted,
+        marginBottom: 16,
+    },
+    quoteBox: {
+        borderLeftWidth: 4,
+        borderLeftColor: COLORS.primary,
+        backgroundColor: COLORS.gray100,
+        padding: 12,
+        borderRadius: RADIUS.small,
+        marginBottom: 16,
+    },
+    quoteText: {
+        fontSize: 16,
+        fontWeight: '500',
+        fontStyle: 'italic',
+        color: COLORS.textSecondary,
+    },
+    replyInput: {
+        borderWidth: BORDERS.thin,
+        borderColor: COLORS.border,
+        borderRadius: RADIUS.medium,
+        padding: 16,
+        fontSize: 16,
+        fontWeight: '500',
+        color: COLORS.textPrimary,
+        backgroundColor: COLORS.surface,
+        minHeight: 100,
+        marginBottom: 20,
+        ...SHADOWS.medium,
+    },
+    modalActions: {
+        flexDirection: 'row',
+    },
 });
