@@ -110,7 +110,10 @@ export class FeedService {
             cursor: cursor ? { id: cursor } : undefined,
             where: {
                 id: { notIn: Array.from(excludedIds) },
-                profilePicture: { not: null },
+                // NOTE: Removing strict `profilePicture` requirement to avoid
+                // excluding legitimate users during early development. If you
+                // want to enforce profile pictures later, add an opt-in flag
+                // or make this configurable.
                 banned: false,
             },
             select: {
