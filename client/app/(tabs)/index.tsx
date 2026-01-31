@@ -45,8 +45,11 @@ export default function FeedScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
+    // Fetch once on mount. Avoid depending on `fetchFeed` which recreates
+    // when internal hook state changes and can cause an infinite fetch loop.
     fetchFeed();
-  }, [fetchFeed]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentProfile = profiles[currentIndex];
 

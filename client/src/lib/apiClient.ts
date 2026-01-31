@@ -13,7 +13,43 @@
  * 2. Use apiClient.get(), apiClient.post(), etc. everywhere
  */
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+/**
+ * API base URL resolution
+ * - If `EXPO_PUBLIC_API_URL` is provided use it.
+ * - Otherwise default to localhost but when running in the
+ *   simulator/emulator replace `localhost` with the proper host
+ *   so device/emulator can reach the dev server.
+ */
+const DEFAULT_LOCAL = 'http://localhost:3000';
+let API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_LOCAL;
+
+if (__DEV__) {
+  try {
+    // If the URL targets localhost, try to find a host reachable from device/emulator
+    if (API_BASE_URL.includes('localhost')) {
+      // Expo provides debuggerHost (e.g. '192.168.1.10:19000') in Constants
+      const dbgHost: string | undefined = (Constants.manifest && (Constants.manifest as any).debuggerHost) || (Constants.manifest2 && (Constants.manifest2 as any).debuggerHost);
+      let hostIp: string | null = null;
+
+      if (dbgHost) {
+        hostIp = dbgHost.split(':')[0];
+      }
+
+      if (!hostIp) {
+        // Android emulator default host mapping
+        hostIp = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
+      }
+
+      API_BASE_URL = API_BASE_URL.replace('localhost', hostIp);
+    }
+  } catch (e) {
+    // Non-fatal - keep original URL if anything goes wrong
+    console.warn('apiClient: failed to auto-resolve localhost for emulator, using default', e);
+  }
+}
 
 type TokenGetter = () => string | null;
 type UnauthorizedHandler = () => void;
