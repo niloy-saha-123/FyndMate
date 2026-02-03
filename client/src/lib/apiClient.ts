@@ -26,29 +26,64 @@ import Constants from 'expo-constants';
 const DEFAULT_LOCAL = 'http://localhost:3000';
 let API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_LOCAL;
 
-if (__DEV__) {
+/**
+ * Get the development server host IP for device/emulator connectivity.
+ * Expo SDK 49+ uses expoGoConfig/expoConfig instead of deprecated manifest.
+ */
+function getDevServerHost(): string | null {
   try {
-    // If the URL targets localhost, try to find a host reachable from device/emulator
-    if (API_BASE_URL.includes('localhost')) {
-      // Expo provides debuggerHost (e.g. '192.168.1.10:19000') in Constants
-      const dbgHost: string | undefined = (Constants.manifest && (Constants.manifest as any).debuggerHost) || (Constants.manifest2 && (Constants.manifest2 as any).debuggerHost);
-      let hostIp: string | null = null;
-
-      if (dbgHost) {
-        hostIp = dbgHost.split(':')[0];
-      }
-
-      if (!hostIp) {
-        // Android emulator default host mapping
-        hostIp = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
-      }
-
-      API_BASE_URL = API_BASE_URL.replace('localhost', hostIp);
+    // Method 1: expoGoConfig.debuggerHost (Expo Go app)
+    const expoGoHost = Constants.expoGoConfig?.debuggerHost;
+    if (expoGoHost) {
+      return expoGoHost.split(':')[0];
     }
+
+    // Method 2: expoConfig.hostUri (dev builds, EAS updates)
+    const hostUri = Constants.expoConfig?.hostUri;
+    if (hostUri) {
+      return hostUri.split(':')[0];
+    }
+
+    // Method 3: Legacy fallback for older SDKs (unlikely to work in SDK 54+)
+    const legacyHost = (Constants as any).manifest?.debuggerHost ||
+                       (Constants as any).manifest2?.debuggerHost;
+    if (legacyHost) {
+      return legacyHost.split(':')[0];
+    }
+
+    return null;
   } catch (e) {
-    // Non-fatal - keep original URL if anything goes wrong
-    console.warn('apiClient: failed to auto-resolve localhost for emulator, using default', e);
+    console.warn('apiClient: failed to detect dev server host', e);
+    return null;
   }
+}
+
+if (__DEV__) {
+  // If the URL targets localhost, try to find a host reachable from device/emulator
+  if (API_BASE_URL.includes('localhost')) {
+    const hostIp = getDevServerHost();
+
+    if (hostIp) {
+      API_BASE_URL = API_BASE_URL.replace('localhost', hostIp);
+      console.log(`📡 API Client: Resolved localhost to ${hostIp}`);
+    } else {
+      // Fallback: Use platform-specific defaults
+      // Android emulator: 10.0.2.2 maps to host machine
+      // iOS simulator: 127.0.0.1 works (same as localhost)
+      // Physical devices: This will fail - user must set EXPO_PUBLIC_API_URL
+      const fallbackIp = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
+      API_BASE_URL = API_BASE_URL.replace('localhost', fallbackIp);
+      console.warn(
+        `⚠️ API Client: Could not detect dev server host. Using fallback: ${fallbackIp}\n` +
+        `If running on a physical device, set EXPO_PUBLIC_API_URL in your .env file to your machine's IP.`
+      );
+    }
+  }
+}
+
+// Export for use by other services that need the resolved URL
+export function getApiBaseUrl(): string {
+  return API_BASE_URL;
 }
 
 type TokenGetter = () => string | null;

@@ -35,9 +35,17 @@ export default async function feedRoutes(app: FastifyInstance) {
         try {
             const users = await feedService.getFeed(user.id, limit, cursor);
             return reply.send({ data: users });
-        } catch (error) {
-            request.log.error(error);
-            return reply.status(500).send({ error: 'Failed to fetch feed' });
+        } catch (error: any) {
+            request.log.error({ 
+                error: error.message, 
+                stack: error.stack,
+                userId: user.id,
+                code: error.code 
+            }, 'Feed fetch error');
+            return reply.status(500).send({ 
+                error: 'Failed to fetch feed',
+                message: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
         }
     });
 }

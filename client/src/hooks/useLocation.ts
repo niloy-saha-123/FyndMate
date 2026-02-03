@@ -79,10 +79,6 @@ export async function clearLocationSecret(): Promise<void> {
         console.error('Failed to clear location secret:', error);
     }
 }
-    } catch (error) {
-        console.error('Failed to clear location secret:', error);
-    }
-}
 
 // ─────────────────────────────────────────────────────────────────────
 // LOCATION SHARING OPTIONS (for UI Developer)

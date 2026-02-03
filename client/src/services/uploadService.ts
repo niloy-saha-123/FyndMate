@@ -27,9 +27,10 @@
  */
 
 import pRetry from 'p-retry';
+import { getApiBaseUrl } from '../lib/apiClient';
 
-// API base URL from environment
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+// API base URL - use centralized resolver for consistent localhost handling
+const API_BASE_URL = getApiBaseUrl();
 
 export interface UploadRequestResponse {
   signedUrl: string;
