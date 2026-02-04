@@ -18,6 +18,7 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../lib/apiClient';
 import { useAuth } from '../auth/AuthProvider';
+import CryptoJS from 'crypto-js';
 
 // ─────────────────────────────────────────────────────────────────────
 // SECURE STORAGE KEYS
@@ -25,93 +26,16 @@ import { useAuth } from '../auth/AuthProvider';
 const LOCATION_SECRET_KEY = 'fyndmate_location_secret';
 
 // ─────────────────────────────────────────────────────────────────────
-// HMAC-SHA256 Implementation for React Native
-// ─────────────────────────────────────────────────────────────────────
-// 
-// Since expo-crypto doesn't have native HMAC support, we implement
-// HMAC-SHA256 manually using the standard HMAC construction:
-// HMAC(K, m) = H((K' ⊕ opad) || H((K' ⊕ ipad) || m))
+// HMAC-SHA256 Implementation using crypto-js
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * Compute HMAC-SHA256 signature
+ * Compute HMAC-SHA256 signature using crypto-js
  * This matches the server's crypto.createHmac('sha256', secret).update(data).digest('hex')
  */
-async function computeHmacSha256(data: string, key: string): Promise<string> {
-    const BLOCK_SIZE = 64; // SHA-256 block size in bytes
-    const OPAD = 0x5c;
-    const IPAD = 0x36;
-
-    // Convert key to bytes
-    let keyBytes = stringToBytes(key);
-
-    // If key is longer than block size, hash it first
-    if (keyBytes.length > BLOCK_SIZE) {
-        const hashed = await Crypto.digestStringAsync(
-            Crypto.CryptoDigestAlgorithm.SHA256,
-            key,
-            { encoding: Crypto.CryptoEncoding.HEX }
-        );
-        keyBytes = hexToBytes(hashed);
-    }
-
-    // Pad key to block size
-    const paddedKey = new Uint8Array(BLOCK_SIZE);
-    paddedKey.set(keyBytes);
-
-    // Create inner and outer padded keys
-    const innerKey = new Uint8Array(BLOCK_SIZE);
-    const outerKey = new Uint8Array(BLOCK_SIZE);
-    for (let i = 0; i < BLOCK_SIZE; i++) {
-        innerKey[i] = paddedKey[i] ^ IPAD;
-        outerKey[i] = paddedKey[i] ^ OPAD;
-    }
-
-    // Inner hash: H((K' ⊕ ipad) || m)
-    const innerData = bytesToString(innerKey) + data;
-    const innerHash = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        innerData,
-        { encoding: Crypto.CryptoEncoding.HEX }
-    );
-
-    // Outer hash: H((K' ⊕ opad) || inner_hash)
-    const outerData = bytesToString(outerKey) + hexToString(innerHash);
-    const signature = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        outerData,
-        { encoding: Crypto.CryptoEncoding.HEX }
-    );
-
-    return signature;
-}
-
-function stringToBytes(str: string): Uint8Array {
-    const bytes = new Uint8Array(str.length);
-    for (let i = 0; i < str.length; i++) {
-        bytes[i] = str.charCodeAt(i) & 0xff;
-    }
-    return bytes;
-}
-
-function bytesToString(bytes: Uint8Array): string {
-    return String.fromCharCode(...bytes);
-}
-
-function hexToBytes(hex: string): Uint8Array {
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) {
-        bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
-    }
-    return bytes;
-}
-
-function hexToString(hex: string): string {
-    let str = '';
-    for (let i = 0; i < hex.length; i += 2) {
-        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-    }
-    return str;
+function computeHmacSha256(data: string, key: string): string {
+    const hash = CryptoJS.HmacSHA256(data, key);
+    return hash.toString(CryptoJS.enc.Hex);
 }
 
 /**
@@ -124,6 +48,7 @@ async function getLocationSecret(): Promise<string | null> {
         let secret = await SecureStore.getItemAsync(LOCATION_SECRET_KEY);
         
         if (!secret) {
+            console.log('📍 Fetching location secret from server...');
             // Fetch from server (endpoint returns user's locationSecret)
             const response = await apiClient.get<{ locationSecret: string }>('/api/users/me/location-secret');
             secret = response.locationSecret;
@@ -131,12 +56,13 @@ async function getLocationSecret(): Promise<string | null> {
             if (secret) {
                 // Store securely for future use
                 await SecureStore.setItemAsync(LOCATION_SECRET_KEY, secret);
+                console.log('📍 Location secret saved to secure storage');
             }
         }
         
         return secret;
     } catch (error) {
-        console.error('Failed to get location secret:', error);
+        console.error('❌ Failed to get location secret:', error);
         return null;
     }
 }
@@ -148,6 +74,7 @@ async function getLocationSecret(): Promise<string | null> {
 export async function clearLocationSecret(): Promise<void> {
     try {
         await SecureStore.deleteItemAsync(LOCATION_SECRET_KEY);
+        console.log('📍 Location secret cleared');
     } catch (error) {
         console.error('Failed to clear location secret:', error);
     }
@@ -214,18 +141,7 @@ export function useLocation() {
     // Get current user from auth context
     const { user } = useAuth();
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Load preference and permission from storage on mount
-    // ─────────────────────────────────────────────────────────────────────
-    useEffect(() => {
-        Promise.all([
-            AsyncStorage.getItem('locationSharing'),
-            AsyncStorage.getItem('locationPermission')
-        ]).then(([sharing, perm]) => {
-            if (sharing) setPreference(sharing as LocationSharing);
-            if (perm) setPermission(perm as LocationPermission);
-        });
-    }, []);
+    // Note: preference/permission loading is handled in the initialization effect at the bottom
 
     // ─────────────────────────────────────────────────────────────────────
     // Check if we should update location (debouncing logic)
@@ -342,11 +258,12 @@ export function useLocation() {
         const { userId, latitude, longitude, timestamp, nonce } = payload;
         const data = `${userId}|${latitude}|${longitude}|${timestamp}|${nonce}`;
 
-        // Compute HMAC-SHA256 signature
-        // expo-crypto doesn't have native HMAC, so we use the secret as key
+        console.log('📍 Generating signature for data:', data);
+        console.log('📍 Using secret (first 10 chars):', secret.substring(0, 10) + '...');
+
+        // Compute HMAC-SHA256 signature using crypto-js
         // Server uses: crypto.createHmac('sha256', secret).update(data).digest('hex')
-        // We replicate this by creating a keyed hash
-        const signature = await computeHmacSha256(data, secret);
+        const signature = computeHmacSha256(data, secret);
 
         return signature;
     }
@@ -364,23 +281,29 @@ export function useLocation() {
         }
 
         setLoading(true);
+        console.log('📍 Starting location update...');
+        
         try {
             // 1. Request permission
+            console.log('📍 Step 1: Requesting permission...');
             const hasPermission = await requestPermission();
             if (!hasPermission) {
+                console.log('📍 Permission denied');
                 setLoading(false);
                 return;
             }
 
             // 2. Get GPS coordinates ONCE (battery optimization)
+            console.log('📍 Step 2: Getting GPS coordinates...');
             const location = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced,
             });
+            console.log('📍 GPS coordinates:', location.coords.latitude, location.coords.longitude);
 
             // 3. Check if we should update (using the position we just got)
             const shouldUpdate = await shouldUpdateLocation(location);
             if (!shouldUpdate) {
-                console.log('Location update skipped (debounced)');
+                console.log('📍 Location update skipped (debounced)');
                 setLoading(false);
                 return;
             }
@@ -388,10 +311,12 @@ export function useLocation() {
             const { latitude, longitude } = location.coords;
 
             // 4. Detect OS permission level
+            console.log('📍 Step 4: Checking OS permission level...');
             const backgroundPerm = await Location.getBackgroundPermissionsAsync();
             const osPermission: LocationPermission = backgroundPerm.granted
                 ? 'always'
                 : 'whileUsing';
+            console.log('📍 OS permission:', osPermission);
 
             // Save permission locally
             await AsyncStorage.setItem('locationPermission', osPermission);
@@ -401,8 +326,10 @@ export function useLocation() {
             if (!user?.id) {
                 throw new Error('User not authenticated. Please log in again.');
             }
+            console.log('📍 Step 5: User ID:', user.id);
 
             // 6. Build signed payload with HMAC signature
+            console.log('📍 Step 6: Generating HMAC signature...');
             const timestamp = new Date().toISOString();
             const nonce = Crypto.randomUUID();
             const signature = await generateSignature({
@@ -412,8 +339,10 @@ export function useLocation() {
                 timestamp,
                 nonce,
             });
+            console.log('📍 Signature generated:', signature.substring(0, 20) + '...');
 
             // 7. Send to server (GPS coordinates only - server does reverse geocoding)
+            console.log('📍 Step 7: Sending to server...');
             const response = await apiClient.patch<{
                 success: boolean;
                 city: string;
@@ -429,6 +358,8 @@ export function useLocation() {
                 locationPermission: osPermission,  // 'always' or 'whileUsing'
             });
 
+            console.log('📍 Server response:', response);
+
             // 8. Save last location locally (for debouncing)
             await AsyncStorage.setItem(
                 'lastLocation',
@@ -442,12 +373,16 @@ export function useLocation() {
             // 9. Update UI state with server response
             if (response.city && response.country) {
                 setCurrentLocation(`${response.city}, ${response.country}`);
+                console.log('📍 Location set to:', response.city, response.country);
+            } else {
+                console.log('📍 No city/country in response');
             }
             setLastUpdated(new Date());
 
-            console.log('Location updated successfully:', response);
+            console.log('✅ Location updated successfully!');
         } catch (error: any) {
-            console.error('Error updating location:', error);
+            console.error('❌ Error updating location:', error);
+            console.error('❌ Error details:', error.message, error.stack);
             Alert.alert('Error', error.message || 'Failed to update location. Please try again.');
         } finally {
             setLoading(false);
@@ -504,12 +439,36 @@ export function useLocation() {
     // 2. When user changes preference to "whileOpen" or "always" (changePreference)
     // 3. When user manually taps "Update Location Now" button (updateLocationNow)
     // 
+    const [initialized, setInitialized] = useState(false);
+    
+    // Load saved preference first, then auto-update if enabled
     useEffect(() => {
-        if (preference === 'on') {
-            // Auto-update on app launch (respects debouncing)
-            updateLocationNow();
+        async function initLocation() {
+            // Load saved preference from storage
+            const savedPref = await AsyncStorage.getItem('locationSharing');
+            const savedPerm = await AsyncStorage.getItem('locationPermission');
+            
+            if (savedPref) {
+                setPreference(savedPref as LocationSharing);
+            }
+            if (savedPerm) {
+                setPermission(savedPerm as LocationPermission);
+            }
+            
+            setInitialized(true);
+            
+            // Auto-update on app launch if preference is 'on'
+            if (savedPref === 'on') {
+                console.log('📍 Auto-updating location on app launch...');
+                // Small delay to ensure everything is ready
+                setTimeout(() => {
+                    updateLocationNow();
+                }, 500);
+            }
         }
-    }, []); // Run once on mount (preference changes handled in changePreference)
+        
+        initLocation();
+    }, []); // Run once on mount
 
     return {
         preference,
@@ -519,5 +478,6 @@ export function useLocation() {
         lastUpdated,
         updateLocationNow,
         changePreference,
+        initialized,
     };
 };

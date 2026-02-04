@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+   <title>Collab - Find Tech Collaborators</title>
+   <script src="https://cdn.tailwindcss.com"></script>
+   <script src="https://unpkg.com/lucide@latest"></script>
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+   <style>
+       * {
+           font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+           -webkit-tap-highlight-color: transparent;
+       }
+       
+       body {
+           background-color: #E5E7EB;
+           display: flex;
+           justify-content: center;
+           align-items: center;
+           min-height: 100vh;
+           margin: 0;
+       }
+       
+       .mobile-frame {
+           width: 390px;
+           height: 844px;
+           background-color: #FAFAFA;
+           position: relative;
+           overflow: hidden;
+           box-shadow: 20px 20px 0 0 rgba(0,0,0,0.2);
+           border: 3px solid #000;
+           border-radius: 40px;
+       }
+       
+       @media (max-width: 390px) {
+           .mobile-frame {
+               width: 100vw;
+               height: 100vh;
+               box-shadow: none;
+               border: none;
+               border-radius: 0;
+           }
+       }
+       
+       .hide-scrollbar::-webkit-scrollbar {
+           display: none;
+       }
+       .hide-scrollbar {
+           -ms-overflow-style: none;
+           scrollbar-width: none;
+       }
+       
+       .card-enter {
+           animation: slideIn 0.3s ease-out;
+       }
+       
+       .card-exit-left {
+           animation: slideOutLeft 0.3s ease-in forwards;
+       }
+       
+       @keyframes slideIn {
+           from { transform: translateX(100%); opacity: 0; }
+           to { transform: translateX(0); opacity: 1; }
+       }
+       
+       @keyframes slideOutLeft {
+           from { transform: translateX(0); opacity: 1; }
+           to { transform: translateX(-100%); opacity: 0; }
+       }
+       
+       .modal-enter {
+           animation: modalUp 0.3s ease-out;
+       }
+       
+       @keyframes modalUp {
+           from { transform: translateY(100%); }
+           to { transform: translateY(0); }
+       }
+       
+       /* Neo-brutalist styling */
+       .neo-card {
+           background-color: #fff;
+           border: 3px solid #000;
+           box-shadow: 6px 6px 0 0 #000;
+           border-radius: 16px;
+       }
+       
+       .neo-btn-primary {
+           background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+           border: 3px solid #000;
+           box-shadow: 4px 4px 0 0 #000;
+           color: white;
+           font-weight: 700;
+           transition: all 0.1s;
+       }
+       
+       .neo-btn-primary:active {
+           transform: translate(2px, 2px);
+           box-shadow: 2px 2px 0 0 #000;
+       }
+       
+       .neo-btn-secondary {
+           background-color: #fff;
+           border: 3px solid #000;
+           box-shadow: 4px 4px 0 0 #000;
+           color: #000;
+           font-weight: 700;
+           transition: all 0.1s;
+       }
+       
+       .neo-btn-secondary:active {
+           transform: translate(2px, 2px);
+           box-shadow: 2px 2px 0 0 #000;
+       }
+       
+       .neo-input {
+           border: 3px solid #000;
+           border-radius: 12px;
+           background-color: #fff;
+           box-shadow: inset 2px 2px 0 0 rgba(0,0,0,0.1);
+       }
+       
+       .skill-chip {
+           background-color: #EDE9FE;
+           color: #5B21B6;
+           border: 2px solid #000;
+           font-weight: 600;
+           box-shadow: 2px 2px 0 0 #000;
+       }
+       
+       .looking-chip {
+           background-color: #FCE7F3;
+           color: #BE185D;
+           border: 2px solid #000;
+           font-weight: 600;
+           box-shadow: 2px 2px 0 0 #000;
+       }
+       
+       .hatched-bg {
+           background: repeating-linear-gradient(
+               45deg,
+               #F9A8D4,
+               #F9A8D4 8px,
+               #F472B6 8px,
+               #F472B6 16px
+           );
+           border: 3px solid #000;
+       }
+       
+       .timeline-dot {
+           width: 12px;
+           height: 12px;
+           background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+           border: 2px solid #000;
+           border-radius: 50%;
+           position: relative;
+           z-index: 10;
+       }
+       
+       .timeline-line {
+           width: 3px;
+           background-color: #000;
+           position: absolute;
+           left: 4px;
+           top: 10px;
+           bottom: -20px;
+       }
+       
+       .github-line {
+           stroke-dasharray: 1000;
+           stroke-dashoffset: 1000;
+           animation: drawLine 2s ease-out forwards;
+       }
+       
+       @keyframes drawLine {
+           to { stroke-dashoffset: 0; }
+       }
+       
+       .nav-item.active {
+           color: #5B21B6;
+       }
+       
+       .nav-item.active svg {
+           stroke-width: 3;
+           fill: #EDE9FE;
+       }
+       
+       .decoration-triangle {
+           position: absolute;
+           width: 0;
+           height: 0;
+           border-style: solid;
+           filter: drop-shadow(2px 2px 0 rgba(0,0,0,1));
+       }
+       
+       .geo-circle {
+           background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+           border: 2px solid #000;
+           box-shadow: 2px 2px 0 0 #000;
+       }
+       
+       /* Pattern for gaps between sections */
+       .gap-pattern {
+           height: 20px;
+           background: repeating-linear-gradient(
+               45deg,
+               #F9A8D4,
+               #F9A8D4 6px,
+               #F472B6 6px,
+               #F472B6 12px
+           );
+           border-left: 3px solid #000;
+           border-right: 3px solid #000;
+           margin: 0 -4px;
+       }
+   </style>
+<base target="_blank">
+</head>
+<body>
+   <div class="mobile-frame" id="app">
+       <!-- Decorative Geometric Elements like Image 1 -->
+       <div class="decoration-triangle top-4 right-4 border-l-[30px] border-l-transparent border-r-[30px] border-r-transparent border-b-[50px] border-b-[#8B5CF6] rotate-12 pointer-events-none z-50"></div>
+       <div class="decoration-triangle bottom-32 left-4 border-l-[25px] border-l-transparent border-r-[25px] border-r-transparent border-t-[40px] border-t-[#6366F1] -rotate-12 pointer-events-none z-50"></div>
+       
+       <!-- Status Bar -->
+       <div class="h-12 bg-[#FAFAFA] flex justify-between items-center px-6 pt-2 text-sm font-bold text-[#000] select-none border-b-2 border-black">
+           <span>9:41</span>
+           <div class="flex items-center gap-1">
+               <i data-lucide="signal" class="w-4 h-4 stroke-[3]"></i>
+               <i data-lucide="wifi" class="w-4 h-4 stroke-[3]"></i>
+               <i data-lucide="battery-full" class="w-5 h-5 stroke-[3]"></i>
+           </div>
+       </div>
+
+       <!-- Header -->
+       <div class="px-4 pt-2 pb-4 bg-[#FAFAFA] border-b-2 border-black relative">
+           <div class="absolute top-2 left-4 geo-circle w-3 h-3 rounded-full"></div>
+           <h1 class="text-[26px] font-extrabold text-[#000] text-center tracking-tight">Collab</h1>
+           <p class="text-xs text-[#4B5563] text-center mt-0.5 font-bold uppercase tracking-wider">Find collaborators in tech</p>
+           <i data-lucide="sparkles" class="absolute top-4 right-8 w-5 h-5 text-[#EC4899] fill-[#F9A8D4] stroke-[2.5]"></i>
+       </div>
+
+       <!-- Main Content Area -->
+       <div class="flex-1 overflow-hidden relative h-[calc(100%-180px)] bg-[#FAFAFA]">
+           
+           <!-- Home Screen -->
+           <div id="screen-home" class="screen h-full flex flex-col">
+               <div class="flex-1 overflow-y-auto hide-scrollbar px-4 pb-24 pt-4" id="profile-container">
+                   <!-- Profile Card injected here -->
+               </div>
+               
+               <!-- Bottom Actions -->
+               <div class="absolute bottom-0 left-0 right-0 bg-[#FAFAFA] px-6 py-4 border-t-3 border-black hatched-bg">
+                   <div class="flex items-center justify-between gap-3">
+                       <button onclick="skipProfile()" class="neo-btn-secondary px-6 py-3 rounded-full text-sm flex-1 bg-white">
+                           Skip
+                       </button>
+                       
+                       <button onclick="openRequestModal()" class="neo-btn-primary px-6 py-3 rounded-full text-sm flex-[2] flex items-center justify-center gap-2">
+                           <i data-lucide="star" class="w-4 h-4 fill-yellow-300 stroke-black"></i>
+                           Request
+                       </button>
+                       
+                       <button onclick="saveProfile()" class="neo-btn-secondary w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0">
+                           <i data-lucide="bookmark" class="w-5 h-5"></i>
+                       </button>
+                   </div>
+               </div>
+           </div>
+
+           <!-- Requests Screen -->
+           <div id="screen-requests" class="screen hidden h-full overflow-y-auto hide-scrollbar px-4 pt-4 pb-24 bg-[#FAFAFA]">
+               <div class="flex items-center gap-2 mb-6">
+                   <div class="geo-circle w-4 h-4 rounded-full"></div>
+                   <h2 class="text-2xl font-extrabold text-[#000]">Requests</h2>
+               </div>
+               
+               <div class="space-y-4" id="requests-list">
+                   <!-- Request Cards with Neo styling -->
+                   <div class="neo-card p-4 relative">
+                       <div class="absolute -top-2 -right-2 bg-yellow-300 border-2 border-black rounded-full p-1">
+                           <i data-lucide="star" class="w-3 h-3 fill-black stroke-black"></i>
+                       </div>
+                       <div class="flex justify-between items-start mb-3">
+                           <div class="flex gap-3">
+                               <div class="relative">
+                                   <img src="https://i.pravatar.cc/150?img=11" class="w-12 h-12 rounded-full object-cover border-2 border-black" alt="Alex">
+                                   <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 border-2 border-black rounded-full"></div>
+                               </div>
+                               <div>
+                                   <h3 class="font-bold text-[#000] text-[15px]">Alex Chen</h3>
+                                   <p class="text-[13px] text-[#5B21B6] font-bold">ML Engineer · 2d ago</p>
+                               </div>
+                           </div>
+                       </div>
+                       <p class="text-[14px] text-[#374151] mb-4 line-clamp-2 font-medium">Hey! I'm working on a computer vision project for healthcare and would love to collaborate with a backend engineer...</p>
+                       <div class="flex gap-2">
+                           <button class="flex-1 py-2.5 rounded-full border-2 border-black bg-white text-[#000] font-bold text-sm shadow-[3px_3px_0_0_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all">
+                               Chat first
+                           </button>
+                           <button class="flex-1 py-2.5 rounded-full bg-[#6366F1] border-2 border-black text-white font-bold text-sm shadow-[3px_3px_0_0_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all">
+                               Accept
+                           </button>
+                       </div>
+                   </div>
+
+                   <div class="neo-card p-4">
+                       <div class="flex justify-between items-start mb-3">
+                           <div class="flex gap-3">
+                               <img src="https://i.pravatar.cc/150?img=5" class="w-12 h-12 rounded-full object-cover border-2 border-black" alt="Maya">
+                               <div>
+                                   <h3 class="font-bold text-[#000] text-[15px]">Maya Rodriguez</h3>
+                                   <p class="text-[13px] text-[#5B21B6] font-bold">Product Designer · 5d ago</p>
+                               </div>
+                           </div>
+                       </div>
+                       <p class="text-[14px] text-[#374151] mb-4 line-clamp-2 font-medium">Looking for a developer to join our hackathon team. We're building a sustainability app!</p>
+                       <div class="flex gap-2">
+                           <button class="flex-1 py-2.5 rounded-full border-2 border-black bg-white text-[#000] font-bold text-sm shadow-[3px_3px_0_0_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all">
+                               Chat first
+                           </button>
+                           <button class="flex-1 py-2.5 rounded-full bg-[#EC4899] border-2 border-black text-white font-bold text-sm shadow-[3px_3px_0_0_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all">
+                               Accept
+                           </button>
+                       </div>
+                   </div>
+               </div>
+           </div>
+
+           <!-- Chats Screen -->
+           <div id="screen-chats" class="screen hidden h-full overflow-y-auto hide-scrollbar px-4 pt-4 pb-24 bg-[#FAFAFA]">
+               <div class="flex items-center gap-2 mb-6">
+                   <i data-lucide="message-circle" class="w-6 h-6 text-[#8B5CF6] fill-[#EDE9FE] stroke-[2.5]"></i>
+                   <h2 class="text-2xl font-extrabold text-[#000]">Chats</h2>
+               </div>
+               
+               <div class="space-y-3">
+                   <div class="neo-card p-3 flex items-center gap-3 hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-all cursor-pointer">
+                       <div class="relative">
+                           <img src="https://i.pravatar.cc/150?img=12" class="w-14 h-14 rounded-full object-cover border-2 border-black" alt="Jordan">
+                           <div class="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-black rounded-full"></div>
+                       </div>
+                       <div class="flex-1 min-w-0">
+                           <div class="flex justify-between items-center mb-0.5">
+                               <h3 class="font-bold text-[15px] text-[#000]">Jordan Park</h3>
+                               <span class="text-xs text-[#8B5CF6] font-bold">2h</span>
+                           </div>
+                           <p class="text-[14px] text-[#374151] truncate font-medium">Sounds great! Let's schedule a call to discuss the architecture.</p>
+                       </div>
+                   </div>
+
+                   <div class="neo-card p-3 flex items-center gap-3 hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-all cursor-pointer">
+                       <img src="https://i.pravatar.cc/150?img=9" class="w-14 h-14 rounded-full object-cover border-2 border-black" alt="Sam">
+                       <div class="flex-1 min-w-0">
+                           <div class="flex justify-between items-center mb-0.5">
+                               <h3 class="font-bold text-[15px] text-[#000]">Sam Taylor</h3>
+                               <span class="text-xs text-[#8B5CF6] font-bold">1d</span>
+                           </div>
+                           <p class="text-[14px] text-[#374151] truncate font-medium">Are you still looking for a frontend collaborator?</p>
+                       </div>
+                       <div class="w-6 h-6 bg-[#6366F1] border-2 border-black rounded-full flex items-center justify-center text-white text-xs font-bold shadow-[2px_2px_0_0_rgba(0,0,0,1)]">1</div>
+                   </div>
+
+                   <div class="neo-card p-3 flex items-center gap-3 opacity-75 hover:translate-y-[2px] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-all cursor-pointer">
+                       <img src="https://i.pravatar.cc/150?img=3" class="w-14 h-14 rounded-full object-cover border-2 border-black" alt="Riley">
+                       <div class="flex-1 min-w-0">
+                           <div class="flex justify-between items-center mb-0.5">
+                               <h3 class="font-bold text-[15px] text-[#000]">Riley Kim</h3>
+                               <span class="text-xs text-[#9CA3AF] font-bold">3d</span>
+                           </div>
+                           <p class="text-[14px] text-[#9CA3AF] truncate font-medium">You: Let's connect next week when I'm free</p>
+                       </div>
+                   </div>
+               </div>
+           </div>
+
+           <!-- Profile Screen -->
+           <div id="screen-profile" class="screen hidden h-full overflow-y-auto hide-scrollbar px-4 pb-24 bg-[#FAFAFA]">
+               <div class="flex justify-between items-center mb-6">
+                   <div class="flex items-center gap-2">
+                       <div class="geo-circle w-4 h-4 rounded-full"></div>
+                       <h2 class="text-2xl font-extrabold text-[#000]">My Profile</h2>
+                   </div>
+                   <button class="text-[#000] font-bold text-sm border-2 border-black px-4 py-2 rounded-full bg-white shadow-[3px_3px_0_0_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all">Edit</button>
+               </div>
+               
+               <div id="own-profile-container">
+                   <!-- Own profile rendered here -->
+               </div>
+           </div>
+       </div>
+
+       <!-- Bottom Navigation -->
+       <div class="absolute bottom-0 left-0 right-0 bg-white border-t-3 border-black px-6 py-3 flex justify-between items-center z-20 shadow-[0_-4px_0_0_rgba(0,0,0,0.1)]">
+           <button onclick="switchTab('home')" class="nav-item active flex flex-col items-center gap-1 text-[#9CA3AF] transition-all" data-tab="home">
+               <i data-lucide="home" class="w-6 h-6 stroke-[2.5]"></i>
+               <span class="text-[11px] font-bold">Home</span>
+           </button>
+           
+           <button onclick="switchTab('requests')" class="nav-item flex flex-col items-center gap-1 text-[#9CA3AF] transition-all" data-tab="requests">
+               <i data-lucide="inbox" class="w-6 h-6 stroke-[2.5]"></i>
+               <span class="text-[11px] font-bold">Requests</span>
+           </button>
+           
+           <button onclick="switchTab('chats')" class="nav-item flex flex-col items-center gap-1 text-[#9CA3AF] transition-all" data-tab="chats">
+               <i data-lucide="message-circle" class="w-6 h-6 stroke-[2.5]"></i>
+               <span class="text-[11px] font-bold">Chats</span>
+           </button>
+           
+           <button onclick="switchTab('profile')" class="nav-item flex flex-col items-center gap-1 text-[#9CA3AF] transition-all" data-tab="profile">
+               <i data-lucide="user" class="w-6 h-6 stroke-[2.5]"></i>
+               <span class="text-[11px] font-bold">Profile</span>
+           </button>
+       </div>
+
+       <!-- Request Modal Overlay -->
+       <div id="request-modal" class="hidden absolute inset-0 bg-black/60 z-50 flex items-end backdrop-blur-sm">
+           <div class="bg-white w-full rounded-t-[2rem] p-6 modal-enter max-h-[85%] overflow-y-auto border-t-3 border-black shadow-[0_-10px_0_0_rgba(0,0,0,0.2)]">
+               <div class="w-12 h-2 bg-[#000] rounded-full mx-auto mb-6"></div>
+               
+               <div class="flex items-center gap-2 mb-2">
+                   <i data-lucide="star" class="w-5 h-5 text-[#EC4899] fill-[#F9A8D4]"></i>
+                   <h3 class="text-xl font-extrabold text-[#000]">Send Collaboration Request</h3>
+               </div>
+               <p class="text-sm text-[#4B5563] mb-6 font-medium">Include a short message so they know why you reached out.</p>
+               
+               <div class="flex items-center gap-3 mb-6 p-3 bg-[#EDE9FE] rounded-xl border-2 border-black shadow-[3px_3px_0_0_rgba(0,0,0,1)]">
+                   <img id="modal-avatar" src="" class="w-12 h-12 rounded-full object-cover border-2 border-black" alt="">
+                   <div>
+                       <h4 id="modal-name" class="font-bold text-[#000] text-[15px]"></h4>
+                       <p id="modal-role" class="text-[13px] text-[#5B21B6] font-bold"></p>
+                   </div>
+               </div>
+
+               <div class="mb-4">
+                   <div class="flex gap-2 flex-wrap mb-3">
+                       <button onclick="insertTemplate('hackathon')" class="px-3 py-1.5 rounded-full bg-[#FCE7F3] text-[#BE185D] text-xs font-bold border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all">Hackathon teammate</button>
+                       <button onclick="insertTemplate('project')" class="px-3 py-1.5 rounded-full bg-[#EDE9FE] text-[#5B21B6] text-xs font-bold border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all">Side project partner</button>
+                       <button onclick="insertTemplate('startup')" class="px-3 py-1.5 rounded-full bg-[#F0FDF4] text-[#047857] text-xs font-bold border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] active:translate-y-[1px] active:shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-all">Long-term collaborator</button>
+                   </div>
+                   
+                   <textarea id="request-message" 
+                       class="w-full h-32 p-4 rounded-xl border-2 border-black bg-white text-[16px] text-[#000] placeholder-[#9CA3AF] resize-none focus:outline-none focus:ring-0 shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-all font-medium"
+                       placeholder="Explain what you're building or learning and why you want to collaborate."></textarea>
+                   <div class="flex justify-between mt-3 px-1">
+                       <span class="text-xs text-[#6B7280] font-bold" id="char-count">0 characters</span>
+                       <span class="text-xs text-[#DC2626] hidden font-bold" id="error-msg">Minimum 20 characters required</span>
+                   </div>
+               </div>
+
+               <div class="flex gap-3 mt-6">
+                   <button onclick="closeRequestModal()" class="flex-1 py-3.5 rounded-full border-2 border-black bg-white text-[#000] font-bold text-[15px] shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all">
+                       Cancel
+                   </button>
+                   <button onclick="sendRequest()" id="send-btn" disabled class="flex-1 py-3.5 rounded-full bg-[#6366F1] border-2 border-black text-white font-bold text-[15px] shadow-[4px_4px_0_0_rgba(0,0,0,1)] opacity-50 cursor-not-allowed transition-all">
+                       Send request
+                   </button>
+               </div>
+           </div>
+       </div>
+   </div>
+
+   <script>
+       // Initialize Lucide icons
+       lucide.createIcons();
+
+       // Profile Data
+       const profiles = [
+           {
+               name: "Sarah Lee",
+               age: 22,
+               pronouns: "she/her",
+               role: "Backend Engineer",
+               image: "https://i.pravatar.cc/400?img=5",
+               bio: "Passionate about building scalable systems and open source tools. Currently exploring distributed systems and cloud architecture. Looking to collaborate on meaningful projects that solve real problems.",
+               meta: ["3+ yrs experience", "Open-source contributor", "Student"],
+               lookingFor: ["Cofounder", "Project partner"],
+               skills: ["TypeScript", "Next.js", "Postgres", "Redis", "AWS", "Docker", "Kubernetes", "Go", "Python"],
+               experience: [
+                   {
+                       company: "Stripe",
+                       role: "Backend Engineering Intern",
+                       duration: "2023 – Present",
+                       description: "Working on payment infrastructure and API optimization. Reduced latency by 40% on critical endpoints."
+                   },
+                   {
+                       company: "Open Source",
+                       role: "Core Contributor",
+                       duration: "2022 – Present",
+                       description: "Maintaining popular Node.js libraries with 50k+ weekly downloads."
+                   }
+               ],
+               projects: [
+                   {
+                       name: "CacheFlow",
+                       role: "Backend · Side project",
+                       description: "A smart caching layer for serverless functions handling 10k+ req/min",
+                       stack: ["Node.js", "Postgres", "Redis"]
+                   },
+                   {
+                       name: "TypeSafe API",
+                       role: "Creator · Open source",
+                       description: "End-to-end type safety for REST APIs with 2k+ GitHub stars",
+                       stack: ["TypeScript", "Zod"]
+                   }
+               ],
+               githubActivity: 24,
+               availability: {
+                   hours: "5–10",
+                   duration: "3+ months",
+                   time: "Evenings & Weekends"
+               },
+               location: "Pittsburgh, United States",
+               workMode: "Remote"
+           },
+           {
+               name: "David Kim",
+               age: 25,
+               pronouns: "he/him",
+               role: "ML Engineer",
+               image: "https://i.pravatar.cc/400?img=12",
+               bio: "Deep learning researcher focused on NLP and computer vision. Previously built recommendation systems at Spotify. Excited about AI for good and sustainable tech.",
+               meta: ["4+ yrs experience", "Former Spotify", "PhD Student"],
+               lookingFor: ["Learning partner", "Project partner"],
+               skills: ["PyTorch", "TensorFlow", "Python", "CUDA", "MLOps", "Kubernetes", "Spark", "SQL"],
+               experience: [
+                   {
+                       company: "Spotify",
+                       role: "ML Engineer",
+                       duration: "2022 – 2024",
+                       description: "Built recommendation algorithms serving 400M+ users. Improved engagement by 15%."
+                   }
+               ],
+               projects: [
+                   {
+                       name: "EcoVision",
+                       role: "ML Lead · Hackathon",
+                       description: "AI-powered waste sorting using computer vision",
+                       stack: ["PyTorch", "OpenCV", "Python"]
+                   }
+               ],
+               githubActivity: 28,
+               availability: {
+                   hours: "10–15",
+                   duration: "6+ months",
+                   time: "Flexible"
+               },
+               location: "San Francisco, United States",
+               workMode: "Hybrid"
+           },
+           {
+               name: "Maya Chen",
+               age: 23,
+               pronouns: "they/them",
+               role: "Product Designer",
+               image: "https://i.pravatar.cc/400?img=9",
+               bio: "Designer who codes. I bridge the gap between pixels and performance. Passionate about accessible design systems and user research.",
+               meta: ["2+ yrs experience", "Design systems", "CS Background"],
+               lookingFor: ["Cofounder", "Learning partner"],
+               skills: ["Figma", "Framer", "React", "TypeScript", "Tailwind", "SwiftUI", "User Research"],
+               experience: [
+                   {
+                       company: "Figma",
+                       role: "Product Design Intern",
+                       duration: "2023 – 2024",
+                       description: "Designed features for dev mode and component libraries."
+                   }
+               ],
+               projects: [
+                   {
+                       name: "DesignKit",
+                       role: "Creator · Side project",
+                       description: "Open source design system for early-stage startups",
+                       stack: ["Figma", "React", "Storybook"]
+                   }
+               ],
+               githubActivity: 18,
+               availability: {
+                   hours: "5–10",
+                   duration: "Ongoing",
+                   time: "Weekends"
+               },
+               location: "New York, United States",
+               workMode: "In-person"
+           }
+       ];
+
+       let currentProfileIndex = 0;
+       let currentScreen = 'home';
+
+       // Render Profile Card
+       function renderProfile(profile, isOwnProfile = false) {
+           const skillsHtml = profile.skills.slice(0, 10).map(skill => 
+               `<span class="skill-chip px-3 py-1.5 rounded-full text-xs">${skill}</span>`
+           ).join('') + (profile.skills.length > 10 ? `<span class="text-xs text-[#5B21B6] font-bold ml-1 cursor-pointer hover:underline border-b-2 border-[#5B21B6]">+ more skills</span>` : '');
+
+           const experienceHtml = profile.experience.map((exp, idx) => `
+               <div class="relative pl-6 pb-6 last:pb-0">
+                   <div class="timeline-dot absolute left-0 top-1.5"></div>
+                   ${idx !== profile.experience.length - 1 ? '<div class="timeline-line"></div>' : ''}
+                   <h4 class="font-bold text-[15px] text-[#000]">${exp.company}</h4>
+                   <p class="text-[14px] text-[#5B21B6] font-bold">${exp.role}</p>
+                   <p class="text-[12px] text-[#6B7280] mt-0.5 font-bold">${exp.duration}</p>
+                   <p class="text-[14px] text-[#374151] mt-2 leading-relaxed font-medium">${exp.description}</p>
+               </div>
+           `).join('');
+
+           const projectsHtml = profile.projects.map(proj => `
+               <div class="mb-4 last:mb-0 p-3 bg-[#FAFAFA] rounded-lg border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                   <div class="flex justify-between items-baseline mb-1">
+                       <h4 class="font-bold text-[15px] text-[#000]">${proj.name}</h4>
+                       <span class="text-[12px] text-[#8B5CF6] font-bold bg-[#EDE9FE] px-2 py-1 rounded-full border border-black">${proj.role}</span>
+                   </div>
+                   <p class="text-[14px] text-[#374151] mb-2 leading-relaxed font-medium">${proj.description}</p>
+                   <div class="flex gap-1.5 flex-wrap">
+                       ${proj.stack.map(tech => `<span class="px-2 py-1 bg-white rounded text-[11px] text-[#000] font-bold border-2 border-black shadow-[1px_1px_0_0_rgba(0,0,0,1)]">${tech}</span>`).join('')}
+                   </div>
+               </div>
+           `).join('');
+
+           const lookingForHtml = profile.lookingFor.map(item => 
+               `<span class="looking-chip px-3 py-1.5 rounded-full text-xs">${item}</span>`
+           ).join('');
+
+           const githubChart = `
+               <div class="bg-white rounded-xl border-2 border-black p-4 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                   <svg viewBox="0 0 300 60" class="w-full h-16">
+                       <defs>
+                           <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                               <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:0.3" />
+                               <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:0" />
+                           </linearGradient>
+                       </defs>
+                       <path d="M 0,50 Q 30,45 60,40 T 120,35 T 180,25 T 240,30 T 300,20 L 300,60 L 0,60 Z" fill="url(#gradient)" />
+                       <path d="M 0,50 Q 30,45 60,40 T 120,35 T 180,25 T 240,30 T 300,20" fill="none" stroke="#000" stroke-width="3" class="github-line" stroke-linecap="round" stroke-linejoin="round"/>
+                   </svg>
+                   <p class="text-xs text-[#000] mt-2 text-center font-bold">Active ${profile.githubActivity} days in last 30</p>
+               </div>
+               <button class="mt-3 text-[#5B21B6] text-sm font-bold flex items-center gap-1 hover:underline border-b-2 border-[#5B21B6]">
+                   View GitHub profile <i data-lucide="arrow-right" class="w-4 h-4"></i>
+               </button>
+           `;
+
+           return `
+               <div class="neo-card mb-6 ${!isOwnProfile ? 'card-enter' : ''} overflow-hidden">
+                   <!-- Header -->
+                   <div class="p-4 pb-2 flex justify-between items-center">
+                       <span class="text-[11px] font-bold text-[#000] uppercase tracking-wider border border-black px-2 py-1 rounded-full bg-[#EDE9FE]">Collab</span>
+                       <i data-lucide="star" class="w-4 h-4 text-[#EC4899] fill-[#F9A8D4] stroke-black stroke-2"></i>
+                   </div>
+                   
+                   <!-- Photo -->
+                   <div class="px-4">
+                       <div class="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-gray-100 border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
+                           <img src="${profile.image}" class="w-full h-full object-cover" alt="${profile.name}">
+                           <div class="absolute top-2 right-2 geo-circle w-3 h-3 rounded-full"></div>
+                       </div>
+                   </div>
+
+                   <!-- Basic Info -->
+                   <div class="p-4 pt-3">
+                       <h2 class="text-[22px] font-extrabold text-[#000] mb-0.5">${profile.name}</h2>
+                       <p class="text-[14px] text-[#5B21B6] font-bold">${profile.age} · ${profile.pronouns} · ${profile.role}</p>
+                   </div>
+
+                   <!-- Pink Hatched Divider -->
+                   <div class="gap-pattern mx-4 rounded-sm"></div>
+
+                   <!-- Content Sections -->
+                   <div class="px-4 pb-6 pt-4 space-y-6">
+                       <!-- Bio -->
+                       <div>
+                           <p class="text-[16px] text-[#000] leading-[1.5] line-clamp-3 font-medium" id="bio-text">${profile.bio}</p>
+                           <button onclick="toggleBio()" class="text-[#8B5CF6] text-sm font-bold mt-2 hover:underline border-b-2 border-[#8B5CF6]">See more</button>
+                           
+                           <div class="flex gap-2 mt-3 flex-wrap">
+                               ${profile.meta.map(m => `<span class="px-3 py-1.5 bg-[#F3F4F6] rounded-full text-[12px] font-bold text-[#000] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]">${m}</span>`).join('')}
+                           </div>
+                       </div>
+
+                       <!-- Looking For -->
+                       <div>
+                           <h3 class="text-[16px] font-extrabold text-[#000] mb-3 flex items-center gap-2">
+                               <div class="geo-circle w-3 h-3 rounded-full"></div>
+                               Looking for
+                           </h3>
+                           <div class="flex gap-2 flex-wrap">
+                               ${lookingForHtml}
+                           </div>
+                       </div>
+
+                       <!-- Skills -->
+                       <div>
+                           <h3 class="text-[16px] font-extrabold text-[#000] mb-3 flex items-center gap-2">
+                               <div class="w-3 h-3 bg-[#EC4899] border-2 border-black rotate-45"></div>
+                               Skills
+                           </h3>
+                           <div class="flex gap-2 flex-wrap">
+                               ${skillsHtml}
+                           </div>
+                       </div>
+
+                       <!-- Pink Hatched Divider -->
+                       <div class="gap-pattern rounded-sm"></div>
+
+                       <!-- Experience -->
+                       <div>
+                           <h3 class="text-[16px] font-extrabold text-[#000] mb-4 flex items-center gap-2">
+                               <i data-lucide="briefcase" class="w-4 h-4 text-[#6366F1]"></i>
+                               Experience
+                           </h3>
+                           ${experienceHtml}
+                       </div>
+
+                       <!-- Projects -->
+                       <div>
+                           <h3 class="text-[16px] font-extrabold text-[#000] mb-4 flex items-center gap-2">
+                               <i data-lucide="folder" class="w-4 h-4 text-[#EC4899]"></i>
+                               Projects
+                           </h3>
+                           ${projectsHtml}
+                           <button class="text-[#5B21B6] text-sm font-bold mt-2 hover:underline border-b-2 border-[#5B21B6]">View more projects</button>
+                       </div>
+
+                       <!-- GitHub Activity -->
+                       <div>
+                           <h3 class="text-[16px] font-extrabold text-[#000] mb-3 flex items-center gap-2">
+                               <i data-lucide="github" class="w-4 h-4"></i>
+                               GitHub activity
+                           </h3>
+                           ${githubChart}
+                       </div>
+
+                       <!-- Availability -->
+                       <div>
+                           <h3 class="text-[16px] font-extrabold text-[#000] mb-3 flex items-center gap-2">
+                               <i data-lucide="clock" class="w-4 h-4 text-[#6366F1]"></i>
+                               Availability
+                           </h3>
+                           <div class="space-y-3">
+                               <div class="flex items-center justify-between py-2 border-b-2 border-black">
+                                   <div class="flex items-center gap-3 text-[14px] text-[#374151] font-bold">
+                                       <i data-lucide="clock" class="w-4 h-4 text-[#000] stroke-[2.5]"></i>
+                                       Hours/week
+                                   </div>
+                                   <span class="font-bold text-[14px] text-[#5B21B6] bg-[#EDE9FE] px-3 py-1 rounded-full border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]">${profile.availability.hours}</span>
+                               </div>
+                               <div class="flex items-center justify-between py-2 border-b-2 border-black">
+                                   <div class="flex items-center gap-3 text-[14px] text-[#374151] font-bold">
+                                       <i data-lucide="calendar" class="w-4 h-4 text-[#000] stroke-[2.5]"></i>
+                                       Duration
+                                   </div>
+                                   <span class="font-bold text-[14px] text-[#5B21B6] bg-[#EDE9FE] px-3 py-1 rounded-full border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]">${profile.availability.duration}</span>
+                               </div>
+                               <div class="flex items-center justify-between py-2">
+                                   <div class="flex items-center gap-3 text-[14px] text-[#374151] font-bold">
+                                       <i data-lucide="sun" class="w-4 h-4 text-[#000] stroke-[2.5]"></i>
+                                       Preferred time
+                                   </div>
+                                   <span class="font-bold text-[14px] text-[#5B21B6] bg-[#EDE9FE] px-3 py-1 rounded-full border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]">${profile.availability.time}</span>
+                               </div>
+                           </div>
+                       </div>
+
+                       <!-- Location -->
+                       <div>
+                           <h3 class="text-[16px] font-extrabold text-[#000] mb-3 flex items-center gap-2">
+                               <i data-lucide="map-pin" class="w-4 h-4 text-[#EC4899]"></i>
+                               Location
+                           </h3>
+                           <div class="flex items-center gap-2 text-[14px] text-[#000] font-bold mb-2">
+                               <i data-lucide="map-pin" class="w-4 h-4 text-[#000] stroke-[2.5]"></i>
+                               ${profile.location}
+                           </div>
+                           <span class="inline-block mt-2 px-3 py-1 bg-[#FCE7F3] rounded-full text-[12px] font-bold text-[#BE185D] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]">${profile.workMode}</span>
+                       </div>
+
+                       <!-- CTA -->
+                       ${!isOwnProfile ? `
+                       <div class="pt-4 border-t-2 border-black">
+                           <p class="text-[14px] text-[#374151] mb-3 text-center font-bold">Want to collaborate with ${profile.name.split(' ')[0]}?</p>
+                           <button onclick="openRequestModal()" class="w-full py-3.5 rounded-full bg-[#6366F1] text-white font-extrabold text-[15px] border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all flex items-center justify-center gap-2">
+                               <i data-lucide="star" class="w-4 h-4 fill-yellow-300 stroke-black"></i>
+                               Request to collaborate
+                           </button>
+                       </div>
+                       ` : ''}
+                   </div>
+               </div>
+               
+               ${!isOwnProfile ? '<div class="h-20"></div>' : '<div class="h-8"></div>'}
+           `;
+       }
+
+       // Initialize
+       function loadProfile(index) {
+           const container = document.getElementById('profile-container');
+           container.innerHTML = renderProfile(profiles[index]);
+           lucide.createIcons();
+       }
+
+       function loadOwnProfile() {
+           const container = document.getElementById('own-profile-container');
+           container.innerHTML = renderProfile(profiles[0], true);
+           lucide.createIcons();
+       }
+
+       // Actions
+       function skipProfile() {
+           const container = document.getElementById('profile-container');
+           const card = container.firstElementChild;
+           card.classList.add('card-exit-left');
+           
+           setTimeout(() => {
+               currentProfileIndex = (currentProfileIndex + 1) % profiles.length;
+               loadProfile(currentProfileIndex);
+           }, 300);
+       }
+
+       function saveProfile() {
+           // Visual feedback only
+           const btn = event.currentTarget;
+           btn.innerHTML = '<i data-lucide="check" class="w-5 h-5 text-[#6366F1] fill-[#6366F1]"></i>';
+           lucide.createIcons();
+           setTimeout(() => {
+               btn.innerHTML = '<i data-lucide="bookmark" class="w-5 h-5"></i>';
+               lucide.createIcons();
+           }, 1000);
+       }
+
+       function toggleBio() {
+           const bio = document.getElementById('bio-text');
+           const btn = event.target;
+           if (bio.classList.contains('line-clamp-3')) {
+               bio.classList.remove('line-clamp-3');
+               btn.textContent = 'Show less';
+           } else {
+               bio.classList.add('line-clamp-3');
+               btn.textContent = 'See more';
+           }
+       }
+
+       // Modal
+       function openRequestModal() {
+           const profile = profiles[currentProfileIndex];
+           document.getElementById('modal-avatar').src = profile.image;
+           document.getElementById('modal-name').textContent = profile.name;
+           document.getElementById('modal-role').textContent = profile.role;
+           document.getElementById('request-modal').classList.remove('hidden');
+           document.getElementById('request-message').value = '';
+           document.getElementById('request-message').focus();
+           updateCharCount();
+       }
+
+       function closeRequestModal() {
+           document.getElementById('request-modal').classList.add('hidden');
+       }
+
+       function insertTemplate(type) {
+           const templates = {
+               hackathon: "Hey! I'm looking for a teammate for an upcoming hackathon focused on [topic]. Your experience with ",
+               project: "Hi! I'm working on a side project and think your skills would be a great fit. ",
+               startup: "Hello! I'm building a startup in the [industry] space and looking for a technical co-founder. "
+           };
+           const textarea = document.getElementById('request-message');
+           textarea.value = templates[type];
+           textarea.focus();
+           updateCharCount();
+       }
+
+       function updateCharCount() {
+           const text = document.getElementById('request-message').value;
+           const count = text.length;
+           const sendBtn = document.getElementById('send-btn');
+           const errorMsg = document.getElementById('error-msg');
+           
+           document.getElementById('char-count').textContent = count + ' characters';
+           
+           if (count >= 20) {
+               sendBtn.disabled = false;
+               sendBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+               sendBtn.classList.add('shadow-[4px_4px_0_0_rgba(0,0,0,1)]');
+               errorMsg.classList.add('hidden');
+           } else {
+               sendBtn.disabled = true;
+               sendBtn.classList.add('opacity-50', 'cursor-not-allowed');
+               sendBtn.classList.remove('shadow-[4px_4px_0_0_rgba(0,0,0,1)]');
+               if (count > 0) errorMsg.classList.remove('hidden');
+           }
+       }
+
+       document.getElementById('request-message').addEventListener('input', updateCharCount);
+
+       function sendRequest() {
+           closeRequestModal();
+           // Show success state on button temporarily
+           const originalHTML = event.target.innerHTML;
+           event.target.innerHTML = '<i data-lucide="check" class="w-4 h-4 inline mr-1"></i> Sent!';
+           lucide.createIcons();
+           setTimeout(() => {
+               event.target.innerHTML = originalHTML;
+               skipProfile();
+           }, 500);
+       }
+
+       // Navigation
+       function switchTab(tab) {
+           // Hide all screens
+           document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+           document.getElementById(`screen-${tab}`).classList.remove('hidden');
+           
+           // Update nav
+           document.querySelectorAll('.nav-item').forEach(n => {
+               n.classList.remove('active');
+               n.classList.remove('text-[#5B21B6]');
+               n.classList.add('text-[#9CA3AF]');
+           });
+           const activeNav = document.querySelector(`[data-tab="${tab}"]`);
+           activeNav.classList.add('active');
+           activeNav.classList.remove('text-[#9CA3AF]');
+           activeNav.classList.add('text-[#5B21B6]');
+           
+           currentScreen = tab;
+           
+           // Refresh icons
+           lucide.createIcons();
+       }
+
+       // Touch handling for swipe
+       let touchStartX = 0;
+       let touchEndX = 0;
+       
+       const profileContainer = document.getElementById('profile-container');
+       
+       profileContainer.addEventListener('touchstart', e => {
+           touchStartX = e.changedTouches[0].screenX;
+       });
+       
+       profileContainer.addEventListener('touchend', e => {
+           touchEndX = e.changedTouches[0].screenX;
+           handleSwipe();
+       });
+       
+       function handleSwipe() {
+           if (touchEndX < touchStartX - 100) {
+               skipProfile();
+           }
+       }
+
+       // Init
+       loadProfile(0);
+       loadOwnProfile();
+       
+       // Close modal on backdrop click
+       document.getElementById('request-modal').addEventListener('click', function(e) {
+           if (e.target === this) closeRequestModal();
+       });
+   </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 /**
  * @file client/app/(tabs)/profilePage.tsx
- * @description User Profile Screen - View and Edit mode with photo grid
+ * @description User Profile Screen with Neo-brutalist design
  */
 
 import React, { useState, useCallback } from 'react';
@@ -22,34 +22,53 @@ import { useAuth } from '../../src/auth/AuthProvider';
 import { updateProfile } from '../../src/services/profileService';
 import { supabase } from '../../src/auth/supabaseClient';
 import { getOptimizedImageUrl, ImageSizes } from '../../src/utils/imageOptimization';
-
-// Colors - Dark theme with orange accents
-const COLORS = {
-  primary: '#6058AE',
-  primaryLight: '#8B85C2',
-  background: '#121212',
-  surface: '#1E1E1E',
-  card: '#2A2A2A',
-  white: '#FFFFFF',
-  text: '#FFFFFF',
-  textSecondary: '#B0B0B0',
-  textLight: '#888888',
-  border: '#3A3A3A',
-  danger: '#E74C3C',
-  success: '#27AE60',
-};
+import { COLORS, SHADOWS, BORDERS, RADIUS } from '../../src/theme/colors';
+import { NeoCard } from '../../src/components/NeoCard';
+import { NeoButton } from '../../src/components/NeoButton';
+import { NeoChip, ChipContainer } from '../../src/components/NeoChip';
 
 // Available skills/interests for selection
 const AVAILABLE_SKILLS = [
-  'React', 'React Native', 'TypeScript', 'JavaScript', 'Python', 'Node.js',
-  'AI/ML', 'Flutter', 'Swift', 'Kotlin', 'Go', 'Rust', 'AWS', 'Firebase',
-  'PostgreSQL', 'MongoDB', 'GraphQL', 'Docker', 'Kubernetes', 'UI/UX',
+  'React',
+  'React Native',
+  'TypeScript',
+  'JavaScript',
+  'Python',
+  'Node.js',
+  'AI/ML',
+  'Flutter',
+  'Swift',
+  'Kotlin',
+  'Go',
+  'Rust',
+  'AWS',
+  'Firebase',
+  'PostgreSQL',
+  'MongoDB',
+  'GraphQL',
+  'Docker',
+  'Kubernetes',
+  'UI/UX',
 ];
 
 const AVAILABLE_INTERESTS = [
-  'Startups', 'Open Source', 'Gaming', 'Music', 'Travel', 'Fitness',
-  'Reading', 'Photography', 'Art', 'Cooking', 'Movies', 'Podcasts',
-  'Crypto', 'Investing', 'Mentoring', 'Hackathons', 'Side Projects',
+  'Startups',
+  'Open Source',
+  'Gaming',
+  'Music',
+  'Travel',
+  'Fitness',
+  'Reading',
+  'Photography',
+  'Art',
+  'Cooking',
+  'Movies',
+  'Podcasts',
+  'Crypto',
+  'Investing',
+  'Mentoring',
+  'Hackathons',
+  'Side Projects',
 ];
 
 const EXPERIENCE_LEVELS = [
@@ -70,14 +89,12 @@ const COMMITMENT_LEVELS = [
 export default function ProfilePage() {
   const { top, bottom } = useSafeAreaInsets();
   const { profile, refreshProfile, session } = useAuth();
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  
-  // Photo slot (single profile picture)
+
   const [photo, setPhoto] = useState<string | null>(profile?.profilePicture ?? null);
-  
-  // Form state
+
   const [formData, setFormData] = useState({
     fullName: profile?.fullName ?? '',
     bio: profile?.bio ?? '',
@@ -92,7 +109,6 @@ export default function ProfilePage() {
 
   const handleEditToggle = useCallback(() => {
     if (isEditing) {
-      // Reset form data when canceling
       setFormData({
         fullName: profile?.fullName ?? '',
         bio: profile?.bio ?? '',
@@ -109,7 +125,7 @@ export default function ProfilePage() {
 
   const handleSave = useCallback(async () => {
     if (!session?.user?.id) return;
-    
+
     setSaving(true);
     try {
       await updateProfile(session.user.id, formData);
@@ -124,63 +140,41 @@ export default function ProfilePage() {
   }, [session, formData, refreshProfile]);
 
   const toggleSkill = useCallback((skill: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       skills: prev.skills.includes(skill)
-        ? prev.skills.filter(s => s !== skill)
+        ? prev.skills.filter((s) => s !== skill)
         : [...prev.skills, skill],
     }));
   }, []);
 
   const toggleInterest = useCallback((interest: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       interests: prev.interests.includes(interest)
-        ? prev.interests.filter(i => i !== interest)
+        ? prev.interests.filter((i) => i !== interest)
         : [...prev.interests, interest],
     }));
   }, []);
 
   const handlePickImage = useCallback(() => {
-    // Note: Image picker requires a development build, not Expo Go
     Alert.alert(
       'Development Build Required',
       'Profile picture upload requires a development build. Run `npx expo run:android` or `npx expo run:ios` to enable this feature.'
     );
   }, []);
 
-  const handleDeletePhoto = useCallback(() => {
-    Alert.alert(
-      'Delete Photo',
-      'Are you sure you want to delete your profile photo?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            setPhoto(null);
-          },
-        },
-      ]
-    );
-  }, []);
-
   const handleLogout = useCallback(async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await supabase.auth.signOut();
-          },
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          await supabase.auth.signOut();
         },
-      ]
-    );
+      },
+    ]);
   }, []);
 
   const calculateAge = (birthDate: string | null): number | null => {
@@ -201,7 +195,10 @@ export default function ProfilePage() {
     <View style={[styles.container, { paddingTop: top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Profile</Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.geoCircle} />
+          <Text style={styles.headerTitle}>My Profile</Text>
+        </View>
         <TouchableOpacity
           style={[styles.editButton, isEditing && styles.editButtonActive]}
           onPress={handleEditToggle}
@@ -212,34 +209,29 @@ export default function ProfilePage() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.content, { paddingBottom: bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Picture - Single Photo */}
+        {/* Profile Picture */}
         <View style={styles.profilePhotoSection}>
-          <Text style={styles.sectionLabel}>Profile Picture</Text>
           <TouchableOpacity
             style={styles.profilePhotoContainer}
             onPress={isEditing ? handlePickImage : undefined}
             disabled={!isEditing}
           >
             {photo ? (
-              <>
-                <Image 
-                  source={{ uri: getOptimizedImageUrl(photo, ImageSizes.CARD.width, ImageSizes.CARD.quality) }} 
-                  style={styles.profilePhoto} 
-                />
-                {isEditing && (
-                  <TouchableOpacity
-                    style={styles.deletePhotoButton}
-                    onPress={handleDeletePhoto}
-                  >
-                    <Ionicons name="close-circle" size={28} color={COLORS.danger} />
-                  </TouchableOpacity>
-                )}
-              </>
+              <Image
+                source={{
+                  uri: getOptimizedImageUrl(
+                    photo,
+                    ImageSizes.CARD.width,
+                    ImageSizes.CARD.quality
+                  ),
+                }}
+                style={styles.profilePhoto}
+              />
             ) : (
               <View style={styles.emptyProfilePhoto}>
                 {isEditing ? (
@@ -259,13 +251,13 @@ export default function ProfilePage() {
         </View>
 
         {/* Name & Basic Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Name</Text>
+        <NeoCard style={styles.section}>
+          <Text style={styles.sectionLabel}>NAME</Text>
           {isEditing ? (
             <TextInput
               style={styles.input}
               value={formData.fullName}
-              onChangeText={(text) => setFormData(prev => ({ ...prev, fullName: text }))}
+              onChangeText={(text) => setFormData((prev) => ({ ...prev, fullName: text }))}
               placeholder="Your name"
               placeholderTextColor={COLORS.textLight}
             />
@@ -275,20 +267,24 @@ export default function ProfilePage() {
               {age && <Text style={styles.ageText}>, {age}</Text>}
             </Text>
           )}
-        </View>
+        </NeoCard>
 
         {/* Location Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Location</Text>
+        <NeoCard style={styles.section}>
+          <Text style={styles.sectionLabel}>LOCATION</Text>
           <View style={styles.locationCard}>
             <View style={styles.locationInfo}>
               <Ionicons name="location" size={24} color={COLORS.primary} />
               <View style={styles.locationDetails}>
                 {profile?.city && profile?.country ? (
                   <>
-                    <Text style={styles.locationCity}>{profile.city}, {profile.country}</Text>
+                    <Text style={styles.locationCity}>
+                      {profile.city}, {profile.country}
+                    </Text>
                     <Text style={styles.locationStatus}>
-                      {profile.locationSharing === 'on' ? '📍 Location sharing on' : '🔒 Location sharing off'}
+                      {profile.locationSharing === 'on'
+                        ? '📍 Location sharing on'
+                        : '🔒 Location sharing off'}
                     </Text>
                   </>
                 ) : (
@@ -299,25 +295,13 @@ export default function ProfilePage() {
                 )}
               </View>
             </View>
-            <TouchableOpacity 
-              style={styles.updateLocationButton}
-              onPress={() => {
-                Alert.alert(
-                  'Update Location',
-                  'Go to Settings to enable GPS location sharing.',
-                  [{ text: 'OK' }]
-                );
-              }}
-            >
-              <Text style={styles.updateLocationText}>Update</Text>
-            </TouchableOpacity>
           </View>
-        </View>
+        </NeoCard>
 
         {/* Bio Section */}
-        <View style={styles.section}>
+        <NeoCard style={styles.section}>
           <View style={styles.labelRow}>
-            <Text style={styles.sectionLabel}>Bio</Text>
+            <Text style={styles.sectionLabel}>BIO</Text>
             {isEditing && (
               <Text style={styles.charCount}>
                 {formData.bio.length}/{MAX_BIO_LENGTH}
@@ -330,7 +314,7 @@ export default function ProfilePage() {
               value={formData.bio}
               onChangeText={(text) => {
                 if (text.length <= MAX_BIO_LENGTH) {
-                  setFormData(prev => ({ ...prev, bio: text }));
+                  setFormData((prev) => ({ ...prev, bio: text }));
                 }
               }}
               placeholder="Tell others about yourself, your projects, and what you're looking for..."
@@ -339,79 +323,57 @@ export default function ProfilePage() {
               textAlignVertical="top"
             />
           ) : (
-            <Text style={styles.bioText}>
-              {profile?.bio || 'No bio yet. Tap Edit to add one!'}
-            </Text>
+            <Text style={styles.bioText}>{profile?.bio || 'No bio yet. Tap Edit to add one!'}</Text>
           )}
-        </View>
+        </NeoCard>
 
         {/* Skills Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Skills</Text>
-          <View style={styles.tagContainer}>
-            {(isEditing ? AVAILABLE_SKILLS : (profile?.skills || [])).map((skill) => {
+        <NeoCard style={styles.section}>
+          <Text style={styles.sectionLabel}>SKILLS</Text>
+          <ChipContainer>
+            {(isEditing ? AVAILABLE_SKILLS : profile?.skills || []).map((skill) => {
               const isSelected = formData.skills.includes(skill);
               return (
-                <Pressable
+                <NeoChip
                   key={skill}
-                  style={[
-                    styles.tag,
-                    isSelected && styles.tagSelected,
-                    !isEditing && styles.tagViewMode,
-                  ]}
+                  label={skill}
+                  variant="skill"
+                  selected={isSelected}
                   onPress={isEditing ? () => toggleSkill(skill) : undefined}
-                  disabled={!isEditing}
-                >
-                  <Text style={[
-                    styles.tagText,
-                    isSelected && styles.tagTextSelected,
-                  ]}>
-                    {skill}
-                  </Text>
-                </Pressable>
+                />
               );
             })}
             {!isEditing && (!profile?.skills || profile.skills.length === 0) && (
               <Text style={styles.emptyText}>No skills added yet</Text>
             )}
-          </View>
-        </View>
+          </ChipContainer>
+        </NeoCard>
 
         {/* Interests Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Interests</Text>
-          <View style={styles.tagContainer}>
-            {(isEditing ? AVAILABLE_INTERESTS : (profile?.interests || [])).map((interest) => {
+        <NeoCard style={styles.section}>
+          <Text style={styles.sectionLabel}>INTERESTS</Text>
+          <ChipContainer>
+            {(isEditing ? AVAILABLE_INTERESTS : profile?.interests || []).map((interest) => {
               const isSelected = formData.interests.includes(interest);
               return (
-                <Pressable
+                <NeoChip
                   key={interest}
-                  style={[
-                    styles.tag,
-                    isSelected && styles.tagSelected,
-                    !isEditing && styles.tagViewMode,
-                  ]}
+                  label={interest}
+                  variant="looking"
+                  selected={isSelected}
                   onPress={isEditing ? () => toggleInterest(interest) : undefined}
-                  disabled={!isEditing}
-                >
-                  <Text style={[
-                    styles.tagText,
-                    isSelected && styles.tagTextSelected,
-                  ]}>
-                    {interest}
-                  </Text>
-                </Pressable>
+                />
               );
             })}
             {!isEditing && (!profile?.interests || profile.interests.length === 0) && (
               <Text style={styles.emptyText}>No interests added yet</Text>
             )}
-          </View>
-        </View>
+          </ChipContainer>
+        </NeoCard>
 
         {/* Experience Level */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Experience Level</Text>
+        <NeoCard style={styles.section}>
+          <Text style={styles.sectionLabel}>EXPERIENCE LEVEL</Text>
           {isEditing ? (
             <View style={styles.optionsList}>
               {EXPERIENCE_LEVELS.map((level) => (
@@ -421,12 +383,14 @@ export default function ProfilePage() {
                     styles.optionButton,
                     formData.experience === level.value && styles.optionButtonActive,
                   ]}
-                  onPress={() => setFormData(prev => ({ ...prev, experience: level.value }))}
+                  onPress={() => setFormData((prev) => ({ ...prev, experience: level.value }))}
                 >
-                  <Text style={[
-                    styles.optionButtonText,
-                    formData.experience === level.value && styles.optionButtonTextActive,
-                  ]}>
+                  <Text
+                    style={[
+                      styles.optionButtonText,
+                      formData.experience === level.value && styles.optionButtonTextActive,
+                    ]}
+                  >
                     {level.label}
                   </Text>
                 </TouchableOpacity>
@@ -434,14 +398,14 @@ export default function ProfilePage() {
             </View>
           ) : (
             <Text style={styles.valueText}>
-              {EXPERIENCE_LEVELS.find(l => l.value === profile?.experience)?.label || 'Not set'}
+              {EXPERIENCE_LEVELS.find((l) => l.value === profile?.experience)?.label || 'Not set'}
             </Text>
           )}
-        </View>
+        </NeoCard>
 
         {/* Commitment Level */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Commitment Level</Text>
+        <NeoCard style={styles.section}>
+          <Text style={styles.sectionLabel}>COMMITMENT LEVEL</Text>
           {isEditing ? (
             <View style={styles.optionsList}>
               {COMMITMENT_LEVELS.map((level) => (
@@ -451,12 +415,14 @@ export default function ProfilePage() {
                     styles.optionButton,
                     formData.commitment === level.value && styles.optionButtonActive,
                   ]}
-                  onPress={() => setFormData(prev => ({ ...prev, commitment: level.value }))}
+                  onPress={() => setFormData((prev) => ({ ...prev, commitment: level.value }))}
                 >
-                  <Text style={[
-                    styles.optionButtonText,
-                    formData.commitment === level.value && styles.optionButtonTextActive,
-                  ]}>
+                  <Text
+                    style={[
+                      styles.optionButtonText,
+                      formData.commitment === level.value && styles.optionButtonTextActive,
+                    ]}
+                  >
                     {level.label}
                   </Text>
                 </TouchableOpacity>
@@ -464,21 +430,23 @@ export default function ProfilePage() {
             </View>
           ) : (
             <Text style={styles.valueText}>
-              {COMMITMENT_LEVELS.find(l => l.value === profile?.commitment)?.label || 'Not set'}
+              {COMMITMENT_LEVELS.find((l) => l.value === profile?.commitment)?.label || 'Not set'}
             </Text>
           )}
-        </View>
+        </NeoCard>
 
         {/* GitHub Username */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>GitHub</Text>
+        <NeoCard style={styles.section}>
+          <Text style={styles.sectionLabel}>GITHUB</Text>
           {isEditing ? (
             <View style={styles.inputWithIcon}>
               <Ionicons name="logo-github" size={20} color={COLORS.textLight} />
               <TextInput
                 style={styles.inputWithIconText}
                 value={formData.githubUsername}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, githubUsername: text }))}
+                onChangeText={(text) =>
+                  setFormData((prev) => ({ ...prev, githubUsername: text }))
+                }
                 placeholder="your-github-username"
                 placeholderTextColor={COLORS.textLight}
                 autoCapitalize="none"
@@ -486,40 +454,32 @@ export default function ProfilePage() {
             </View>
           ) : (
             <View style={styles.githubRow}>
-              <Ionicons name="logo-github" size={20} color={COLORS.text} />
-              <Text style={styles.githubText}>
-                {profile?.githubUsername || 'Not connected'}
-              </Text>
+              <Ionicons name="logo-github" size={20} color={COLORS.textPrimary} />
+              <Text style={styles.githubText}>{profile?.githubUsername || 'Not connected'}</Text>
             </View>
           )}
-        </View>
+        </NeoCard>
 
         {/* Save Button (Edit Mode) */}
         {isEditing && (
-          <TouchableOpacity
-            style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+          <NeoButton
+            title={saving ? 'Saving...' : 'Save Changes'}
             onPress={handleSave}
             disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            )}
-          </TouchableOpacity>
+            fullWidth
+            style={{ marginTop: 8 }}
+          />
         )}
 
         {/* Settings Section */}
         <View style={styles.settingsSection}>
           <Text style={styles.settingsSectionTitle}>Settings</Text>
-          
+
           <TouchableOpacity style={styles.settingsItem} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={22} color={COLORS.danger} />
-            <Text style={[styles.settingsItemText, { color: COLORS.danger }]}>
-              Logout
-            </Text>
+            <Text style={[styles.settingsItemText, { color: COLORS.danger }]}>Logout</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.settingsItem}>
             <Ionicons name="trash-outline" size={22} color={COLORS.danger} />
             <Text style={[styles.settingsItemText, { color: COLORS.danger }]}>
@@ -537,46 +497,67 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: COLORS.surface,
-    borderBottomWidth: 1,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: BORDERS.thin,
     borderBottomColor: COLORS.border,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  geoCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    marginRight: 8,
+    ...SHADOWS.small,
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.text,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
   },
   editButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    ...SHADOWS.small,
   },
   editButtonActive: {
     backgroundColor: COLORS.primary,
   },
   editButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
   },
   editButtonTextActive: {
-    color: COLORS.white,
+    color: COLORS.surface,
   },
+
+  // Scroll
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: 20,
+    padding: 16,
   },
-  
-  // Profile Picture Styles (Single Photo)
+
+  // Profile Picture
   profilePhotoSection: {
     marginBottom: 24,
     alignItems: 'center',
@@ -585,11 +566,11 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: COLORS.card,
+    backgroundColor: COLORS.surface,
     overflow: 'hidden',
-    position: 'relative',
-    borderWidth: 3,
-    borderColor: COLORS.primary,
+    borderWidth: BORDERS.medium,
+    borderColor: COLORS.border,
+    ...SHADOWS.large,
   },
   profilePhoto: {
     width: '100%',
@@ -600,85 +581,108 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.gray100,
   },
   addPhotoText: {
     fontSize: 14,
     color: COLORS.primary,
     marginTop: 8,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   noPhotoText: {
     fontSize: 12,
     color: COLORS.textLight,
     marginTop: 4,
+    fontWeight: '600',
   },
-  deletePhotoButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-  },
-  
-  // Section Styles
+
+  // Section
   section: {
-    marginBottom: 24,
+    marginBottom: 16,
+    padding: 16,
   },
   sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.skillText,
+    marginBottom: 12,
+    letterSpacing: 1,
   },
   labelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   charCount: {
     fontSize: 12,
-    color: COLORS.textSecondary,
+    color: COLORS.textMuted,
+    fontWeight: '700',
   },
+
+  // Inputs
   input: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.small,
+    padding: 12,
     fontSize: 16,
-    color: COLORS.text,
-    borderWidth: 1,
+    fontWeight: '500',
+    color: COLORS.textPrimary,
+    borderWidth: BORDERS.thin,
     borderColor: COLORS.border,
   },
   bioInput: {
     height: 100,
     textAlignVertical: 'top',
   },
-  displayName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  ageText: {
-    fontWeight: 'normal',
-    color: COLORS.textSecondary,
-  },
-  locationRow: {
+  inputWithIcon: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.small,
+    paddingHorizontal: 12,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    gap: 12,
   },
-  locationText: {
-    fontSize: 14,
+  inputWithIconText: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontWeight: '500',
+    color: COLORS.textPrimary,
+  },
+
+  // Display
+  displayName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  ageText: {
+    fontWeight: '600',
     color: COLORS.textSecondary,
   },
-  // Location Card Styles
+  bioText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
+    lineHeight: 24,
+  },
+  valueText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    fontStyle: 'italic',
+    fontWeight: '500',
+  },
+
+  // Location
   locationCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -694,80 +698,37 @@ const styles = StyleSheet.create({
   },
   locationCity: {
     fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.text,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
   },
   locationStatus: {
     fontSize: 12,
     color: COLORS.textSecondary,
     marginTop: 2,
-  },
-  updateLocationButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  updateLocationText: {
-    fontSize: 14,
     fontWeight: '600',
-    color: COLORS.white,
   },
-  bioText: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    lineHeight: 24,
-  },
-  valueText: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    fontStyle: 'italic',
-  },
-  
-  // Tags
-  tagContainer: {
+
+  // GitHub
+  githubRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
   },
-  tag: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.card,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  tagSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  tagViewMode: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  tagText: {
-    fontSize: 14,
+  githubText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: COLORS.textSecondary,
   },
-  tagTextSelected: {
-    color: COLORS.white,
-    fontWeight: '600',
-  },
-  
+
   // Options
   optionsList: {
     gap: 8,
   },
   optionButton: {
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.small,
     padding: 14,
-    borderWidth: 1,
+    borderWidth: BORDERS.thin,
     borderColor: COLORS.border,
   },
   optionButtonActive: {
@@ -776,69 +737,25 @@ const styles = StyleSheet.create({
   },
   optionButtonText: {
     fontSize: 15,
+    fontWeight: '600',
     color: COLORS.textSecondary,
   },
   optionButtonTextActive: {
-    color: COLORS.white,
-    fontWeight: '600',
+    color: COLORS.surface,
+    fontWeight: '700',
   },
-  
-  // GitHub
-  inputWithIcon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: 12,
-  },
-  inputWithIconText: {
-    flex: 1,
-    paddingVertical: 16,
-    fontSize: 16,
-    color: COLORS.text,
-  },
-  githubRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  githubText: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-  },
-  
-  // Save Button
-  saveButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 32,
-  },
-  saveButtonDisabled: {
-    opacity: 0.7,
-  },
-  saveButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  
+
   // Settings
   settingsSection: {
     marginTop: 16,
     paddingTop: 24,
-    borderTopWidth: 1,
+    borderTopWidth: BORDERS.thin,
     borderTopColor: COLORS.border,
   },
   settingsSectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
     marginBottom: 16,
   },
   settingsItem: {
@@ -849,5 +766,6 @@ const styles = StyleSheet.create({
   },
   settingsItemText: {
     fontSize: 16,
+    fontWeight: '700',
   },
 });

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "88871502262",
+    "project_id": "fyndmate-2935f",
+    "storage_bucket": "fyndmate-2935f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:88871502262:android:aabec782bd1df219d3c117",
+        "android_client_info": {
+          "package_name": "com.fyndMate.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_TYLdo_sFQ0JRL3EKnmH5Uu3Hiw2_IvA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

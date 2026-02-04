@@ -34,18 +34,23 @@ export class FeedService {
      * Aggregates all exclusions to return fresh profiles.
      */
     async getFeed(userId: string, limit = 20, cursor?: string): Promise<FeedUser[]> {
-        // Validation: CUID format check
-        const cuidRegex = /^c[a-z0-9]{7,}$/i;
-        if (!cuidRegex.test(userId)) {
+        // Validation: UUID format check (Supabase uses UUIDs)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(userId)) {
             throw new Error("Invalid user ID format.");
         }
 
         // Cache Hit: Return cached feed if this is an initial load (no cursor)
         const cacheKey = `feed:${userId}`;
         if (!cursor) {
-            const cached = await redis.get(cacheKey);
-            if (cached) {
-                return JSON.parse(cached);
+            try {
+                const cached = await redis.get(cacheKey);
+                if (cached) {
+                    return JSON.parse(cached);
+                }
+            } catch (redisError) {
+                // Redis unavailable - continue without cache
+                console.warn('Redis cache miss (error):', redisError);
             }
         }
 
@@ -69,7 +74,13 @@ export class FeedService {
         const excludedIds = new Set<string>();
         excludedIds.add(userId);
 
-        const [incomingLikes, matches, blocks] = await Promise.all([
+        const [outgoingLikes, incomingLikes, matches, blocks] = await Promise.all([
+            // Outgoing likes/passes (I already swiped on them) - should not appear again
+            prisma.like.findMany({
+                where: { likerId: userId },
+                select: { likedId: true },
+            }),
+
             // Incoming likes (they liked me) should appear in "Likes You", not Feed.
             prisma.like.findMany({
                 where: { likedId: userId, liked: true },
@@ -91,6 +102,10 @@ export class FeedService {
             }),
         ]);
 
+        // Exclude users I've already swiped on (liked or passed)
+        outgoingLikes.forEach(l => excludedIds.add(l.likedId));
+
+        // Exclude users who have liked me (they appear in "Likes You" section)
         incomingLikes.forEach(l => excludedIds.add(l.likerId));
 
         matches.forEach(m => {
@@ -110,8 +125,12 @@ export class FeedService {
             cursor: cursor ? { id: cursor } : undefined,
             where: {
                 id: { notIn: Array.from(excludedIds) },
-                profilePicture: { not: null },
                 banned: false,
+                // In development, show all users for testing
+                // In production, only show users who have completed onboarding
+                ...(process.env.NODE_ENV === 'production' 
+                    ? { onboardingCompleted: true }
+                    : {}),
             },
             select: {
                 id: true,
@@ -134,7 +153,12 @@ export class FeedService {
 
         // Cache Miss: Store result for 5 minutes if this was an initial load
         if (!cursor && result.length > 0) {
-            await redis.setex(cacheKey, 300, JSON.stringify(result));
+            try {
+                await redis.setex(cacheKey, 300, JSON.stringify(result));
+            } catch (redisError) {
+                // Redis unavailable - continue without caching
+                console.warn('Redis cache write failed:', redisError);
+            }
         }
 
         return result;

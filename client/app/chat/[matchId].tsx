@@ -8,17 +8,20 @@ import {
   StyleSheet,
   Modal,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Alert
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, router } from "expo-router";
 import { useAuth } from "../../src/auth/AuthProvider";
 import {
   getMessages,
   sendMessage,
-  editMessage,
-  // deleteMessage
+  editMessage
 } from "../../src/chat/chat.service";
 import { subscribeToMessages } from "../../src/chat/chat.realtime";
+import { supabase } from "../../src/auth/supabaseClient";
+import { useChatNotificationGuard } from "../../src/notifications/useChatNotificationGuard";
+
 
 interface Message {
   id: string;
@@ -29,54 +32,88 @@ interface Message {
   editedAt?: string | null;
 }
 
-type RealtimeEvent = "upsert" | "delete";
-
-// NOTE THIS FILE HANDLES THE DISPLAY FOR THE CHAT MESSAGES
-// ADDITIONAL NOTE: WE ARE UNSURE OF IF WE WANT THE DELETED MESSAGES TO LEAVE A TRACE. IF WE DO WANT IT, ADD THE LOGIC IN THIS FILE
+type RealtimeEvent = "upsert" | "delete" | "match_inactive";
 
 export default function ChatScreen() {
   const { matchId } = useLocalSearchParams<{ matchId?: string }>();
   const { user } = useAuth();
 
+  if (matchId) {
+    useChatNotificationGuard(matchId);
+  }
+
   const [messages, setMessages] = useState<Message[]>([]);
-  const [text, setText] = useState<string>("");
+  const [text, setText] = useState("");
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [matchStatus, setMatchStatus] = useState<{
+    status: string;
+    blockedBy: string | null;
+  } | null>(null);
 
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-  const [actionModalVisible, setActionModalVisible] = useState<boolean>(false);
-  const [confirmDeleteVisible, setConfirmDeleteVisible] =
-    useState<boolean>(false);
-
-  const [savingEdit, setSavingEdit] = useState<boolean>(false);
+  const [actionModalVisible, setActionModalVisible] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const flatListRef = useRef<FlatList<Message>>(null);
 
   useEffect(() => {
     if (!matchId || !user) return;
 
-    getMessages(matchId).then((data: Message[]) => {
-      setMessages(data);
-    });
+    supabase
+      .from("Match")
+      .select("status, blockedBy")
+      .eq("id", matchId)
+      .single()
+      .then(({ data }) => {
+        if (data) setMatchStatus(data);
+      });
+
+    getMessages(matchId).then(setMessages).catch(console.error);
 
     const unsubscribe = subscribeToMessages(
       matchId,
-      (event: RealtimeEvent, msg: Message) => {
+      (event: RealtimeEvent, payload: any) => {
+        if (event === "match_inactive") {
+          if (payload.status === "blocked") {
+            setMatchStatus({
+              status: payload.status,
+              blockedBy: payload.blockedBy
+            });
+          } else {
+            Alert.alert(
+              "Chat unavailable",
+              "This conversation is no longer available."
+            );
+            router.replace("/(tabs)/chat");
+          }
+          return;
+        }
+
         setMessages(prev => {
-          // if (event === "delete") {
-          //   return prev.filter(m => m.id !== msg.id);
-          // }
-          const exists = prev.some(m => m.id === msg.id);
-          if (exists) {
-            return prev.map(m => (m.id === msg.id ? msg : m));
+          if (event === "delete") {
+            return prev.filter(m => m.id !== payload.id);
           }
 
-          return [...prev, msg];
+          const exists = prev.some(m => m.id === payload.id);
+          if (exists) {
+            return prev.map(m => (m.id === payload.id ? payload : m));
+          }
+
+          return [...prev, payload];
         });
       }
     );
 
     return unsubscribe;
   }, [matchId, user]);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 50);
+    }
+  }, [messages.length]);
 
   function canEditMessage(message: Message): boolean {
     if (!user) return false;
@@ -88,7 +125,7 @@ export default function ChatScreen() {
     );
   }
 
-  async function handleSend(): Promise<void> {
+  async function handleSend() {
     if (!text.trim() || !user || !matchId) return;
 
     const content = text.trim();
@@ -103,43 +140,26 @@ export default function ChatScreen() {
       } else {
         await sendMessage(matchId, content, user.id);
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message?.toLowerCase().includes("permission")) {
+        Alert.alert(
+          "Message not sent",
+          "You can no longer send messages in this chat."
+        );
+        router.replace("/(tabs)/chat");
+        return;
+      }
+
       console.error(err);
-      alert("Failed to send message");
+      Alert.alert("Error", "Failed to send message");
       setText(content);
       setSavingEdit(false);
     }
   }
 
-
-  //COMMENTED THE DELETE FUNCTION OUT
-  // async function confirmDelete(): Promise<void> {
-  //   if (!selectedMessage) return;
-
-  //   const msg = selectedMessage;
-  //   setMessages(prev => prev.filter(m => m.id !== msg.id));
-  //   setConfirmDeleteVisible(false);
-
-  //   try {
-  //     await deleteMessage(msg.id);
-  //   } catch (err) {
-  //     console.error("Delete failed:", err);
-  //     alert("Failed to delete message");
-  //     setMessages(prev => [...prev, msg]);
-  //   }
-
-  //   setSelectedMessage(null);
-  // }
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 50);
-    }
-  }, [messages.length]);
-
   if (!user) return <Text>Loading...</Text>;
+
+  const isBlocked = matchStatus?.status === "blocked";
 
   return (
     <KeyboardAvoidingView
@@ -148,7 +168,15 @@ export default function ChatScreen() {
       keyboardVerticalOffset={80}
     >
       <View style={styles.container}>
-        <FlatList<Message>
+        {isBlocked && (
+          <View style={styles.blockedBanner}>
+            <Text style={styles.blockedText}>
+              This conversation is unavailable
+            </Text>
+          </View>
+        )}
+
+        <FlatList
           ref={flatListRef}
           data={messages}
           keyExtractor={item => item.id}
@@ -159,7 +187,7 @@ export default function ChatScreen() {
             return (
               <Pressable
                 onLongPress={() => {
-                  if (!canEditMessage(item)) return;
+                  if (!canEditMessage(item) || isBlocked) return;
                   setSelectedMessage(item);
                   setActionModalVisible(true);
                 }}
@@ -195,27 +223,30 @@ export default function ChatScreen() {
           }}
         />
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder={editingMessage ? "Edit message…" : "Type a message…"}
-            style={styles.input}
-            multiline
-          />
-          <Pressable
-            onPress={handleSend}
-            disabled={!text.trim() || savingEdit}
-            style={[
-              styles.sendButton,
-              (!text.trim() || savingEdit) && styles.sendButtonDisabled
-            ]}
-          >
-            <Text style={styles.sendButtonText}>
-              {editingMessage ? "Save" : "Send"}
-            </Text>
-          </Pressable>
-        </View>
+        {!isBlocked && (
+          <View style={styles.inputContainer}>
+            <TextInput
+              value={text}
+              onChangeText={setText}
+              placeholder={editingMessage ? "Edit message…" : "Type a message…"}
+              style={styles.input}
+              multiline
+            />
+            <Pressable
+              onPress={handleSend}
+              disabled={!text.trim() || savingEdit}
+              style={[
+                styles.sendButton,
+                (!text.trim() || savingEdit) && styles.sendButtonDisabled
+              ]}
+            >
+              <Text style={styles.sendButtonText}>
+                {editingMessage ? "Save" : "Send"}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         <Modal transparent animationType="fade" visible={actionModalVisible}>
           <Pressable
             style={styles.modalOverlay}
@@ -233,41 +264,12 @@ export default function ChatScreen() {
                 <Text style={styles.modalAction}>Edit</Text>
               </Pressable>
 
-              {/* <Pressable
-                onPress={() => {
-                  setActionModalVisible(false);
-                  setConfirmDeleteVisible(true);
-                }}
-              >
-                <Text style={[styles.modalAction, { color: "red" }]}>
-                  Delete
-                </Text>
-              </Pressable> */}
-
               <Pressable onPress={() => setActionModalVisible(false)}>
                 <Text style={styles.modalAction}>Cancel</Text>
               </Pressable>
             </View>
           </Pressable>
         </Modal>
-
-        {/* <Modal transparent animationType="fade" visible={confirmDeleteVisible}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.confirmBox}>
-              <Text style={styles.confirmText}>Delete this message?</Text>
-
-              <View style={styles.confirmActions}>
-                <Pressable onPress={() => setConfirmDeleteVisible(false)}>
-                  <Text style={styles.confirmCancel}>No</Text>
-                </Pressable>
-
-                <Pressable onPress={confirmDelete}>
-                  <Text style={styles.confirmDelete}>Yes</Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </Modal> */}
       </View>
     </KeyboardAvoidingView>
   );
@@ -276,6 +278,17 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5" },
   messageList: { padding: 16 },
+
+  blockedBanner: {
+    backgroundColor: "#ff3b30",
+    padding: 12,
+    alignItems: "center"
+  },
+  blockedText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600"
+  },
 
   messageBubble: {
     maxWidth: "75%",
@@ -345,27 +358,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 12,
     textAlign: "center"
-  },
-
-  confirmBox: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 12,
-    width: 260
-  },
-  confirmText: {
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: 16
-  },
-  confirmActions: {
-    flexDirection: "row",
-    justifyContent: "space-between"
-  },
-  confirmCancel: { fontSize: 16 },
-  confirmDelete: {
-    fontSize: 16,
-    color: "red",
-    fontWeight: "600"
   }
 });

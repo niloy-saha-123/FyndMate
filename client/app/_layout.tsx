@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native';
 import { AuthProvider } from "../src/auth/AuthProvider";
 import { ApiClientInitializer } from "../src/components/ApiClientInitializer";
+import { NotificationProvider } from '@/src/notifications/NotificationProvider';
 import { supabase } from "../src/auth/supabaseClient";
 import { useEffect } from 'react';
 
@@ -12,27 +13,25 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  /*
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session) {
+          router.replace("/(tabs)");
+        } else {
+          router.replace("/login");
+        }
+      }
+    );
 
-  //  useEffect(() => {
+    return () => listener.subscription.unsubscribe();
+  }, []);
+  */
 
-  //   const { data: listener } = supabase.auth.onAuthStateChange(
-  //     (_event, session) => {
-  //       console.log("AUTH CHANGE", session);
-
-  //       if (session) {
-  //         router.replace("/(tabs)");
-  //       } else {
-  //         router.replace("/login");
-  //       }
-  //     }
-  //   );
-
-  //   return () => listener.subscription.unsubscribe();
-  // }, []);
-  
   return (
-
-      <AuthProvider>
+    <AuthProvider>
+      <NotificationProvider>
         <ApiClientInitializer>
           <SafeAreaView style={styles.statusbar}>
             <Stack>
@@ -45,14 +44,14 @@ export default function RootLayout() {
             </Stack>
           </SafeAreaView>
         </ApiClientInitializer>
-      </AuthProvider>
-      
+      </NotificationProvider>
+    </AuthProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  statusbar:{
+  statusbar: {
     flex: 1,
-    backgroundColor:'#000',
+    backgroundColor: '#000',
   }
 });
