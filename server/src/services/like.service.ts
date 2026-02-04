@@ -99,7 +99,9 @@ export class LikeService {
                 throw new Error("You have already liked this user.");
             }
 
-            throw new Error("Interaction already exists.");
+            // User is passing on someone they already passed - just return existing silently
+            // This can happen if feed shows a previously passed user again
+            return existing;
         }
 
         const matchExists = await prisma.match.findFirst({

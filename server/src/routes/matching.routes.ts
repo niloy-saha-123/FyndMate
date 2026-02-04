@@ -66,9 +66,14 @@ export default async function matchingRoutes(app: FastifyInstance) {
     app.post('/likes/:likeId/accept', async (request, reply) => {
         const user = request.user!;
 
+        // Log the incoming likeId for debugging
+        const params = request.params as { likeId?: string };
+        request.log.info({ likeId: params.likeId }, 'Accept like request received');
+
         const paramsResult = likeIdParamSchema.safeParse(request.params);
         if (!paramsResult.success) {
             const firstIssue = paramsResult.error.issues[0];
+            request.log.error({ params: request.params, error: paramsResult.error }, 'Like ID validation failed');
             return reply.status(400).send({
                 error: 'Validation failed',
                 message: firstIssue?.message || 'Invalid like ID',

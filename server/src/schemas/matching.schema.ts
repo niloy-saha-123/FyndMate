@@ -50,9 +50,10 @@ export const acceptLikeSchema = z.object({
 /**
  * Schema for like ID parameter
  * Used in: POST /api/likes/:likeId/accept, DELETE /api/likes/:likeId
+ * Accepts both UUID and CUID formats for backwards compatibility
  */
 export const likeIdParamSchema = z.object({
-    likeId: z.string().uuid('Invalid like ID format'),
+    likeId: z.string().min(1, 'Like ID is required'),
 });
 
 // ============================================
@@ -62,9 +63,10 @@ export const likeIdParamSchema = z.object({
 /**
  * Schema for match ID parameter
  * Used in: POST /api/matches/:matchId/unmatch
+ * Accepts both UUID and CUID formats for backwards compatibility
  */
 export const matchIdParamSchema = z.object({
-    matchId: z.string().uuid('Invalid match ID format'),
+    matchId: z.string().min(1, 'Match ID is required'),
 });
 
 // ============================================
