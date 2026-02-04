@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { updateProfile } from '../../src/services/profileService';
 import { supabase } from '../../src/auth/supabaseClient';
@@ -26,6 +27,7 @@ import { COLORS, SHADOWS, BORDERS, RADIUS } from '../../src/theme/colors';
 import { NeoCard } from '../../src/components/NeoCard';
 import { NeoButton } from '../../src/components/NeoButton';
 import { NeoChip, ChipContainer } from '../../src/components/NeoChip';
+import { useProfilePictureUpload } from '../../src/hooks/useProfilePictureUpload';
 
 // Available skills/interests for selection
 const AVAILABLE_SKILLS = [
@@ -89,6 +91,7 @@ const COMMITMENT_LEVELS = [
 export default function ProfilePage() {
   const { top, bottom } = useSafeAreaInsets();
   const { profile, refreshProfile, session } = useAuth();
+  const { upload, uploading, progress, error: uploadError } = useProfilePictureUpload();
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -157,12 +160,50 @@ export default function ProfilePage() {
     }));
   }, []);
 
-  const handlePickImage = useCallback(() => {
-    Alert.alert(
-      'Development Build Required',
-      'Profile picture upload requires a development build. Run `npx expo run:android` or `npx expo run:ios` to enable this feature.'
-    );
-  }, []);
+  const handlePickImage = useCallback(async () => {
+    // Request permission first
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (!permissionResult.granted) {
+      Alert.alert(
+        'Permission Required',
+        'Please allow access to your photo library to upload a profile picture.'
+      );
+      return;
+    }
+
+    // Launch image picker
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.[0]?.uri) {
+      return;
+    }
+
+    const imageUri = result.assets[0].uri;
+
+    try {
+      // Upload the image
+      const publicUrl = await upload(imageUri);
+      
+      // Update local state with new photo
+      setPhoto(publicUrl);
+      
+      // Update profile in database
+      if (session?.user?.id) {
+        await updateProfile(session.user.id, { profilePicture: publicUrl });
+        await refreshProfile();
+      }
+      
+      Alert.alert('Success', 'Profile picture updated!');
+    } catch (error: any) {
+      Alert.alert('Upload Failed', error.message || 'Failed to upload profile picture');
+    }
+  }, [upload, session, refreshProfile]);
 
   const handleLogout = useCallback(async () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -219,9 +260,16 @@ export default function ProfilePage() {
           <TouchableOpacity
             style={styles.profilePhotoContainer}
             onPress={isEditing ? handlePickImage : undefined}
-            disabled={!isEditing}
+            disabled={!isEditing || uploading}
           >
-            {photo ? (
+            {uploading ? (
+              <View style={styles.emptyProfilePhoto}>
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={styles.addPhotoText}>
+                  {progress?.step === 'uploading' ? 'Uploading...' : 'Processing...'}
+                </Text>
+              </View>
+            ) : photo ? (
               <Image
                 source={{
                   uri: getOptimizedImageUrl(
