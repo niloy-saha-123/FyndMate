@@ -27,6 +27,12 @@ export function useFeed() {
 
         setLoading(true);
         setError(null);
+        
+        // If resetting, also reset hasMore so we can fetch fresh data
+        if (reset) {
+            setHasMore(true);
+            setCursor(undefined);
+        }
 
         try {
             // If resetting, clear cursor
@@ -35,6 +41,8 @@ export function useFeed() {
 
             if (data.length < 20) {
                 setHasMore(false); // No more to fetch
+            } else {
+                setHasMore(true);
             }
 
             // If resetting, replace list. Else, append.

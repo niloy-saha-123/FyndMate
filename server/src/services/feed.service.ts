@@ -66,7 +66,7 @@ export class FeedService {
 
         // Build Exclusion List
         // We exclude:
-        // 1. Users I have already liked (incoming or outgoing)
+        // 1. Users I have already LIKED (not passed - passed users can reappear)
         // 2. Users I am matched with
         // 3. Users I have blocked or who have blocked me
         //
@@ -75,9 +75,10 @@ export class FeedService {
         excludedIds.add(userId);
 
         const [outgoingLikes, incomingLikes, matches, blocks] = await Promise.all([
-            // Outgoing likes/passes (I already swiped on them) - should not appear again
+            // Outgoing LIKES only (not passes) - users I liked should not reappear
+            // Passed users (liked=false) CAN reappear in the feed for second chances
             prisma.like.findMany({
-                where: { likerId: userId },
+                where: { likerId: userId, liked: true },
                 select: { likedId: true },
             }),
 
@@ -102,7 +103,7 @@ export class FeedService {
             }),
         ]);
 
-        // Exclude users I've already swiped on (liked or passed)
+        // Exclude users I've already LIKED (passed users can reappear)
         outgoingLikes.forEach(l => excludedIds.add(l.likedId));
 
         // Exclude users who have liked me (they appear in "Likes You" section)
