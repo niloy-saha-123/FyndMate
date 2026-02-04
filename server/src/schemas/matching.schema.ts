@@ -17,7 +17,7 @@ import { z } from 'zod';
  * Used in: POST /api/likes
  */
 export const createLikeSchema = z.object({
-    likedId: z.string().cuid('Invalid user ID format'),
+    likedId: z.string().uuid('Invalid user ID format'),
     liked: z.boolean({
         message: 'liked must be a boolean',
     }),
@@ -52,7 +52,7 @@ export const acceptLikeSchema = z.object({
  * Used in: POST /api/likes/:likeId/accept, DELETE /api/likes/:likeId
  */
 export const likeIdParamSchema = z.object({
-    likeId: z.string().cuid('Invalid like ID format'),
+    likeId: z.string().uuid('Invalid like ID format'),
 });
 
 // ============================================
@@ -64,7 +64,7 @@ export const likeIdParamSchema = z.object({
  * Used in: POST /api/matches/:matchId/unmatch
  */
 export const matchIdParamSchema = z.object({
-    matchId: z.string().cuid('Invalid match ID format'),
+    matchId: z.string().uuid('Invalid match ID format'),
 });
 
 // ============================================
@@ -80,7 +80,7 @@ export const feedQuerySchema = z.object({
         .optional()
         .transform(val => val ? parseInt(val, 10) : 20)
         .refine(val => val >= 1 && val <= 50, 'Limit must be between 1 and 50'),
-    cursor: z.string().cuid('Invalid cursor format').optional(),
+    cursor: z.string().uuid('Invalid cursor format').optional(),
 });
 
 // ============================================
@@ -92,7 +92,7 @@ export const feedQuerySchema = z.object({
  * Used in: POST /api/users/block
  */
 export const blockUserSchema = z.object({
-    userId: z.string().cuid('Invalid user ID format'),
+    userId: z.string().uuid('Invalid user ID format'),
 });
 
 // ============================================

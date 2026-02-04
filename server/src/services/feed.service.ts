@@ -34,9 +34,9 @@ export class FeedService {
      * Aggregates all exclusions to return fresh profiles.
      */
     async getFeed(userId: string, limit = 20, cursor?: string): Promise<FeedUser[]> {
-        // Validation: CUID format check
-        const cuidRegex = /^c[a-z0-9]{7,}$/i;
-        if (!cuidRegex.test(userId)) {
+        // Validation: UUID format check (Supabase uses UUIDs)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidRegex.test(userId)) {
             throw new Error("Invalid user ID format.");
         }
 
