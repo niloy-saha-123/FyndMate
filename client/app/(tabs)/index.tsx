@@ -56,7 +56,7 @@ export default function FeedScreen() {
   const handleSkip = async () => {
     if (!currentProfile) return;
     await swipe(currentProfile.id, false);
-    setCurrentIndex((prev) => prev + 1);
+    // Note: Don't increment currentIndex - swipe() removes the profile from array
   };
 
   const handleLike = async () => {
@@ -67,7 +67,7 @@ export default function FeedScreen() {
     await swipe(currentProfile.id, true, message);
     setMessage('');
     setShowRequestModal(false);
-    setCurrentIndex((prev) => prev + 1);
+    // Note: Don't increment currentIndex - swipe() removes the profile from array
   };
 
   const handleSave = () => {
