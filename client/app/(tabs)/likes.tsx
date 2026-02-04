@@ -60,10 +60,16 @@ export default function LikesScreen() {
                 {/* Header */}
                 <View style={styles.requestHeader}>
                     <View style={styles.avatarContainer}>
-                        <Image
-                            source={{ uri: item.likerUser.profilePicture || 'https://i.pravatar.cc/150' }}
-                            style={styles.avatar}
-                        />
+                        {item.likerUser.profilePicture ? (
+                            <Image
+                                source={{ uri: item.likerUser.profilePicture }}
+                                style={styles.avatar}
+                            />
+                        ) : (
+                            <View style={[styles.avatar, styles.noPhotoPlaceholder]}>
+                                <Ionicons name="person" size={30} color={COLORS.border} />
+                            </View>
+                        )}
                         {isOnline && <View style={styles.onlineIndicator} />}
                     </View>
                     <View style={styles.requestHeaderInfo}>
@@ -305,6 +311,11 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         borderWidth: 2,
         borderColor: COLORS.border,
+    },
+    noPhotoPlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: COLORS.gray200,
     },
     onlineIndicator: {
         position: 'absolute',
