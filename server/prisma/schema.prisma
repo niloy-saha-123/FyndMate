@@ -9,7 +9,7 @@ datasource db {
 }
 
 model User {
-  id                          String                        @id @default(cuid())
+  id                          String                        @id @default(uuid())
   supabaseId                  String                        @unique
   email                       String                        @unique
   name                        String
@@ -32,7 +32,7 @@ model User {
   country                     String?
   lastLocationAt              DateTime?
   latitude                    Float?
-  locationSecret              String?                       @default(cuid())
+  locationSecret              String?                       @default(uuid())
   locationSharing             String                        @default("off")
   longitude                   Float?
   locationPermission          String?
@@ -61,7 +61,7 @@ model User {
 }
 
 model Project {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   userId      String
   title       String
   description String
@@ -77,7 +77,7 @@ model Project {
 }
 
 model Like {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   likerId   String
   likedId   String
   liked     Boolean
@@ -95,7 +95,7 @@ model Like {
 }
 
 model Match {
-  id                          String                        @id @default(cuid())
+  id                          String                        @id @default(uuid())
   user1Id                     String
   user2Id                     String
   status                      String                        @default("active")
@@ -113,7 +113,7 @@ model Match {
 }
 
 model Block {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   blockerId String
   blockedId String
   createdAt DateTime @default(now())
@@ -142,7 +142,7 @@ model Message {
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   createdAt DateTime @default(now())
   userId    String
   action    String
@@ -164,7 +164,7 @@ model AuditLog {
 }
 
 model UploadSession {
-  id          String    @id @default(cuid())
+  id          String    @id @default(uuid())
   createdAt   DateTime  @default(now())
   expiresAt   DateTime
   userId      String
