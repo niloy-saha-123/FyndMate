@@ -194,10 +194,16 @@ export default function ChatTab() {
           <View style={styles.chatContent}>
             {/* Avatar */}
             <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: otherUser.profilePicture }}
-                style={styles.avatar}
-              />
+              {otherUser.profilePicture ? (
+                <Image
+                  source={{ uri: otherUser.profilePicture }}
+                  style={styles.avatar}
+                />
+              ) : (
+                <View style={[styles.avatar, styles.noPhotoPlaceholder]}>
+                  <Ionicons name="person" size={24} color={COLORS.border} />
+                </View>
+              )}
               {!isBlocked && item.unreadCount === 0 && (
                 <View style={styles.onlineIndicator} />
               )}
@@ -343,6 +349,11 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 2,
     borderColor: COLORS.border,
+  },
+  noPhotoPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.gray200,
   },
   onlineIndicator: {
     position: 'absolute',

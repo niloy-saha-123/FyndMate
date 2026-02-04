@@ -183,10 +183,16 @@ export default function FeedScreen() {
 
             {/* Profile Image */}
             <View style={styles.imageContainer}>
-              <Image
-                source={{ uri: currentProfile.profilePicture || 'https://i.pravatar.cc/400' }}
-                style={styles.profileImage}
-              />
+              {currentProfile.profilePicture ? (
+                <Image
+                  source={{ uri: currentProfile.profilePicture }}
+                  style={styles.profileImage}
+                />
+              ) : (
+                <View style={[styles.profileImage, styles.noPhotoPlaceholder]}>
+                  <Ionicons name="person" size={80} color={COLORS.border} />
+                </View>
+              )}
               <View style={styles.imageGeoCircle} />
             </View>
 
@@ -326,10 +332,16 @@ export default function FeedScreen() {
 
             {/* Profile Preview */}
             <View style={styles.modalProfilePreview}>
-              <Image
-                source={{ uri: currentProfile.profilePicture || 'https://i.pravatar.cc/100' }}
-                style={styles.modalAvatar}
-              />
+              {currentProfile.profilePicture ? (
+                <Image
+                  source={{ uri: currentProfile.profilePicture }}
+                  style={styles.modalAvatar}
+                />
+              ) : (
+                <View style={[styles.modalAvatar, styles.noPhotoPlaceholderSmall]}>
+                  <Ionicons name="person" size={24} color={COLORS.border} />
+                </View>
+              )}
               <View>
                 <Text style={styles.modalName}>{currentProfile.name}</Text>
                 <Text style={styles.modalRole}>{currentProfile.role || 'Developer'}</Text>
@@ -513,6 +525,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
+  },
+  noPhotoPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.gray200,
+  },
+  noPhotoPlaceholderSmall: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.gray200,
   },
   imageGeoCircle: {
     position: 'absolute',
