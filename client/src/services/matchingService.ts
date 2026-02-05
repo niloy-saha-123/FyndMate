@@ -29,7 +29,16 @@ export interface UserProfile {
     profilePicture: string | null;
     bio: string | null;
     skills: string[];
-    // ... add other fields as needed
+    interests?: string[];
+    experience?: string | null;
+    commitment?: string | null;
+    city?: string | null;
+    country?: string | null;
+    locationSharing?: string | null;
+    // UI-specific fields (may not be returned by all endpoints)
+    role?: string | null;
+    age?: number | null;
+    lookingFor?: string[];
 }
 
 export interface Like {
