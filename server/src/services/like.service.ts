@@ -9,9 +9,22 @@ import { redis } from '../lib/redis.js';
 import { blockService } from './block.service.js';
 import { matchService } from './match.service.js';
 
+// Status constants for type safety (stored as strings in DB)
+const LIKE_STATUS = {
+    PENDING: 'active',    // DB uses 'active' for pending likes
+    ACCEPTED: 'accepted',
+    DECLINED: 'declined',
+} as const;
+
+const MATCH_STATUS = {
+    ACTIVE: 'active',
+    UNMATCHED: 'unmatched',
+    BLOCKED: 'blocked',
+} as const;
+
 type ReceivedLike = Prisma.LikeGetPayload<{
     include: {
-        likerUser: {
+        liker: {
             select: {
                 id: true;
                 name: true;
@@ -26,12 +39,14 @@ type ReceivedLike = Prisma.LikeGetPayload<{
 export class LikeService {
     /**
      * Create a Like (or Pass).
+     * If reciprocal like exists, automatically creates a match (Hinge-style instant match).
      */
     async createLike(likerId: string, likedId: string, liked: boolean, message?: string): Promise<Like | Match> {
         if (likerId === likedId) {
             throw new Error("Cannot like yourself.");
         }
 
+        // Validate intro message when liking
         if (liked) {
             if (!message || message.trim().length < 20) {
                 throw new Error("Intro message must be at least 20 characters.");
@@ -53,16 +68,16 @@ export class LikeService {
                 likedId,
                 timestamp: new Date().toISOString()
             });
-
-            // Prevent user enumeration
             throw new Error("Cannot interact with this user.");
         }
 
+        // Check for blocks in either direction
         const isBlocked = await blockService.hasBlock(likerId, likedId);
         if (isBlocked) {
             throw new Error("Cannot interact with this user.");
         }
 
+        // Check for existing like
         const existing = await prisma.like.findUnique({
             where: {
                 likerId_likedId: { likerId, likedId },
@@ -70,18 +85,20 @@ export class LikeService {
         });
 
         // Instant Match Check (Hinge-style)
-        // If we are liking them, check if they already liked us.
+        // If we are liking them, check if they already liked us
         if (liked) {
             const reciprocalLike = await prisma.like.findFirst({
                 where: {
                     likerId: likedId,
                     likedId: likerId,
-                    status: 'active',
+                    status: LIKE_STATUS.PENDING,
                     liked: true
                 }
             });
 
             if (reciprocalLike) {
+                // They already liked us - create match immediately
+                // The current user's message becomes their reply
                 return await matchService.acceptLike(reciprocalLike.id, message);
             }
         }
@@ -91,7 +108,12 @@ export class LikeService {
             if (!existing.liked && liked) {
                 return await prisma.like.update({
                     where: { id: existing.id },
-                    data: { liked: true, message, status: 'active', createdAt: new Date() },
+                    data: { 
+                        liked: true, 
+                        message, 
+                        status: LIKE_STATUS.PENDING, 
+                        createdAt: new Date() 
+                    },
                 });
             }
 
@@ -99,18 +121,18 @@ export class LikeService {
                 throw new Error("You have already liked this user.");
             }
 
-            // User is passing on someone they already passed - just return existing silently
-            // This can happen if feed shows a previously passed user again
+            // User is passing on someone they already passed - return existing silently
             return existing;
         }
 
+        // Check for existing active match
         const matchExists = await prisma.match.findFirst({
             where: {
                 OR: [
                     { user1Id: likerId, user2Id: likedId },
                     { user1Id: likedId, user2Id: likerId }
                 ],
-                status: 'active'
+                status: MATCH_STATUS.ACTIVE
             }
         });
 
@@ -118,13 +140,14 @@ export class LikeService {
             throw new Error("You are already matched with this user.");
         }
 
+        // Create new like/pass
         const result = await prisma.like.create({
             data: {
                 likerId,
                 likedId,
                 liked,
                 message: liked ? message : null,
-                status: 'active',
+                status: LIKE_STATUS.PENDING,
             },
         });
 
@@ -150,10 +173,10 @@ export class LikeService {
                 where: {
                     likedId: userId,
                     liked: true,
-                    status: 'active',
+                    status: LIKE_STATUS.PENDING,
                 },
                 include: {
-                    likerUser: {
+                    liker: {
                         select: {
                             id: true,
                             name: true,
@@ -184,20 +207,26 @@ export class LikeService {
             blockedIds.add(b.blockedId);
         });
 
-        return likes.filter(like => !blockedIds.has(like.likerUser.id));
+        return likes.filter(like => !blockedIds.has(like.liker.id));
     }
 
+    /**
+     * Get a specific like by ID with user details.
+     */
     async getLike(likeId: string) {
         return await prisma.like.findUnique({
             where: { id: likeId },
-            include: { likerUser: true, likedUser: true }
+            include: { liker: true, likedUser: true }
         });
     }
 
-    async archiveLike(likeId: string) {
+    /**
+     * Decline a like.
+     */
+    async declineLike(likeId: string) {
         return await prisma.like.update({
             where: { id: likeId },
-            data: { status: 'archived' }
+            data: { status: LIKE_STATUS.DECLINED }
         });
     }
 }

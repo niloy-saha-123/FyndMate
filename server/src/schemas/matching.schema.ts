@@ -22,8 +22,8 @@ export const createLikeSchema = z.object({
         message: 'liked must be a boolean',
     }),
     message: z.string()
-        .min(20, 'Message must be at least 20 characters')
-        .max(500, 'Message cannot exceed 500 characters')
+        .min(20, 'Intro message must be at least 20 characters')
+        .max(500, 'Intro message cannot exceed 500 characters')
         .optional(),
 }).refine((data) => {
     // If liked is true, message is required
@@ -32,7 +32,7 @@ export const createLikeSchema = z.object({
     }
     return true;
 }, {
-    message: 'Message is required when liking someone',
+    message: 'Intro message is required when liking someone',
     path: ['message'],
 });
 

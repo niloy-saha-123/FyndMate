@@ -5,6 +5,19 @@
 
 import { prisma } from '../lib/prisma.js';
 
+// Status constants for type safety (stored as strings in DB)
+const LIKE_STATUS = {
+    PENDING: 'active',    // DB uses 'active' for pending likes
+    ACCEPTED: 'accepted',
+    DECLINED: 'declined',
+} as const;
+
+const MATCH_STATUS = {
+    ACTIVE: 'active',
+    UNMATCHED: 'unmatched',
+    BLOCKED: 'blocked',
+} as const;
+
 export class BlockService {
     /**
      * Check if a bidirectional block exists between two users.
@@ -24,7 +37,7 @@ export class BlockService {
     /**
      * Block a user.
      * Validates that an interaction exists before blocking to prevent feed abuse.
-     * Automatically cleans up existing matches and archives likes.
+     * Updates matches to BLOCKED status and declines pending likes.
      */
     async blockUser(blockerId: string, blockedId: string) {
         if (blockerId === blockedId) {
@@ -63,28 +76,30 @@ export class BlockService {
         try {
             return await prisma.$transaction(async (tx) => {
                 const block = await tx.block.create({
-                    data: { blockerId, blockedId },
-                });
-
-                // Remove existing matches
-                await tx.match.deleteMany({
-                    where: {
-                        OR: [
-                            { user1Id: blockerId, user2Id: blockedId },
-                            { user1Id: blockedId, user2Id: blockerId },
-                        ],
+                    data: { 
+                        blockerId, 
+                        blockedId,
                     },
                 });
 
-                // Archive existing likes
+                // Update existing matches to BLOCKED status
+                if (matchExists) {
+                    await tx.match.update({
+                        where: { id: matchExists.id },
+                        data: { status: MATCH_STATUS.BLOCKED },
+                    });
+                }
+
+                // Decline existing likes in both directions
                 await tx.like.updateMany({
                     where: {
                         OR: [
                             { likerId: blockerId, likedId: blockedId },
                             { likerId: blockedId, likedId: blockerId },
                         ],
+                        status: LIKE_STATUS.PENDING,
                     },
-                    data: { status: 'archived' },
+                    data: { status: LIKE_STATUS.DECLINED },
                 });
 
                 return block;

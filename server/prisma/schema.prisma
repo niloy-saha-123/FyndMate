@@ -85,7 +85,7 @@ model Like {
   status    String   @default("active")
   createdAt DateTime @default(now())
   likedUser User     @relation("LikesReceived", fields: [likedId], references: [id], onDelete: Cascade)
-  likerUser User     @relation("LikesMade", fields: [likerId], references: [id], onDelete: Cascade)
+  liker     User     @relation("LikesMade", fields: [likerId], references: [id], onDelete: Cascade)
 
   @@unique([likerId, likedId])
   @@index([likerId, liked])
