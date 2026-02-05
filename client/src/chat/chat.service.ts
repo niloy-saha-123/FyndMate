@@ -7,7 +7,6 @@ export async function getMyMatches(userId: string) {
       id,
       createdAt,
       status,
-      blockedBy,
       user1Id,
       user2Id,
       User1:User!Match_user1Id_fkey(id, name, profilePicture),
@@ -21,7 +20,7 @@ export async function getMyMatches(userId: string) {
       )
     `)
     .or(`user1Id.eq.${userId},user2Id.eq.${userId}`)
-    .in("status", ["active", "blocked"]) // Include blocked matches
+    .in("status", ["active", "blocked"])
     .order("createdAt", { ascending: false })
     .order("createdAt", { foreignTable: "messages", ascending: false });
 
@@ -47,8 +46,7 @@ export async function unblockMatch(matchId: string) {
   const { data, error } = await supabase
     .from("Match")
     .update({
-      status: "active",
-      blockedBy: null
+      status: "active"
     })
     .eq("id", matchId)
     .select();
@@ -76,7 +74,7 @@ export async function sendMessage(
 
   const { data: match, error: matchError } = await supabase
     .from("Match")
-    .select("status, blockedBy")
+    .select("status")
     .eq("id", matchId)
     .single();
 
@@ -88,7 +86,11 @@ export async function sendMessage(
 
   const { data, error } = await supabase
     .from("Message")
-    .insert({ matchId, content, senderId })
+    .insert({ 
+      matchId, 
+      content, 
+      senderId
+    })
     .select()
     .single();
 
@@ -114,22 +116,54 @@ export async function editMessage(messageId: string, content: string){
 export async function hideMatch(matchId: string) {
   const { error } = await supabase
     .from("Match")
-    .update({ status: "hidden" })
+    .update({ status: "unmatched" })
     .eq("id", matchId);
 
   if (error) throw error;
 }
 
+/**
+ * Block a match by creating a Block record and updating match status.
+ */
 export async function blockMatch(matchId: string, userId: string) {
   console.log("Attempting to block match:", matchId, "by user:", userId);
   
+  // First, get the match to find the other user
+  const { data: match, error: matchError } = await supabase
+    .from("Match")
+    .select("user1Id, user2Id")
+    .eq("id", matchId)
+    .single();
+
+  if (matchError) {
+    console.error("Error fetching match:", matchError);
+    throw matchError;
+  }
+
+  const blockedId = match.user1Id === userId ? match.user2Id : match.user1Id;
+
+  // Create block record
+  const { error: blockError } = await supabase
+    .from("Block")
+    .upsert({
+      blockerId: userId,
+      blockedId: blockedId,
+    }, {
+      onConflict: 'blockerId,blockedId'
+    });
+
+  if (blockError) {
+    console.error("Error creating block:", blockError);
+    throw blockError;
+  }
+
+  // Update match status
   const { data, error } = await supabase
     .from("Match")
     .update({
-      status: "blocked",
-      blockedBy: userId
+      status: "blocked"
     })
-    .eq("id", String(matchId)) 
+    .eq("id", String(matchId))
     .select();
 
   if (error) {

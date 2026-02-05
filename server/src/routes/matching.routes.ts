@@ -93,7 +93,7 @@ export default async function matchingRoutes(app: FastifyInstance) {
         const { replyMessage } = bodyResult.data;
 
         try {
-            // Verify ownership
+            // Verify ownership - only the receiver can accept a like
             const like = await likeService.getLike(likeId);
             if (!like) return reply.status(404).send({ error: 'Like not found' });
             if (like.likedId !== user.id) return reply.status(403).send({ error: 'Not authorized' });
@@ -125,7 +125,7 @@ export default async function matchingRoutes(app: FastifyInstance) {
             if (!like) return reply.status(404).send({ error: 'Like not found' });
             if (like.likedId !== user.id) return reply.status(403).send({ error: 'Not authorized' });
 
-            await likeService.archiveLike(likeId);
+            await likeService.declineLike(likeId);
             return reply.send({ success: true });
         } catch (error: any) {
             request.log.error(error);
