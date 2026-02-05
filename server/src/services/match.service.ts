@@ -116,6 +116,13 @@ export class MatchService {
             // 4. Create Initial Messages
             // Message 1: The Liker's Intro (User B)
             const now = new Date();
+            
+            console.log('DEBUG BEFORE MESSAGE CREATE:');
+            console.log('  likerId:', likerId, 'type:', typeof likerId);
+            console.log('  likedId:', likedId, 'type:', typeof likedId);
+            console.log('  introContent:', introContent);
+            console.log('  newMatch.id:', newMatch.id);
+            
             if (introContent) {
                 await tx.message.create({
                     data: {
