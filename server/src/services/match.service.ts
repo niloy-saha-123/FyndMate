@@ -26,13 +26,15 @@ export class MatchService {
      */
     async acceptLike(likeId: string, replyMessage?: string): Promise<Match> {
         // Extract user IDs for cache invalidation after transaction completes
-        let likerId: string;
-        let likedId: string;
+        let outerLikerId: string = '';
+        let outerLikedId: string = '';
 
         const match = await prisma.$transaction(async (tx) => {
             const like = await tx.like.findUnique({
                 where: { id: likeId }
             });
+
+            console.log('DEBUG: Like record fetched:', JSON.stringify(like, null, 2));
 
             if (!like) {
                 console.warn('Accept attempt on non-existent like', {
@@ -51,9 +53,27 @@ export class MatchService {
                 throw new Error("Not authorized.");
             }
 
-            likerId = String(like.likerId);
-            likedId = String(like.likedId);
+            // Validate that the like has valid user IDs
+            if (!like.likerId || !like.likedId) {
+                console.error('Like record has null user IDs', {
+                    likeId,
+                    likerId: like.likerId,
+                    likedId: like.likedId,
+                    timestamp: new Date().toISOString()
+                });
+                throw new Error("Invalid like record.");
+            }
+
+            // Use local constants inside the transaction to avoid closure issues
+            const likerId = like.likerId;
+            const likedId = like.likedId;
             const introContent = like.message;
+
+            // Set outer variables for cache invalidation after transaction
+            outerLikerId = likerId;
+            outerLikedId = likedId;
+
+            console.log('DEBUG: Extracted IDs - likerId:', likerId, 'likedId:', likedId);
 
             const [u1, u2] = [likerId, likedId].sort();
 
@@ -130,8 +150,8 @@ export class MatchService {
 
         // Cache invalidation AFTER transaction succeeds (prevents inconsistency on rollback)
         await Promise.all([
-            redis.del(`feed:${likerId!}`),
-            redis.del(`feed:${likedId!}`)
+            redis.del(`feed:${outerLikerId}`),
+            redis.del(`feed:${outerLikedId}`)
         ]);
 
         return match;
