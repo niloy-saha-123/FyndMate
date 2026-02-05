@@ -124,26 +124,30 @@ export class MatchService {
             // Message 1: The Liker's Intro (User B)
             const now = new Date();
             
-            console.log('DEBUG BEFORE MESSAGE CREATE:');
-            console.log('  likerId:', likerId, 'type:', typeof likerId);
-            console.log('  likedId:', likedId, 'type:', typeof likedId);
-            console.log('  introContent:', introContent);
-            console.log('  newMatch.id:', newMatch.id);
-            
+            // Create Intro Message (from Liker)
             if (introContent && likerId) {
-                // Use raw SQL to bypass any Prisma client issues
-                await tx.$executeRaw`
-                    INSERT INTO "Message" ("matchId", "senderId", "content", "createdAt")
-                    VALUES (${newMatch.id}, ${likerId}, ${introContent}, ${now})
-                `;
+                console.log('Creating intro message with senderId:', likerId);
+                await tx.message.create({
+                    data: {
+                        match: { connect: { id: newMatch.id } },
+                        sender: { connect: { id: likerId } },
+                        content: introContent,
+                        createdAt: now,
+                    }
+                });
             }
 
             // Create Reply Message (from Accepter)
             if (replyMessage && replyMessage.trim().length > 0 && likedId) {
-                await tx.$executeRaw`
-                    INSERT INTO "Message" ("matchId", "senderId", "content", "createdAt")
-                    VALUES (${newMatch.id}, ${likedId}, ${replyMessage}, ${new Date(now.getTime() + 1)})
-                `;
+                console.log('Creating reply message with senderId:', likedId);
+                await tx.message.create({
+                    data: {
+                        match: { connect: { id: newMatch.id } },
+                        sender: { connect: { id: likedId } },
+                        content: replyMessage,
+                        createdAt: new Date(now.getTime() + 1),
+                    }
+                });
             }
 
             // 4. Archive Like
