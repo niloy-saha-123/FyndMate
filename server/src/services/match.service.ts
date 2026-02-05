@@ -30,8 +30,13 @@ export class MatchService {
         let outerLikedId: string = '';
 
         const match = await prisma.$transaction(async (tx) => {
+            // Fetch like WITH the liker user to ensure we have valid IDs
             const like = await tx.like.findUnique({
-                where: { id: likeId }
+                where: { id: likeId },
+                include: {
+                    likerUser: { select: { id: true } },
+                    likedUser: { select: { id: true } }
+                }
             });
 
             console.log('DEBUG: Like record fetched:', JSON.stringify(like, null, 2));
@@ -54,19 +59,21 @@ export class MatchService {
             }
 
             // Validate that the like has valid user IDs
-            if (!like.likerId || !like.likedId) {
+            if (!like.likerId || !like.likedId || !like.likerUser?.id || !like.likedUser?.id) {
                 console.error('Like record has null user IDs', {
                     likeId,
                     likerId: like.likerId,
                     likedId: like.likedId,
+                    likerUserId: like.likerUser?.id,
+                    likedUserId: like.likedUser?.id,
                     timestamp: new Date().toISOString()
                 });
                 throw new Error("Invalid like record.");
             }
 
-            // Use local constants inside the transaction to avoid closure issues
-            const likerId = like.likerId;
-            const likedId = like.likedId;
+            // Use the related user IDs to ensure they exist in the User table
+            const likerId = like.likerUser.id;
+            const likedId = like.likedUser.id;
             const introContent = like.message;
 
             // Set outer variables for cache invalidation after transaction
@@ -123,27 +130,20 @@ export class MatchService {
             console.log('  introContent:', introContent);
             console.log('  newMatch.id:', newMatch.id);
             
-            if (introContent) {
-                await tx.message.create({
-                    data: {
-                        matchId: newMatch.id,
-                        senderId: likerId,
-                        content: introContent,
-                        createdAt: now,
-                    },
-                });
+            if (introContent && likerId) {
+                // Use raw SQL to bypass any Prisma client issues
+                await tx.$executeRaw`
+                    INSERT INTO "Message" ("matchId", "senderId", "content", "createdAt")
+                    VALUES (${newMatch.id}, ${likerId}, ${introContent}, ${now})
+                `;
             }
 
             // Create Reply Message (from Accepter)
-            if (replyMessage && replyMessage.trim().length > 0) {
-                await tx.message.create({
-                    data: {
-                        matchId: newMatch.id,
-                        senderId: likedId,
-                        content: replyMessage,
-                        createdAt: new Date(now.getTime() + 1), // Ensure chronological order
-                    }
-                });
+            if (replyMessage && replyMessage.trim().length > 0 && likedId) {
+                await tx.$executeRaw`
+                    INSERT INTO "Message" ("matchId", "senderId", "content", "createdAt")
+                    VALUES (${newMatch.id}, ${likedId}, ${replyMessage}, ${new Date(now.getTime() + 1)})
+                `;
             }
 
             // 4. Archive Like
