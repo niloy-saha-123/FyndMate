@@ -1,70 +1,78 @@
 /**
  * @file src/utils/rate-limit.ts
- * @description Redis-based rate limiter for upload endpoints.
- * Limits users to 5 uploads per hour to prevent spam.
+ * @description Upload-specific rate limiting utilities using hybrid rate limiter
  */
 
-import { redis } from '../lib/redis.js';
+import { rateLimiter } from '../rate-limiting/index.js';
 
 const UPLOAD_LIMIT = 5;
 const WINDOW_SECONDS = 3600; // 1 hour
 
-// TODO [10K Users]: Implement sliding-window rate limiting to prevent boundary attacks
-// TODO [100K Users]: Migrate to distributed rate limiting (Token Bucket with Redis Lua scripts)
-// TODO: Replace INCR+EXPIRE with atomic Lua script to prevent key leaks on server crash
+// TODO [2K Users]: Increase upload limit to 10/hour for verified users
+// TODO [5K Users]: Implement tiered limits based on user reputation/activity
 
 /**
- * Check if user has exceeded upload rate limit using Redis
+ * Check if user has exceeded upload rate limit
+ * Uses hybrid Redis/in-memory rate limiter for reliability
+ * 
  * @param userId - User's ID (from JWT)
  * @returns true if allowed, false if rate limit exceeded
  */
 export async function checkUploadRateLimit(userId: string): Promise<boolean> {
   try {
-    const key = `rl:upload:${userId}`;
-    const count = await redis.incr(key);
-
-    // Set expiry on first request
-    if (count === 1) {
-      await redis.expire(key, WINDOW_SECONDS);
-    }
-
-    return count <= UPLOAD_LIMIT;
+    const result = await rateLimiter.check(
+      `upload:${userId}`,
+      UPLOAD_LIMIT,
+      WINDOW_SECONDS
+    );
+    
+    return result.allowed;
   } catch (err) {
-    console.error('Redis error in upload rate limiter:', err);
-    // TODO [10K Users]: Add fallback in-memory rate limiting instead of failing open
-    return true; // Fail open on Redis error
+    // Critical failure: fail closed for security
+    console.error('🚨 Upload rate limiter failed:', err);
+    return false;
   }
 }
 
 /**
  * Get remaining uploads for a user (for informational purposes)
+ * 
+ * @param userId - User's ID
+ * @returns Number of uploads remaining in current window
  */
 export async function getRemainingUploads(userId: string): Promise<number> {
   try {
-    const key = `rl:upload:${userId}`;
-    const count = await redis.get(key);
-
-    if (!count) {
-      return UPLOAD_LIMIT;
-    }
-
-    return Math.max(0, UPLOAD_LIMIT - parseInt(count, 10));
+    return await rateLimiter.getRemaining(
+      `upload:${userId}`,
+      UPLOAD_LIMIT,
+      WINDOW_SECONDS
+    );
   } catch (err) {
-    console.error('Redis error getting remaining uploads:', err);
-    return UPLOAD_LIMIT; // Assume full quota on error
+    console.error('Error getting remaining uploads:', err);
+    // On error, return conservative estimate
+    return 0;
   }
 }
 
 /**
  * Get TTL (seconds until reset) for upload rate limit
+ * 
+ * @param userId - User's ID
+ * @returns Seconds until rate limit resets
  */
 export async function getUploadRateLimitTTL(userId: string): Promise<number> {
   try {
-    const key = `rl:upload:${userId}`;
-    const ttl = await redis.ttl(key);
-    return ttl > 0 ? ttl : WINDOW_SECONDS;
+    // Check current limit to get retry-after value
+    const result = await rateLimiter.check(
+      `upload:${userId}`,
+      UPLOAD_LIMIT,
+      WINDOW_SECONDS
+    );
+    
+    return result.retryAfter || WINDOW_SECONDS;
   } catch (err) {
-    console.error('Redis error getting upload TTL:', err);
+    console.error('Error getting upload TTL:', err);
+    // Return default window on error
     return WINDOW_SECONDS;
   }
 }

@@ -160,10 +160,14 @@ export class MatchService {
         });
 
         // Cache invalidation AFTER transaction succeeds (prevents inconsistency on rollback)
+        // Non-critical: If Redis is down, caches will just stay stale for 5 minutes
         await Promise.all([
             redis.del(`feed:${outerLikerId}`),
             redis.del(`feed:${outerLikedId}`)
-        ]);
+        ]).catch(err => {
+            console.warn('Cache invalidation failed (non-critical):', err.message);
+            // Not throwing - match was created successfully, cache will expire naturally
+        });
 
         return match;
     }

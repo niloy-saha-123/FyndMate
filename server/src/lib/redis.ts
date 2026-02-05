@@ -68,9 +68,58 @@ redis.on('close', () => {
     console.warn('Redis connection closed');
 });
 
-// TODO [10K Users]: Migrate to Redis Cluster or Managed Redis (AWS ElastiCache, Upstash) for high availability
+// TODO [5K Users]: Migrate to managed Redis with SLA (Upstash Pro, AWS ElastiCache, Redis Cloud)
+// TODO [10K Users]: Implement Redis Cluster for high availability and automatic failover
 // TODO [10K Users]: Add Prometheus metrics for Redis health (connection pool, hit rate, latency)
-// TODO [10K Users]: Implement circuit breaker for Redis itself (fail-fast on timeout, fallback to in-memory)
 // TODO [100K Users]: Add regional Redis replicas for multi-region deployments
+
+/**
+ * Check Redis health at server startup
+ * CRITICAL: This runs during server initialization to catch configuration issues early
+ */
+export async function checkRedisHealth(): Promise<void> {
+    try {
+        const start = Date.now();
+        await redis.ping();
+        const latency = Date.now() - start;
+        
+        console.info(`✅ Redis connected successfully (latency: ${latency}ms)`);
+        
+        // TODO [2K Users]: Alert if Redis latency is consistently >100ms
+        if (latency > 100) {
+            console.warn(`⚠️  Redis latency is high (${latency}ms). Consider upgrading Redis instance.`);
+        }
+    } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+        
+        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.error('🚨 WARNING: Redis is NOT available');
+        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.error('');
+        console.error('Impact:');
+        console.error('  • Rate limiting: Using in-memory fallback (single-server only)');
+        console.error('  • Nonce validation: Using in-memory fallback (replay protection limited)');
+        console.error('  • Feed caching: Disabled (slower performance)');
+        console.error('  • Circuit breaker: Disabled');
+        console.error('');
+        console.error('Error:', errorMsg);
+        console.error('');
+        console.error('To fix:');
+        console.error('  1. Check REDIS_URL in .env file');
+        console.error('  2. Verify Redis server is running');
+        console.error('  3. For local dev: Use Upstash free tier (https://upstash.com)');
+        console.error('');
+        
+        if (process.env.NODE_ENV === 'production') {
+            console.error('❌ FATAL: Redis is REQUIRED in production');
+            console.error('   Server will not start without Redis to ensure security.');
+            console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            process.exit(1); // Force crash in production to prevent security bypass
+        }
+        
+        console.error('⚠️  Server will start in DEGRADED mode (dev environment only)');
+        console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
+}
 
 export { redis };

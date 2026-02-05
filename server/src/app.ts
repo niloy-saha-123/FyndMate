@@ -56,6 +56,37 @@ export async function buildApp() {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
 
+  // Redis health check endpoint
+  // TODO [1K Users]: Protect this endpoint with authentication
+  // TODO [2K Users]: Add detailed metrics (memory usage, connection pool, etc.)
+  app.get('/health/redis', async (req, reply) => {
+    try {
+      const { rateLimiter } = await import('./rate-limiting/index.js');
+      const healthStatus = (rateLimiter as any).getHealthStatus();
+      
+      return {
+        status: healthStatus.redis.healthy ? 'healthy' : 'degraded',
+        redis: {
+          healthy: healthStatus.redis.healthy,
+          consecutiveFailures: healthStatus.redis.consecutiveFailures,
+          lastChecked: healthStatus.redis.lastChecked,
+          lastError: healthStatus.redis.lastError,
+        },
+        fallback: {
+          active: !healthStatus.redis.healthy,
+          inMemoryStoreSize: healthStatus.inMemoryStoreSize,
+        },
+        timestamp: new Date().toISOString(),
+      };
+    } catch (err) {
+      return reply.status(503).send({
+        status: 'error',
+        error: err instanceof Error ? err.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // Routes
   await app.register(uploadRoutes, { prefix: '/api/upload' });
   await app.register(authRoutes, { prefix: '/auth' });

@@ -129,10 +129,14 @@ export class LikeService {
         });
 
         // Invalidate Feed Cache for both users
+        // Non-critical: If Redis is down, caches will just stay stale for 5 minutes
         await Promise.all([
             redis.del(`feed:${likerId}`),
             redis.del(`feed:${likedId}`)
-        ]);
+        ]).catch(err => {
+            console.warn('Cache invalidation failed (non-critical):', err.message);
+            // Not throwing - like was created successfully, cache will expire naturally
+        });
 
         return result;
     }
