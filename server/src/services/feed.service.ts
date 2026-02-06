@@ -4,29 +4,78 @@
  * Handles exclusion logic (likes, matches, blocks) and implements caching for performance.
  */
 
-import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
 import { filterLocationArrayByPrivacy } from '../utils/locationPrivacy.js';
+import { publicUserFeedSelect, type PublicFeedUser } from '../utils/publicUser.js';
 
 // TODO [100K Users]: Add CDN-level caching for feed results (CloudFront, Fastly) with geographic distribution
 // TODO [100K Users]: Implement cache stampede protection (locking) to prevent thundering herd on cache misses
 // TODO [10K Users]: Add cache hit/miss metrics for monitoring and optimization
 
-type FeedUser = Prisma.UserGetPayload<{
-    select: {
-        id: true;
-        name: true;
-        profilePicture: true;
-        bio: true;
-        experience: true;
-        skills: true;
-        interests: true;
-        city: true;
-        country: true;
-        locationSharing: true;
-    }
-}>;
+// ============================================
+// TODO [PREMIUM FEATURE]: Radius-Based Matching
+// ============================================
+// GOAL: Allow users to find matches within X km radius (e.g., 5km, 10km, 25km, 50km)
+//
+// IMPLEMENTATION:
+// 1. Add new columns to User table (via Prisma migration):
+//    - searchLatitude: Float? (user's search center point, can differ from actual location)
+//    - searchLongitude: Float? (for "search in New York" while living in LA)
+//    - searchRadiusKm: Int? (user's preferred radius, default 50km)
+//
+// 2. Create new function: getFeedWithRadius(userId, radiusKm, limit, cursor)
+//    - Query current user's lat/long (INTERNAL ONLY, never expose in response)
+//    - Use PostGIS or Haversine formula to calculate distance:
+//      ```sql
+//      SELECT id, name, city, country,
+//        (6371 * acos(cos(radians(?)) * cos(radians(latitude)) 
+//              * cos(radians(longitude) - radians(?)) 
+//              + sin(radians(?)) * sin(radians(latitude)))) AS distance
+//      FROM "User"
+//      WHERE distance < ?
+//      ORDER BY distance ASC
+//      ```
+//    - CRITICAL: SELECT only safe fields (id, name, city, country)
+//    - NEVER include latitude/longitude in response
+//
+// 3. Add route: GET /api/feed?radius=10 (protected by premium tier check)
+//
+// 4. Privacy consideration: Optionally show approximate distance ("~5 km away")
+//    without revealing exact coordinates
+//
+// SECURITY: lat/long used ONLY for internal calculations, NEVER returned to client
+
+// ============================================
+// TODO [PREMIUM FEATURE]: Manual Location Override
+// ============================================
+// GOAL: Let users search for matches in different cities (e.g., traveling, relocating)
+//
+// IMPLEMENTATION:
+// 1. Add endpoint: POST /api/location/search
+//    Body: { city: "New York", country: "USA" }
+//
+// 2. Geocode city → lat/long using geocodingService
+//    - Store in searchLatitude/searchLongitude (separate from real location)
+//    - Use for radius matching but don't affect user's actual profile location
+//
+// 3. Update getFeedWithRadius() to use searchLat/searchLong if set,
+//    otherwise fall back to actual latitude/longitude
+//
+// 4. Add "Currently searching in: New York" indicator in client UI
+//
+// 5. Allow reset: DELETE /api/location/search (revert to actual location)
+//
+// DATABASE FIELDS NEEDED:
+//   - searchLatitude: Float? (null = use actual location)
+//   - searchLongitude: Float? (null = use actual location)
+//   - searchCity: String? (display "Searching in X")
+//   - searchCountry: String?
+//   - searchSetAt: DateTime? (when they set it, for expiry)
+//
+// PRIVACY: Actual user location still hidden, only search center changes
+
+type FeedUser = PublicFeedUser;
 
 export class FeedService {
     /**
@@ -133,18 +182,7 @@ export class FeedService {
                     ? { onboardingCompleted: true }
                     : {}),
             },
-            select: {
-                id: true,
-                name: true,
-                profilePicture: true,
-                bio: true,
-                experience: true,
-                skills: true,
-                interests: true,
-                city: true,
-                country: true,
-                locationSharing: true,
-            },
+            select: publicUserFeedSelect,
             orderBy: {
                 createdAt: 'desc',
             },

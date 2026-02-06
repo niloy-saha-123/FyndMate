@@ -8,17 +8,13 @@ import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
 import { blockService } from './block.service.js';
 import { matchService } from './match.service.js';
+import { publicUserLikeSelect } from '../utils/publicUser.js';
+import { sanitizeText } from '../utils/sanitizeText.js';
 
 type ReceivedLike = Prisma.LikeGetPayload<{
     include: {
         likerUser: {
-            select: {
-                id: true;
-                name: true;
-                profilePicture: true;
-                bio: true;
-                skills: true;
-            }
+            select: typeof publicUserLikeSelect;
         }
     }
 }>;
@@ -33,12 +29,14 @@ export class LikeService {
         }
 
         if (liked) {
-            if (!message || message.trim().length < 20) {
+            const sanitizedMessage = message ? sanitizeText(message) : '';
+            if (!sanitizedMessage || sanitizedMessage.length < 20) {
                 throw new Error("Intro message must be at least 20 characters.");
             }
-            if (message.length > 500) {
+            if (sanitizedMessage.length > 500) {
                 throw new Error("Intro message cannot exceed 500 characters.");
             }
+            message = sanitizedMessage;
         }
 
         // Verify target user exists
@@ -118,7 +116,7 @@ export class LikeService {
             throw new Error("You are already matched with this user.");
         }
 
-        const result = await prisma.like.create({
+            const result = await prisma.like.create({
             data: {
                 likerId,
                 likedId,
@@ -158,13 +156,7 @@ export class LikeService {
                 },
                 include: {
                     likerUser: {
-                        select: {
-                            id: true,
-                            name: true,
-                            profilePicture: true,
-                            bio: true,
-                            skills: true,
-                        },
+                        select: publicUserLikeSelect,
                     },
                 },
                 orderBy: {

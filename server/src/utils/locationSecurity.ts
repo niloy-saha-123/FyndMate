@@ -37,6 +37,7 @@ export async function isNonceUsed(nonce: string): Promise<boolean> {
  */
 export async function markNonceUsed(nonce: string): Promise<void> {
     const NONCE_TTL_SECONDS = 10 * 60; // 10 minutes
+    // TODO [POST-MVP]: Align nonce TTL with a tighter timestamp window if we reduce it.
     
     try {
         await nonceStore.markUsed(nonce, NONCE_TTL_SECONDS);

@@ -95,6 +95,8 @@ export async function updateProfile(
   supabaseId: string,
   payload: Partial<UserProfile>
 ): Promise<UserProfile> {
+  // TODO [POST-MVP]: Move profile updates to server API to centralize sanitization.
+  // TODO [POST-MVP]: Add DB-level sanitization trigger for bio/skills/interests.
   // Map fullName to name if needed (your DB uses "name")
   const dbPayload: any = { ...payload };
   if (payload.fullName !== undefined) {

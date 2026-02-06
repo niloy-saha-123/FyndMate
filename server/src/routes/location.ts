@@ -4,6 +4,7 @@
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import crypto from 'crypto';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { updateLocationHandler } from '../controllers/locationController.js';
 import { prisma } from '../lib/prisma.js';
@@ -28,7 +29,10 @@ export async function locationRoutes(app: FastifyInstance) {
         });
 
         if (!user || !user.locationSecret) {
-            const newSecret = `${userId}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            // TODO [POST-MVP]: Add secret rotation with versioning (current + previous) to allow safe key rollover.
+            // TODO [POST-MVP]: Store per-device secrets to limit blast radius if a device is compromised.
+            // TODO [POST-MVP]: Encrypt location secrets at rest (KMS/Vault) instead of storing plaintext.
+            const newSecret = crypto.randomBytes(32).toString('hex');
             await prisma.user.update({
                 where: { id: userId },
                 data: { locationSecret: newSecret }

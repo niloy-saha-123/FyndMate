@@ -6,11 +6,13 @@
 import { Prisma, Match } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
+import { publicUserMatchSelect } from '../utils/publicUser.js';
+import { sanitizeText } from '../utils/sanitizeText.js';
 
 type MatchWithUsers = Prisma.MatchGetPayload<{
     include: {
-        user1: { select: { id: true; name: true; profilePicture: true } };
-        user2: { select: { id: true; name: true; profilePicture: true } };
+        user1: { select: typeof publicUserMatchSelect };
+        user2: { select: typeof publicUserMatchSelect };
         messages: true;
     }
 }>;
@@ -139,15 +141,18 @@ export class MatchService {
 
             // Create Reply Message (from Accepter)
             if (replyMessage && replyMessage.trim().length > 0 && likedId) {
+                const sanitizedReply = sanitizeText(replyMessage);
+                if (sanitizedReply.length > 0) {
                 console.log('Creating reply message with senderId:', likedId);
                 await tx.message.create({
                     data: {
                         match: { connect: { id: newMatch.id } },
                         sender: { connect: { id: likedId } },
-                        content: replyMessage,
+                        content: sanitizedReply,
                         createdAt: new Date(now.getTime() + 1),
                     }
                 });
+                }
             }
 
             // 4. Archive Like
@@ -213,8 +218,8 @@ export class MatchService {
                 status: 'active',
             },
             include: {
-                user1: { select: { id: true, name: true, profilePicture: true } },
-                user2: { select: { id: true, name: true, profilePicture: true } },
+                user1: { select: publicUserMatchSelect },
+                user2: { select: publicUserMatchSelect },
                 messages: {
                     take: 1,
                     orderBy: { createdAt: 'desc' }
