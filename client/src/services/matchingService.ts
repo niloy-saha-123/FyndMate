@@ -39,6 +39,7 @@ export interface UserProfile {
     role?: string | null;
     age?: number | null;
     lookingFor?: string[];
+    githubUsername?: string | null;
 }
 
 export interface Like {
