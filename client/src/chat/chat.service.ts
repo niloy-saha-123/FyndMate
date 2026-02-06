@@ -1,38 +1,15 @@
 import { supabase } from "../auth/supabaseClient";
+import { apiClient } from "../lib/apiClient";
 
 export async function getMyMatches(userId: string) {
-  const { data, error } = await supabase
-    .from("Match")
-    .select(`
-      id,
-      createdAt,
-      status,
-      blockedBy,
-      user1Id,
-      user2Id,
-      User1:User!Match_user1Id_fkey(id, name, profilePicture),
-      User2:User!Match_user2Id_fkey(id, name, profilePicture),
-      messages:Message(
-        id,
-        content,
-        senderId,
-        createdAt,
-        readAt
-      )
-    `)
-    .or(`user1Id.eq.${userId},user2Id.eq.${userId}`)
-    .in("status", ["active", "blocked"]) // Include blocked matches
-    .order("createdAt", { ascending: false })
-    .order("createdAt", { foreignTable: "messages", ascending: false });
+  const response = await apiClient.get<{ data: any[] }>("/api/matches");
 
-  if (error) throw error;
-
-  return data.map(match => {
+  return response.data.map(match => {
     const lastMessage = match.messages?.[0] ?? null;
 
     const unreadCount =
       match.messages?.filter(
-        m => m.readAt === null && m.senderId !== userId
+        (m: any) => m.readAt === null && m.senderId !== userId
       ).length ?? 0;
 
     return {
