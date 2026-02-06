@@ -20,6 +20,7 @@ import {
   TextInput,
   Modal,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -228,6 +229,18 @@ export default function FeedScreen() {
                   <NeoChip label={currentProfile.commitment} variant="meta" />
                 )}
               </ChipContainer>
+
+              {/* GitHub Link */}
+              {currentProfile.githubUsername && (
+                <TouchableOpacity
+                  style={styles.githubLinkContainer}
+                  onPress={() => Linking.openURL(`https://github.com/${currentProfile.githubUsername}`)}
+                >
+                  <Ionicons name="logo-github" size={18} color={COLORS.primary} />
+                  <Text style={styles.githubLinkText}>github.com/{currentProfile.githubUsername}</Text>
+                  <Ionicons name="open-outline" size={14} color={COLORS.primary} />
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Looking For */}
@@ -334,7 +347,7 @@ export default function FeedScreen() {
             <View style={styles.modalProfilePreview}>
               {currentProfile.profilePicture ? (
                 <Image
-                  source={{ uri: currentProfile.profilePicture }}
+                  source={{ uri: currentProfile.profilePicture || '' }}
                   style={styles.modalAvatar}
                 />
               ) : (
@@ -621,6 +634,24 @@ const styles = StyleSheet.create({
     color: COLORS.skillText,
     marginLeft: 4,
     alignSelf: 'center',
+  },
+  githubLinkContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.small,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.primary,
+    borderStyle: 'dashed',
+  },
+  githubLinkText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
   },
 
   // Card CTA

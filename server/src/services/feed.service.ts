@@ -25,6 +25,8 @@ type FeedUser = Prisma.UserGetPayload<{
         city: true;
         country: true;
         locationSharing: true;
+        githubUsername: true;
+        commitment: true;
     }
 }>;
 
@@ -144,6 +146,8 @@ export class FeedService {
                 city: true,
                 country: true,
                 locationSharing: true,
+                githubUsername: true,
+                commitment: true,
             },
             orderBy: {
                 createdAt: 'desc',

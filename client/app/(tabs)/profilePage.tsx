@@ -15,6 +15,7 @@ import {
   Alert,
   ActivityIndicator,
   Pressable,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -501,10 +502,26 @@ export default function ProfilePage() {
               />
             </View>
           ) : (
-            <View style={styles.githubRow}>
-              <Ionicons name="logo-github" size={20} color={COLORS.textPrimary} />
-              <Text style={styles.githubText}>{profile?.githubUsername || 'Not connected'}</Text>
-            </View>
+            <TouchableOpacity 
+              style={styles.githubRow}
+              onPress={() => {
+                if (profile?.githubUsername) {
+                  Linking.openURL(`https://github.com/${profile.githubUsername}`);
+                }
+              }}
+              disabled={!profile?.githubUsername}
+            >
+              <Ionicons name="logo-github" size={20} color={profile?.githubUsername ? COLORS.primary : COLORS.textPrimary} />
+              <Text style={[
+                styles.githubText,
+                profile?.githubUsername && styles.githubLinkText
+              ]}>
+                {profile?.githubUsername || 'Not connected'}
+              </Text>
+              {profile?.githubUsername && (
+                <Ionicons name="open-outline" size={14} color={COLORS.primary} style={{ marginLeft: 4 }} />
+              )}
+            </TouchableOpacity>
           )}
         </NeoCard>
 
@@ -766,6 +783,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.textSecondary,
+  },
+  githubLinkText: {
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
   },
 
   // Options
