@@ -7,6 +7,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { prisma } from '../lib/prisma.js';
+import { signProfilePicture } from '../utils/profilePicture.js';
 
 const MAX_BIO_LENGTH = 300;
 const MAX_SKILLS = 10;
@@ -66,7 +67,8 @@ export default async function profileRoutes(app: FastifyInstance) {
     });
     if (!user) return reply.status(404).send({ error: 'User not found' });
     const age = user.birthDate ? computeAge(new Date(user.birthDate)) : null;
-    return reply.send({ ...user, age });
+    const profilePicture = await signProfilePicture(user.profilePicture);
+    return reply.send({ ...user, profilePicture, age });
   });
 
   app.patch('/profile/me', { preHandler: [authMiddleware] }, async (request, reply) => {
@@ -117,6 +119,8 @@ export default async function profileRoutes(app: FastifyInstance) {
       select: selectFields,
     });
 
-    return reply.send({ ...updated, age });
+    const profilePicture = await signProfilePicture(updated.profilePicture);
+
+    return reply.send({ ...updated, profilePicture, age });
   });
 }

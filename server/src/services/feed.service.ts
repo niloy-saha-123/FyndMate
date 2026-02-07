@@ -8,6 +8,7 @@ import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
 import { filterLocationArrayByPrivacy } from '../utils/locationPrivacy.js';
 import { publicUserFeedSelect, type PublicFeedUser } from '../utils/publicUser.js';
+import { signProfilePicture } from '../utils/profilePicture.js';
 
 function computeAge(birthDate: Date | null): number | null {
     if (!birthDate) return null;
@@ -207,10 +208,19 @@ export class FeedService {
             age: computeAge(u.birthDate as any),
         }));
 
-        const result = filterLocationArrayByPrivacy(withAge).map((u: any) => {
+        const priv = filterLocationArrayByPrivacy(withAge).map((u: any) => {
             delete u.birthDate;
             return u;
         });
+
+        // TODO [POST-MVP]: Add cache stampede protection (lock key) around feed generation.
+        // TODO [POST-MVP]: Batch exclusions with a single query/CTE if feed load grows.
+        const result = await Promise.all(
+            priv.map(async (u: any) => ({
+                ...u,
+                profilePicture: await signProfilePicture(u.profilePicture),
+            }))
+        );
 
         // Cache Miss: Store result for 5 minutes if this was an initial load
         if (!cursor && result.length > 0) {

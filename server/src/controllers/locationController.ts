@@ -85,6 +85,7 @@ export async function updateLocationHandler(req: FastifyRequest, reply: FastifyR
     // ---- Reverse geocode (server-side) ----
     // Convert lat/lon to city/country using OpenStreetMap Nominatim
     // This prevents clients from faking city names
+    // TODO [POST-MVP]: Add request timeout (~3s) around reverseGeocode to avoid long hangs.
     const { city, country, success, error: geocodingError } = await reverseGeocode(latitude, longitude);
 
     // Monitor geocoding failures for alerting

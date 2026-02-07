@@ -65,9 +65,14 @@ export async function authMiddleware(
         name,
         timezone,
       },
-      select: { id: true, email: true },
+      select: { id: true, email: true, banned: true },
     });
 
+    if (finalUser.banned) {
+      return reply.status(403).send({ error: 'Account is banned' });
+    }
+
+    // TODO: Session/device tracking and jti-based revocation (post-MVP).
     // Attach user to request
     request.user = {
       id: finalUser.id,

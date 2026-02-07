@@ -9,6 +9,7 @@ import { redis } from '../lib/redis.js';
 import { publicUserMatchSelect } from '../utils/publicUser.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
 import { filterLocationByPrivacy } from '../utils/locationPrivacy.js';
+import { signProfilePicture } from '../utils/profilePicture.js';
 
 type MatchWithUsers = Prisma.MatchGetPayload<{
     include: {
@@ -220,8 +221,11 @@ export class MatchService {
     /**
      * Get User's Matches (Active connections).
      */
-    async getMatches(userId: string): Promise<MatchWithUsers[]> {
-        return await prisma.match.findMany({
+    async getMatches(userId: string, limit = 20, cursor?: string): Promise<{ data: MatchWithUsers[]; nextCursor: string | null }> {
+        const matches = await prisma.match.findMany({
+            take: limit,
+            skip: cursor ? 1 : 0,
+            cursor: cursor ? { id: cursor } : undefined,
             where: {
                 OR: [
                     { user1Id: userId },
@@ -241,15 +245,32 @@ export class MatchService {
             orderBy: {
                 createdAt: 'desc',
             }
-        }).then(matches => matches.map((m: any) => {
+        });
+
+        const transformed = await Promise.all(matches.map(async (m: any) => {
             const age1 = computeAge(m.user1.birthDate as any);
             const age2 = computeAge(m.user2.birthDate as any);
             const sanitizedUser1 = filterLocationByPrivacy(m.user1);
             const sanitizedUser2 = filterLocationByPrivacy(m.user2);
             const { birthDate: _b1, city: _c1, country: _ct1, ...u1 } = sanitizedUser1 as any;
             const { birthDate: _b2, city: _c2, country: _ct2, ...u2 } = sanitizedUser2 as any;
-            return { ...m, user1: { ...u1, age: age1 }, user2: { ...u2, age: age2 } };
+            return {
+                ...m,
+                user1: {
+                    ...u1,
+                    profilePicture: await signProfilePicture(u1.profilePicture),
+                    age: age1
+                },
+                user2: {
+                    ...u2,
+                    profilePicture: await signProfilePicture(u2.profilePicture),
+                    age: age2
+                }
+            };
         }));
+
+        const nextCursor = matches.length === limit ? matches[matches.length - 1].id : null;
+        return { data: transformed, nextCursor };
     }
 }
 

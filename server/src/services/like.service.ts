@@ -10,6 +10,7 @@ import { blockService } from './block.service.js';
 import { matchService } from './match.service.js';
 import { publicUserLikeSelect } from '../utils/publicUser.js';
 import { filterLocationByPrivacy } from '../utils/locationPrivacy.js';
+import { signProfilePicture } from '../utils/profilePicture.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
 
 type ReceivedLike = Prisma.LikeGetPayload<{
@@ -194,13 +195,17 @@ export class LikeService {
 
         return likes
             .filter(like => !blockedIds.has(like.likerUser.id))
-            .map(like => {
+            .map(async like => {
                 const age = computeAge(like.likerUser.birthDate as any);
                 const sanitizedUser = filterLocationByPrivacy(like.likerUser as any);
                 const { birthDate, city, country, ...restUser } = sanitizedUser;
                 return {
                     ...like,
-                    likerUser: { ...restUser, age },
+                    likerUser: {
+                        ...restUser,
+                        profilePicture: await signProfilePicture(restUser.profilePicture),
+                        age,
+                    },
                 };
             });
     }

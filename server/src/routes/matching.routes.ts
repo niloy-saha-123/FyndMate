@@ -141,9 +141,11 @@ export default async function matchingRoutes(app: FastifyInstance) {
     // Matches
     app.get('/matches', async (request, reply) => {
         const user = request.user!;
+        const { limit, cursor } = request.query as { limit?: string; cursor?: string };
+        const parsedLimit = limit ? Math.min(parseInt(limit, 10) || 20, 50) : 20;
         try {
-            const matches = await matchService.getMatches(user.id);
-            return reply.send({ data: matches });
+            const { data, nextCursor } = await matchService.getMatches(user.id, parsedLimit, cursor);
+            return reply.send({ data, nextCursor });
         } catch (error: any) {
             request.log.error(error);
             return reply.status(500).send({ error: 'Failed to fetch matches' });

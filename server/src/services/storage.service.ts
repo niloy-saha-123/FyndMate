@@ -7,10 +7,12 @@
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { withCircuitBreaker } from '../utils/circuit-breaker.js';
 
-const BUCKET_NAME = 'profile-pictures';
+export const BUCKET_NAME = 'profile-pictures';
 const SIGNED_URL_EXPIRES_IN = 120; // 2 minutes
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+// TODO [POST-MVP]: Make bucket private and serve via short-lived signed GET URLs/CDN token instead of public reads.
+// TODO [POST-MVP]: Stream file validation instead of buffering entire file to reduce memory spikes during uploads.
 
 /**
  * Generate a signed URL for uploading a profile picture.
@@ -22,7 +24,7 @@ export async function createSignedUploadUrl(
 ): Promise<{ signedUrl: string; path: string; expiresAt: Date }> {
   const timestamp = Date.now();
   const crypto = await import('crypto');
-  const randomBytes = crypto.randomBytes(4);
+  const randomBytes = crypto.randomBytes(16); // increase entropy to reduce path guessing
   const randomId = randomBytes.toString('hex');
 
   const path = `${userId}/${timestamp}-${randomId}.${fileExtension}`;

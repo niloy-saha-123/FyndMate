@@ -104,9 +104,11 @@ export async function declineLike(likeId: string) {
 /**
  * GET ACTIVE MATCHES (CHATS)
  */
-export async function getMatches(): Promise<Match[]> {
-    const json = await apiClient.get<{ data: Match[] }>('/api/matches');
-    return json.data;
+export async function getMatches(limit = 20, cursor?: string): Promise<{ data: Match[]; nextCursor: string | null }> {
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (cursor) params.append('cursor', cursor);
+    const json = await apiClient.get<{ data: Match[]; nextCursor?: string | null }>(`/api/matches?${params.toString()}`);
+    return { data: json.data, nextCursor: json.nextCursor ?? null };
 }
 
 /**

@@ -57,6 +57,7 @@ export function useFeed() {
 
         if (lastError) {
             console.error('Feed fetch failed after retries', lastError);
+            // TODO: Add telemetry (e.g., Sentry) and optional offline queue for feed fetch failures.
             setError(lastError.message || 'Failed to load feed');
             setLoading(false);
             return;
