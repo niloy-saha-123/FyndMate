@@ -207,7 +207,7 @@ export default function ProfilePage() {
       
       // Update profile in database
       if (session?.user?.id) {
-        await updateProfile(session.user.id, { profilePicture: publicUrl, birthDate: profile?.birthDate ?? '' });
+        await updateProfile(session.user.id, { profilePicture: publicUrl });
         await refreshProfile();
       }
       

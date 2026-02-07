@@ -193,21 +193,23 @@ export class LikeService {
             blockedIds.add(b.blockedId);
         });
 
-        return likes
-            .filter(like => !blockedIds.has(like.likerUser.id))
-            .map(async like => {
-                const age = computeAge(like.likerUser.birthDate as any);
-                const sanitizedUser = filterLocationByPrivacy(like.likerUser as any);
-                const { birthDate, city, country, ...restUser } = sanitizedUser;
-                return {
-                    ...like,
-                    likerUser: {
-                        ...restUser,
-                        profilePicture: await signProfilePicture(restUser.profilePicture),
-                        age,
-                    },
-                };
-            });
+        return await Promise.all(
+            likes
+                .filter(like => !blockedIds.has(like.likerUser.id))
+                .map(async like => {
+                    const age = computeAge(like.likerUser.birthDate as any);
+                    const sanitizedUser = filterLocationByPrivacy(like.likerUser as any);
+                    const { birthDate, city, country, ...restUser } = sanitizedUser;
+                    return {
+                        ...like,
+                        likerUser: {
+                            ...restUser,
+                            profilePicture: await signProfilePicture(restUser.profilePicture),
+                            age,
+                        },
+                    };
+                })
+        );
     }
 
     async getLike(likeId: string) {

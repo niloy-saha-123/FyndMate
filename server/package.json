@@ -56,22 +56,18 @@
   "dependencies": {
     "@fastify/cors": "^8.4.0",
     "@fastify/multipart": "^8.0.0",
-    "@fastify/websocket": "^8.3.0",
     "@octokit/graphql": "^7.0.1",
     "@prisma/adapter-pg": "^5.22.0",
     "@prisma/client": "5.22.0",
     "@supabase/supabase-js": "^2.89.0",
     "axios": "^1.13.2",
-    "express": "^5.2.1",
     "fastify": "^4.24.3",
     "ioredis": "^5.9.2",
     "pg": "^8.13.0",
     "sharp": "^0.34.5",
-    "socket.io": "^4.6.1",
     "zod": "^4.3.5"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
     "@types/node": "^20.19.27",
     "cuid": "^3.0.0",
     "dotenv": "^17.2.3",

@@ -27,6 +27,8 @@ export class InMemoryRateLimiter implements RateLimiter {
         this.cleanupInterval = setInterval(() => {
             this.cleanup();
         }, 60_000);
+        // Do not keep process alive solely for cleanup (use destroy on shutdown)
+        this.cleanupInterval.unref();
 
         // TODO [10K Users]: Implement LRU cache with max size limit (e.g., 100K entries)
         // to prevent unbounded memory growth

@@ -99,6 +99,6 @@ export async function updateProfile(
   payload: Partial<UserProfile>
 ): Promise<UserProfile> {
   // Server-owned: centralize validation/sanitization and bypass RLS issues
-  const result = await apiClient.patch<{ data: any }>("/api/profile/me", payload);
-  return normalizeProfile(result.data);
+  const result = await apiClient.patch<any>("/api/profile/me", payload);
+  return normalizeProfile(result);
 }

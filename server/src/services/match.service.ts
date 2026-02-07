@@ -239,7 +239,7 @@ export class MatchService {
                 messages: {
                     take: 1,
                     orderBy: { createdAt: 'desc' },
-                    select: { id: true, content: true, senderId: true, createdAt: true },
+                    select: { id: true, content: true, senderId: true, createdAt: true, readAt: true }, // TODO [POST-MVP]: Implement proper read receipts and unread counts server-side.
                 }
             },
             orderBy: {

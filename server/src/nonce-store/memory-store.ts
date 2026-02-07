@@ -26,6 +26,8 @@ export class InMemoryNonceStore implements NonceStore {
         this.cleanupInterval = setInterval(() => {
             this.cleanup();
         }, 60_000);
+        // Do not keep process alive solely for cleanup (use destroy on shutdown)
+        this.cleanupInterval.unref();
     }
 
     async isUsed(nonce: string): Promise<boolean> {

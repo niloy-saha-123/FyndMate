@@ -37,6 +37,8 @@ export class RedisHealthMonitor {
                 // Errors are logged in performHealthCheck
             });
         }, this.CHECK_INTERVAL_MS);
+        // Do not keep process alive solely for health checks (tests/CLI)
+        this.checkInterval.unref();
 
         console.info('[RedisHealthMonitor] Started monitoring Redis health');
     }

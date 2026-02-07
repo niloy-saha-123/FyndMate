@@ -118,16 +118,14 @@ export async function sanitizeLocationResponse(
                 method: request.method
             }, '🚨 CRITICAL: Failed to sanitize location response - failing closed');
             
-            // Return 500 error instead of leaking sensitive location data
-            reply.status(500).send({
+            // Fail closed without double-sending: set status and return safe payload
+            reply.status(500);
+            return {
                 error: 'Internal server error',
                 message: process.env.NODE_ENV === 'development' 
                     ? 'Response sanitization failed' 
                     : undefined
-            });
-            
-            // Throw to stop response pipeline
-            throw new Error('Location sanitization failed - security breach prevented');
+            };
         }
     }
 

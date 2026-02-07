@@ -25,6 +25,8 @@ export const rateLimiter = new HybridRateLimiter(
     memoryLimiter,
     healthMonitor
 );
+// Export shared health monitor for other modules (e.g., nonce store) without reaching into internals
+export { healthMonitor };
 
 // Export individual components for testing
 export { RedisRateLimiter } from './redis-limiter.js';

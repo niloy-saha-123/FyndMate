@@ -11,15 +11,15 @@ import { RedisNonceStore } from './redis-store.js';
 import { InMemoryNonceStore } from './memory-store.js';
 import { HybridNonceStore } from './hybrid-store.js';
 
-// Import health monitor from rate limiting system (shared instance)
-import { rateLimiter } from '../rate-limiting/index.js';
+// Import rate limiter and shared health monitor from rate limiting system
+import { rateLimiter, healthMonitor as rateLimiterHealthMonitor } from '../rate-limiting/index.js';
 
 // Create singleton instances
 const redisStore = new RedisNonceStore(redis);
 const memoryStore = new InMemoryNonceStore();
 
 // Use the same health monitor as rate limiter for consistency
-const healthMonitor = (rateLimiter as any).healthMonitor;
+const healthMonitor = rateLimiterHealthMonitor;
 
 // Export the hybrid store as the default nonce store
 export const nonceStore = new HybridNonceStore(
