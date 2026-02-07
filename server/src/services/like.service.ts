@@ -9,6 +9,7 @@ import { redis } from '../lib/redis.js';
 import { blockService } from './block.service.js';
 import { matchService } from './match.service.js';
 import { publicUserLikeSelect } from '../utils/publicUser.js';
+import { filterLocationByPrivacy } from '../utils/locationPrivacy.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
 
 type ReceivedLike = Prisma.LikeGetPayload<{
@@ -167,7 +168,7 @@ export class LikeService {
                 },
                 include: {
                     likerUser: {
-                        select: { ...publicUserLikeSelect, birthDate: true },
+                        select: { ...publicUserLikeSelect, birthDate: true, city: true, country: true, locationSharing: true },
                     },
                 },
                 orderBy: {
@@ -195,8 +196,8 @@ export class LikeService {
             .filter(like => !blockedIds.has(like.likerUser.id))
             .map(like => {
                 const age = computeAge(like.likerUser.birthDate as any);
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { birthDate, ...restUser } = like.likerUser as any;
+                const sanitizedUser = filterLocationByPrivacy(like.likerUser as any);
+                const { birthDate, city, country, ...restUser } = sanitizedUser;
                 return {
                     ...like,
                     likerUser: { ...restUser, age },

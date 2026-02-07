@@ -8,6 +8,7 @@ import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
 import { publicUserMatchSelect } from '../utils/publicUser.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
+import { filterLocationByPrivacy } from '../utils/locationPrivacy.js';
 
 type MatchWithUsers = Prisma.MatchGetPayload<{
     include: {
@@ -229,11 +230,12 @@ export class MatchService {
                 status: 'active',
             },
             include: {
-                user1: { select: { ...publicUserMatchSelect, birthDate: true } },
-                user2: { select: { ...publicUserMatchSelect, birthDate: true } },
+                user1: { select: { ...publicUserMatchSelect, birthDate: true, city: true, country: true, locationSharing: true } },
+                user2: { select: { ...publicUserMatchSelect, birthDate: true, city: true, country: true, locationSharing: true } },
                 messages: {
                     take: 1,
-                    orderBy: { createdAt: 'desc' }
+                    orderBy: { createdAt: 'desc' },
+                    select: { id: true, content: true, senderId: true, createdAt: true },
                 }
             },
             orderBy: {
@@ -242,8 +244,10 @@ export class MatchService {
         }).then(matches => matches.map((m: any) => {
             const age1 = computeAge(m.user1.birthDate as any);
             const age2 = computeAge(m.user2.birthDate as any);
-            const { birthDate: _b1, ...u1 } = m.user1;
-            const { birthDate: _b2, ...u2 } = m.user2;
+            const sanitizedUser1 = filterLocationByPrivacy(m.user1);
+            const sanitizedUser2 = filterLocationByPrivacy(m.user2);
+            const { birthDate: _b1, city: _c1, country: _ct1, ...u1 } = sanitizedUser1 as any;
+            const { birthDate: _b2, city: _c2, country: _ct2, ...u2 } = sanitizedUser2 as any;
             return { ...m, user1: { ...u1, age: age1 }, user2: { ...u2, age: age2 } };
         }));
     }

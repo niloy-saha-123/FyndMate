@@ -22,12 +22,11 @@ export const publicUserFeedSelect = {
   locationSharing: true,
 } as const;
 
+// Minimal fields for likes inbox preview
 export const publicUserLikeSelect = {
   id: true,
   name: true,
   profilePicture: true,
-  bio: true,
-  skills: true,
 } as const;
 
 export const publicUserMatchSelect = {

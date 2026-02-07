@@ -45,62 +45,28 @@ export async function authMiddleware(
       return reply.status(401).send({ error: 'Invalid or expired token' });
     }
 
-    // Identity Resolution: Map Supabase Auth ID to Database User ID
-    // We purposefully check the DB on every request to ensure recent bans/deletions are respected.
-    const dbUser = await prisma.user.findUnique({
+    const email = data.user.email || `${data.user.id}@placeholder.local`;
+    const name = data.user.user_metadata?.full_name ||
+      data.user.user_metadata?.name ||
+      email.split('@')[0];
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+    // Idempotent resolution: upsert avoids race conditions on concurrent first requests
+    const finalUser = await prisma.user.upsert({
       where: { supabaseId: data.user.id },
+      update: {
+        email,
+        name,
+        timezone,
+      },
+      create: {
+        supabaseId: data.user.id,
+        email,
+        name,
+        timezone,
+      },
       select: { id: true, email: true },
     });
-
-    let finalUser = dbUser;
-
-    // Auto-create user if they exist in Auth but not in DB (e.g. first login)
-    if (!dbUser) {
-      request.log.info({ supabaseId: data.user.id }, 'Auto-creating user row for new Supabase user');
-
-      try {
-        const email = data.user.email || `${data.user.id}@placeholder.local`;
-        const name = data.user.user_metadata?.full_name ||
-          data.user.user_metadata?.name ||
-          email.split('@')[0];
-
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-
-        finalUser = await prisma.user.create({
-          data: {
-            supabaseId: data.user.id,
-            email: email,
-            name: name,
-            timezone: timezone,
-          },
-          select: { id: true, email: true },
-        });
-
-        request.log.info({ userId: finalUser.id, supabaseId: data.user.id }, 'Successfully auto-created user');
-      } catch (createError: any) {
-        // Handle race condition: user might have been created between findUnique and create
-        if (createError.code === 'P2002') {
-          request.log.info({ supabaseId: data.user.id }, 'User already created by concurrent request, fetching...');
-          finalUser = await prisma.user.findUnique({
-            where: { supabaseId: data.user.id },
-            select: { id: true, email: true },
-          });
-
-          if (!finalUser) {
-            request.log.error({ supabaseId: data.user.id }, 'Failed to find or create user');
-            return reply.status(500).send({ error: 'Failed to create user account' });
-          }
-        } else {
-          request.log.error(createError, 'Failed to auto-create user');
-          return reply.status(500).send({ error: 'Failed to create user account' });
-        }
-      }
-    }
-
-    if (!finalUser) {
-      request.log.error({ supabaseId: data.user.id }, 'Unexpected: failed to resolve user');
-      return reply.status(500).send({ error: 'Failed to resolve user account' });
-    }
 
     // Attach user to request
     request.user = {
@@ -113,4 +79,3 @@ export async function authMiddleware(
     return reply.status(500).send({ error: 'Authentication failed' });
   }
 }
-
