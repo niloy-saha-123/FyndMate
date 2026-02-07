@@ -50,7 +50,7 @@ function sanitizeObject(obj: any): any {
         const sanitized: any = {};
         for (const key in obj) {
             // Skip sensitive fields
-            if (SENSITIVE_LOCATION_FIELDS.includes(key as any)) {
+    if (SENSITIVE_LOCATION_FIELDS.includes(key as any)) { // TODO [POST-MVP]: unify with locationPrivacy.ts and remove as any.
                 continue;
             }
             // Recursively sanitize nested objects

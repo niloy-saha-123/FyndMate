@@ -213,8 +213,10 @@ export class FeedService {
             return u;
         });
 
-        // TODO [POST-MVP]: Add cache stampede protection (lock key) around feed generation.
-        // TODO [POST-MVP]: Batch exclusions with a single query/CTE if feed load grows.
+// TODO [POST-MVP]: Add cache stampede protection (lock key) around feed generation.
+// TODO [POST-MVP]: Batch exclusions with a single query/CTE if feed load grows.
+// TODO [POST-MVP]: Move feed limits/TTL to config (e.g., limits.ts with env overrides) to avoid scattered magic numbers.
+// TODO [POST-MVP]: Make onboarding filter a config flag (no dev/prod divergence).
         const result = await Promise.all(
             priv.map(async (u: any) => ({
                 ...u,

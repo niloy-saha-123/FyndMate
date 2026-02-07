@@ -21,6 +21,7 @@ export async function locationRoutes(app: FastifyInstance) {
             rateLimit({ limit: 5, windowSec: 3600, keyPrefix: 'loc_secret' })
         ]
     }, async (req: FastifyRequest, reply: FastifyReply) => {
+        // TODO [POST-MVP]: Define AuthenticatedRequest type to avoid (req as any).user casts.
         const userId = (req as any).user.id;
 
         const user = await prisma.user.findUnique({
@@ -59,6 +60,7 @@ export async function locationRoutes(app: FastifyInstance) {
             }
         }
     }, async (req: FastifyRequest, reply: FastifyReply) => {
+        // TODO [POST-MVP]: Define AuthenticatedRequest type to avoid (req as any).user casts.
         const userId = (req as any).user.id;
         const { locationSharing } = req.body as { locationSharing: 'on' | 'off' };
 

@@ -153,6 +153,7 @@ export default async function matchingRoutes(app: FastifyInstance) {
     });
 
     app.post('/matches/:matchId/unmatch', async (request, reply) => {
+        // TODO [POST-MVP]: Add RESTful DELETE /api/matches/:matchId alias and deprecate this POST.
         const user = request.user!;
 
         const paramsResult = matchIdParamSchema.safeParse(request.params);

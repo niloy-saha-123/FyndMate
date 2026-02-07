@@ -146,12 +146,13 @@ export default async function uploadRoutes(app: FastifyInstance) {
 
         const { uploadPath, idempotencyKey } = parseResult.data;
 
+        // TODO [POST-MVP]: Replace time-based idempotency with key-based uniqueness on idempotencyKey + userId.
         // Idempotency check
         if (idempotencyKey) {
-          const existingSession = await prisma.uploadSession.findFirst({
-            where: {
-              userId,
-              confirmedAt: { not: null },
+            const existingSession = await prisma.uploadSession.findFirst({
+                where: {
+                    userId,
+                    confirmedAt: { not: null },
             },
             orderBy: { confirmedAt: 'desc' },
             take: 10,
@@ -381,4 +382,3 @@ export default async function uploadRoutes(app: FastifyInstance) {
     }
   );
 }
-

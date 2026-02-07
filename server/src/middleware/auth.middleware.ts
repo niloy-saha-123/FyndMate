@@ -45,6 +45,7 @@ export async function authMiddleware(
       return reply.status(401).send({ error: 'Invalid or expired token' });
     }
 
+    // TODO [POST-MVP]: Stop fabricating placeholder emails; require email or store null explicitly.
     const email = data.user.email || `${data.user.id}@placeholder.local`;
     const name = data.user.user_metadata?.full_name ||
       data.user.user_metadata?.name ||
