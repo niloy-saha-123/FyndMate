@@ -35,10 +35,8 @@ export interface UserProfile {
     city?: string | null;
     country?: string | null;
     locationSharing?: string | null;
-    // UI-specific fields (may not be returned by all endpoints)
-    role?: string | null;
+    // UI-specific field (may not be returned by all endpoints)
     age?: number | null;
-    lookingFor?: string[];
 }
 
 export interface Like {

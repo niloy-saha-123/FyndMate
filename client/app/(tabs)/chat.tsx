@@ -133,7 +133,7 @@ export default function ChatTab() {
 
   const renderChatItem = ({ item }: { item: any }) => {
     const isUser1 = item.user1Id === user?.id;
-    const otherUser = isUser1 ? item.User2 : item.User1;
+    const otherUser = isUser1 ? item.user2 : item.user1;
     const isBlocked = item.status === 'blocked';
     const iBlockedThem = isBlocked && item.blockedBy === user.id;
     const theyBlockedMe = isBlocked && item.blockedBy !== user.id;
@@ -194,7 +194,7 @@ export default function ChatTab() {
           <View style={styles.chatContent}>
             {/* Avatar */}
             <View style={styles.avatarContainer}>
-              {otherUser.profilePicture ? (
+              {otherUser?.profilePicture ? (
                 <Image
                   source={{ uri: otherUser.profilePicture }}
                   style={styles.avatar}
@@ -211,7 +211,7 @@ export default function ChatTab() {
 
             {/* Chat Info */}
             <View style={styles.chatInfo}>
-              <Text style={styles.chatName}>{otherUser.name}</Text>
+              <Text style={styles.chatName}>{otherUser?.name ?? 'Unknown user'}</Text>
               <Text
                 numberOfLines={1}
                 style={[

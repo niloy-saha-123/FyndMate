@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from '../auth/supabaseClient';
+import { apiClient } from '../lib/apiClient';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -158,37 +159,11 @@ export async function verifyPushTokenSaved(userId: string): Promise<boolean> {
 
 // Debug function to test push notification directly
 export async function debugSendPush(receiverUserId: string, message: string) {
-  const { data: receiver, error } = await supabase
-    .from('User')
-    .select('pushToken, name')
-    .eq('id', receiverUserId)
-    .single();
-    
-  if (error || !receiver?.pushToken) {
-    console.error('❌ Receiver has no push token:', error);
-    return { success: false, error: 'No push token' };
-  }
-  
-  console.log('📱 Sending test push to:', receiver.name);
-  
-  const response = await fetch('https://exp.host/--/api/v2/push/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      to: receiver.pushToken,
-      sound: 'default',
-      title: 'Test Push',
-      body: message,
-      data: { test: true },
-      priority: 'high',
-      channelId: 'default'
-    })
-  });
-  
-  const result = await response.json();
-  console.log('📱 Expo push response:', result);
-  
-  return { success: true, result };
+  const result = await apiClient.post<{ success: boolean; result?: any; reason?: string; error?: string }>(
+    '/api/notifications/send',
+    { receiverUserId, message, title: 'Test Push' }
+  );
+  return result;
 }
 
 export async function getNotificationPreference(

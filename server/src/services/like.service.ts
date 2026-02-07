@@ -30,8 +30,8 @@ export class LikeService {
 
         if (liked) {
             const sanitizedMessage = message ? sanitizeText(message) : '';
-            if (!sanitizedMessage || sanitizedMessage.length < 20) {
-                throw new Error("Intro message must be at least 20 characters.");
+            if (!sanitizedMessage || sanitizedMessage.length < 10) {
+                throw new Error("Intro message must be at least 10 characters.");
             }
             if (sanitizedMessage.length > 500) {
                 throw new Error("Intro message cannot exceed 500 characters.");

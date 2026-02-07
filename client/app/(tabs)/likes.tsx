@@ -31,6 +31,7 @@ export default function LikesScreen() {
 
     const [selectedLike, setSelectedLike] = useState<Like | null>(null);
     const [replyText, setReplyText] = useState('');
+    const MAX_REPLY_LENGTH = 500;
 
     useEffect(() => {
         fetchLikes();
@@ -75,7 +76,7 @@ export default function LikesScreen() {
                     <View style={styles.requestHeaderInfo}>
                         <Text style={styles.requestName}>{item.likerUser.name}</Text>
                         <Text style={styles.requestMeta}>
-                            {item.likerUser.role || 'Developer'} · {formatDate(item.createdAt)}
+                            {formatDate(item.createdAt)}
                         </Text>
                     </View>
                 </View>
@@ -191,10 +192,14 @@ export default function LikesScreen() {
                             placeholderTextColor={COLORS.textLight}
                             value={replyText}
                             onChangeText={setReplyText}
+                            maxLength={MAX_REPLY_LENGTH}
                             multiline
                             textAlignVertical="top"
                             autoFocus
                         />
+                        <Text style={styles.replyCount}>
+                            {replyText.length}/{MAX_REPLY_LENGTH}
+                        </Text>
 
                         {/* Actions */}
                         <View style={styles.modalActions}>
@@ -206,7 +211,7 @@ export default function LikesScreen() {
                             <NeoButton
                                 title="Send & Match"
                                 onPress={handleAccept}
-                                disabled={replyText.length < 10}
+                                disabled={replyText.length < 1 || replyText.length > MAX_REPLY_LENGTH}
                                 style={{ flex: 1, marginLeft: 12 }}
                             />
                         </View>
@@ -486,6 +491,13 @@ const styles = StyleSheet.create({
         minHeight: 100,
         marginBottom: 20,
         ...SHADOWS.medium,
+    },
+    replyCount: {
+        fontSize: 12,
+        color: COLORS.textMuted,
+        textAlign: 'right',
+        marginTop: -12,
+        marginBottom: 12,
     },
     modalActions: {
         flexDirection: 'row',

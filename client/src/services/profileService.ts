@@ -1,4 +1,5 @@
 import { supabase } from "../auth/supabaseClient";
+import { apiClient } from "../lib/apiClient";
 
 export type UserProfile = {
   id: string;
@@ -95,25 +96,7 @@ export async function updateProfile(
   supabaseId: string,
   payload: Partial<UserProfile>
 ): Promise<UserProfile> {
-  // TODO [POST-MVP]: Move profile updates to server API to centralize sanitization.
-  // TODO [POST-MVP]: Add DB-level sanitization trigger for bio/skills/interests.
-  // Map fullName to name if needed (your DB uses "name")
-  const dbPayload: any = { ...payload };
-  if (payload.fullName !== undefined) {
-    dbPayload.name = payload.fullName;
-    dbPayload.fullName = payload.fullName;
-  }
-
-  const { data, error } = await supabase
-    .from(PROFILE_TABLE)
-    .update(dbPayload)
-    .eq("supabaseId", supabaseId)
-    .select("id, name, fullName, birthDate, gender, onboardingCompleted, profilePicture, bio, skills, interests, experience, commitment, githubUsername, location, city, country, locationSharing")
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return normalizeProfile(data);
+  // Server-owned: centralize validation/sanitization and bypass RLS issues
+  const result = await apiClient.patch<{ data: any }>("/api/profile/me", payload);
+  return normalizeProfile(result.data);
 }

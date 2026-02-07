@@ -42,7 +42,12 @@ export default async function matchingRoutes(app: FastifyInstance) {
 
         try {
             const result = await likeService.createLike(user.id, likedId, liked, message);
-            return reply.send(result);
+            const matched = (result as any).user1Id !== undefined && (result as any).user2Id !== undefined;
+            return reply.send({
+                matched,
+                match: matched ? result : null,
+                like: matched ? null : result,
+            });
         } catch (error: any) {
             request.log.error(error);
             return reply.status(400).send({ error: error.message });

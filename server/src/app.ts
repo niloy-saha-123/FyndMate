@@ -15,6 +15,8 @@ import { locationRoutes } from './routes/location.js';
 import authRoutes from './routes/auth.js';
 import feedRoutes from './routes/feed.routes.js';
 import matchingRoutes from './routes/matching.routes.js';
+import profileRoutes from './routes/profile.routes.js';
+import notificationRoutes from './routes/notifications.routes.js';
 
 export async function buildApp() {
   const app = Fastify({
@@ -93,7 +95,8 @@ export async function buildApp() {
   await app.register(feedRoutes, { prefix: '/api/feed' });
   await app.register(matchingRoutes, { prefix: '/api' });
   await app.register(locationRoutes, { prefix: '/api' });
+  await app.register(profileRoutes, { prefix: '/api' });
+  await app.register(notificationRoutes, { prefix: '/api' });
 
   return app;
 }
-
