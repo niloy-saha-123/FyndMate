@@ -100,6 +100,7 @@ export default function ProfilePage() {
 
   const [formData, setFormData] = useState({
     fullName: profile?.fullName ?? '',
+    birthDate: profile?.birthDate ?? '',
     bio: profile?.bio ?? '',
     skills: profile?.skills ?? [],
     interests: profile?.interests ?? [],
@@ -116,6 +117,7 @@ export default function ProfilePage() {
     if (isEditing) {
       setFormData({
         fullName: profile?.fullName ?? '',
+        birthDate: profile?.birthDate ?? '',
         bio: profile?.bio ?? '',
         skills: profile?.skills ?? [],
         interests: profile?.interests ?? [],
@@ -205,7 +207,7 @@ export default function ProfilePage() {
       
       // Update profile in database
       if (session?.user?.id) {
-        await updateProfile(session.user.id, { profilePicture: publicUrl });
+        await updateProfile(session.user.id, { profilePicture: publicUrl, birthDate: profile?.birthDate ?? '' });
         await refreshProfile();
       }
       

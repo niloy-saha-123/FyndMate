@@ -19,6 +19,17 @@ type ReceivedLike = Prisma.LikeGetPayload<{
     }
 }>;
 
+function computeAge(birthDate: Date | null): number | null {
+    if (!birthDate) return null;
+    const now = new Date();
+    let age = now.getUTCFullYear() - birthDate.getUTCFullYear();
+    const m = now.getUTCMonth() - birthDate.getUTCMonth();
+    if (m < 0 || (m === 0 && now.getUTCDate() < birthDate.getUTCDate())) {
+        age--;
+    }
+    return age;
+}
+
 export class LikeService {
     /**
      * Create a Like (or Pass).
@@ -156,7 +167,7 @@ export class LikeService {
                 },
                 include: {
                     likerUser: {
-                        select: publicUserLikeSelect,
+                        select: { ...publicUserLikeSelect, birthDate: true },
                     },
                 },
                 orderBy: {
@@ -180,7 +191,17 @@ export class LikeService {
             blockedIds.add(b.blockedId);
         });
 
-        return likes.filter(like => !blockedIds.has(like.likerUser.id));
+        return likes
+            .filter(like => !blockedIds.has(like.likerUser.id))
+            .map(like => {
+                const age = computeAge(like.likerUser.birthDate as any);
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { birthDate, ...restUser } = like.likerUser as any;
+                return {
+                    ...like,
+                    likerUser: { ...restUser, age },
+                };
+            });
     }
 
     async getLike(likeId: string) {

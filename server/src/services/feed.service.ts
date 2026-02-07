@@ -9,6 +9,17 @@ import { redis } from '../lib/redis.js';
 import { filterLocationArrayByPrivacy } from '../utils/locationPrivacy.js';
 import { publicUserFeedSelect, type PublicFeedUser } from '../utils/publicUser.js';
 
+function computeAge(birthDate: Date | null): number | null {
+    if (!birthDate) return null;
+    const now = new Date();
+    let age = now.getUTCFullYear() - birthDate.getUTCFullYear();
+    const m = now.getUTCMonth() - birthDate.getUTCMonth();
+    if (m < 0 || (m === 0 && now.getUTCDate() < birthDate.getUTCDate())) {
+        age--;
+    }
+    return age;
+}
+
 // TODO [100K Users]: Add CDN-level caching for feed results (CloudFront, Fastly) with geographic distribution
 // TODO [100K Users]: Implement cache stampede protection (locking) to prevent thundering herd on cache misses
 // TODO [10K Users]: Add cache hit/miss metrics for monitoring and optimization
@@ -75,14 +86,14 @@ import { publicUserFeedSelect, type PublicFeedUser } from '../utils/publicUser.j
 //
 // PRIVACY: Actual user location still hidden, only search center changes
 
-type FeedUser = PublicFeedUser;
+type FeedUserWithAge = PublicFeedUser & { age: number | null };
 
 export class FeedService {
     /**
      * Get the Discovery Feed.
      * Aggregates all exclusions to return fresh profiles.
      */
-    async getFeed(userId: string, limit = 20, cursor?: string): Promise<FeedUser[]> {
+    async getFeed(userId: string, limit = 20, cursor?: string): Promise<FeedUserWithAge[]> {
         // Validation: UUID format check (Supabase/Prisma uses UUIDs)
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(userId)) {
@@ -182,13 +193,24 @@ export class FeedService {
                     ? { onboardingCompleted: true }
                     : {}),
             },
-            select: publicUserFeedSelect,
+            select: {
+                ...publicUserFeedSelect,
+                birthDate: true,
+            },
             orderBy: {
                 createdAt: 'desc',
             },
         });
 
-        const result = filterLocationArrayByPrivacy(users);
+        const withAge: FeedUserWithAge[] = users.map((u) => ({
+            ...u,
+            age: computeAge(u.birthDate as any),
+        }));
+
+        const result = filterLocationArrayByPrivacy(withAge).map((u: any) => {
+            delete u.birthDate;
+            return u;
+        });
 
         // Cache Miss: Store result for 5 minutes if this was an initial load
         if (!cursor && result.length > 0) {
@@ -206,4 +228,4 @@ export class FeedService {
 
 export const feedService = new FeedService();
 
-export type { FeedUser };
+export type { FeedUserWithAge as FeedUser };

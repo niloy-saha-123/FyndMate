@@ -17,6 +17,17 @@ type MatchWithUsers = Prisma.MatchGetPayload<{
     }
 }>;
 
+function computeAge(birthDate: Date | null): number | null {
+    if (!birthDate) return null;
+    const now = new Date();
+    let age = now.getUTCFullYear() - birthDate.getUTCFullYear();
+    const m = now.getUTCMonth() - birthDate.getUTCMonth();
+    if (m < 0 || (m === 0 && now.getUTCDate() < birthDate.getUTCDate())) {
+        age--;
+    }
+    return age;
+}
+
 export class MatchService {
     /**
      * Accept a Like and create a Match.
@@ -218,8 +229,8 @@ export class MatchService {
                 status: 'active',
             },
             include: {
-                user1: { select: publicUserMatchSelect },
-                user2: { select: publicUserMatchSelect },
+                user1: { select: { ...publicUserMatchSelect, birthDate: true } },
+                user2: { select: { ...publicUserMatchSelect, birthDate: true } },
                 messages: {
                     take: 1,
                     orderBy: { createdAt: 'desc' }
@@ -228,7 +239,13 @@ export class MatchService {
             orderBy: {
                 createdAt: 'desc',
             }
-        });
+        }).then(matches => matches.map((m: any) => {
+            const age1 = computeAge(m.user1.birthDate as any);
+            const age2 = computeAge(m.user2.birthDate as any);
+            const { birthDate: _b1, ...u1 } = m.user1;
+            const { birthDate: _b2, ...u2 } = m.user2;
+            return { ...m, user1: { ...u1, age: age1 }, user2: { ...u2, age: age2 } };
+        }));
     }
 }
 

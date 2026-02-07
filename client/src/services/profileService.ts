@@ -6,6 +6,7 @@ export type UserProfile = {
   fullName: string;
   birthDate: string | null;
   gender: string | null;
+  age?: number | null;
   onboardingCompleted: boolean;
   profilePicture: string | null;
   bio: string | null;
@@ -35,6 +36,7 @@ function normalizeProfile(row: any): UserProfile {
     fullName: row.fullName ?? row.name ?? "",
     birthDate: row.birthDate ?? null,
     gender: row.gender ?? null,
+    age: row.age ?? null,
     onboardingCompleted: Boolean(row.onboardingCompleted),
     profilePicture: row.profilePicture ?? null,
     bio: row.bio ?? null,
