@@ -15,11 +15,13 @@ export const publicUserFeedSelect = {
   profilePicture: true,
   bio: true,
   experience: true,
+  commitment: true,
   skills: true,
   interests: true,
   city: true,
   country: true,
   locationSharing: true,
+  githubUsername: true,
 } as const;
 
 // Minimal fields for likes inbox preview
