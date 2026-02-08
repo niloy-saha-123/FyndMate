@@ -2,29 +2,50 @@
  * @file src/utils/locationSecurity.ts
  * @description Security utilities for verifying signed location updates.
  * Handles nonce verification (replay protection) and HMAC signature validation.
+ * 
+ * Uses hybrid nonce store with Redis + in-memory fallback for reliability.
  */
 
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma.js';
-import { redis } from '../lib/redis.js';
+import { nonceStore } from '../nonce-store/index.js';
 
-// TODO [10K Users]: Add rate limit on nonce validation itself to prevent nonce enumeration attacks
-// TODO [10K Users]: Consider persisting critical nonces to DB for replay protection during Redis restarts
+// TODO [5K Users]: Add rate limit on nonce validation itself to prevent nonce enumeration attacks
+// TODO [10K Users]: Implement nonce preflight validation (check format/length before storage)
 
 /**
  * Checks whether a nonce has already been used.
- * Prevents replay attacks using a shared Redis cache.
+ * Uses hybrid nonce store (Redis + in-memory fallback).
+ * 
+ * SECURITY CRITICAL: Always fails closed - if check fails, treats nonce as used.
  */
 export async function isNonceUsed(nonce: string): Promise<boolean> {
-    const exists = await redis.exists(`nonce:${nonce}`);
-    return exists === 1;
+    try {
+        return await nonceStore.isUsed(nonce);
+    } catch (error) {
+        // FAIL CLOSED: On error, treat nonce as used (reject request)
+        console.error('🚨 CRITICAL: Nonce validation failed, failing closed:', error);
+        return true;
+    }
 }
 
 /**
  * Marks a nonce as used and sets it to expire after 10 minutes.
+ * Uses hybrid nonce store (Redis + in-memory fallback).
+ * 
+ * SECURITY CRITICAL: If storage fails, throws error to reject the request.
  */
 export async function markNonceUsed(nonce: string): Promise<void> {
-    await redis.set(`nonce:${nonce}`, '1', 'EX', 10 * 60);
+    const NONCE_TTL_SECONDS = 10 * 60; // 10 minutes
+    // TODO [POST-MVP]: Align nonce TTL with a tighter timestamp window if we reduce it.
+    
+    try {
+        await nonceStore.markUsed(nonce, NONCE_TTL_SECONDS);
+    } catch (error) {
+        // FAIL CLOSED: If we can't store the nonce, reject the request
+        console.error('🚨 CRITICAL: Failed to mark nonce as used:', error);
+        throw new Error('Failed to validate location update. Please try again.');
+    }
 }
 
 /**

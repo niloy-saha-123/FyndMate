@@ -20,6 +20,8 @@ export function useFeed() {
     const [error, setError] = useState<string | null>(null);
     const [cursor, setCursor] = useState<string | undefined>(undefined);
     const [hasMore, setHasMore] = useState(true);
+    const MAX_ATTEMPTS = 2;
+    const RETRY_DELAY_MS = 500;
 
     // Initial Fetch
     const fetchFeed = useCallback(async (reset = false) => {
@@ -34,10 +36,32 @@ export function useFeed() {
             setCursor(undefined);
         }
 
-        try {
-            // If resetting, clear cursor
-            const currentCursor = reset ? undefined : cursor;
-            const data = await getDiscoveryFeed(20, currentCursor);
+        const currentCursor = reset ? undefined : cursor;
+
+        let attempts = 0;
+        let data: UserProfile[] = [];
+        let lastError: any = null;
+
+        while (attempts < MAX_ATTEMPTS) {
+            try {
+                data = await getDiscoveryFeed(20, currentCursor);
+                lastError = null;
+                break;
+            } catch (err) {
+                lastError = err;
+                attempts += 1;
+                if (attempts >= MAX_ATTEMPTS) break;
+                await new Promise(res => setTimeout(res, RETRY_DELAY_MS * attempts));
+            }
+        }
+
+        if (lastError) {
+            console.error('Feed fetch failed after retries', lastError);
+            // TODO: Add telemetry (e.g., Sentry) and optional offline queue for feed fetch failures.
+            setError(lastError.message || 'Failed to load feed');
+            setLoading(false);
+            return;
+        }
 
             if (data.length < 20) {
                 setHasMore(false); // No more to fetch
@@ -57,11 +81,7 @@ export function useFeed() {
             if (data.length > 0) {
                 setCursor(data[data.length - 1].id);
             }
-        } catch (err: any) {
-            setError(err.message || 'Failed to load feed');
-        } finally {
-            setLoading(false);
-        }
+        setLoading(false);
     }, [cursor, loading, hasMore]);
 
     // Swipe Action (Like or Pass)

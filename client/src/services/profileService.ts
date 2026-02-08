@@ -1,10 +1,12 @@
 import { supabase } from "../auth/supabaseClient";
+import { apiClient } from "../lib/apiClient";
 
 export type UserProfile = {
   id: string;
   fullName: string;
   birthDate: string | null;
   gender: string | null;
+  age?: number | null;
   onboardingCompleted: boolean;
   profilePicture: string | null;
   bio: string | null;
@@ -34,6 +36,7 @@ function normalizeProfile(row: any): UserProfile {
     fullName: row.fullName ?? row.name ?? "",
     birthDate: row.birthDate ?? null,
     gender: row.gender ?? null,
+    age: row.age ?? null,
     onboardingCompleted: Boolean(row.onboardingCompleted),
     profilePicture: row.profilePicture ?? null,
     bio: row.bio ?? null,
@@ -95,23 +98,7 @@ export async function updateProfile(
   supabaseId: string,
   payload: Partial<UserProfile>
 ): Promise<UserProfile> {
-  // Map fullName to name if needed (your DB uses "name")
-  const dbPayload: any = { ...payload };
-  if (payload.fullName !== undefined) {
-    dbPayload.name = payload.fullName;
-    dbPayload.fullName = payload.fullName;
-  }
-
-  const { data, error } = await supabase
-    .from(PROFILE_TABLE)
-    .update(dbPayload)
-    .eq("supabaseId", supabaseId)
-    .select("id, name, fullName, birthDate, gender, onboardingCompleted, profilePicture, bio, skills, interests, experience, commitment, githubUsername, location, city, country, locationSharing")
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return normalizeProfile(data);
+  // Server-owned: centralize validation/sanitization and bypass RLS issues
+  const result = await apiClient.patch<any>("/api/profile/me", payload);
+  return normalizeProfile(result);
 }

@@ -48,6 +48,8 @@ export default function OnboardingBirthdate() {
     if (!selectedDate) return "Birthdate is required";
     const today = new Date();
     if (selectedDate > today) return "Birthdate cannot be in the future";
+    const age = computeAge(selectedDate);
+    if (age < 13) return "You must be at least 13 years old";
     return null;
   };
 
@@ -55,6 +57,19 @@ export default function OnboardingBirthdate() {
     if (!date) return "Select your birthdate";
     return date.toLocaleDateString();
   };
+
+  const computeAge = (birth: Date) => {
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const minAgeDate = new Date();
+  minAgeDate.setFullYear(minAgeDate.getFullYear() - 13);
 
   const onContinue = () => {
     const validation = validate();
@@ -102,7 +117,7 @@ export default function OnboardingBirthdate() {
           mode="date"
           display={Platform.OS === "ios" ? "spinner" : "default"}
           onChange={handleDateChange}
-          maximumDate={new Date()}
+          maximumDate={minAgeDate}
         />
       )}
 

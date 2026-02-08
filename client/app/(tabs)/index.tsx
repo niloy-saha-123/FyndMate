@@ -42,6 +42,8 @@ export default function FeedScreen() {
   const { profiles, loading, error, hasMore, fetchFeed, swipe } = useFeed();
 
   const [message, setMessage] = useState('');
+  const MAX_MESSAGE_LENGTH = 500;
+  const MIN_MESSAGE_LENGTH = 10;
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -62,7 +64,7 @@ export default function FeedScreen() {
 
   const handleLike = async () => {
     if (!currentProfile) return;
-    if (message.length < 20) {
+    if (message.length < MIN_MESSAGE_LENGTH || message.length > MAX_MESSAGE_LENGTH) {
       return;
     }
     await swipe(currentProfile.id, true, message);
@@ -201,8 +203,7 @@ export default function FeedScreen() {
             <View style={styles.infoSection}>
               <Text style={styles.profileName}>{currentProfile.name}</Text>
               <Text style={styles.profileMeta}>
-                {currentProfile.age && `${currentProfile.age} · `}
-                {currentProfile.role || 'Developer'}
+                {currentProfile.age ? `${currentProfile.age}` : ''}
               </Text>
             </View>
 
@@ -357,7 +358,7 @@ export default function FeedScreen() {
               )}
               <View>
                 <Text style={styles.modalName}>{currentProfile.name}</Text>
-                <Text style={styles.modalRole}>{currentProfile.role || 'Developer'}</Text>
+                <Text style={styles.modalRole} />
               </View>
             </View>
 
@@ -396,14 +397,18 @@ export default function FeedScreen() {
               placeholderTextColor={COLORS.textLight}
               value={message}
               onChangeText={setMessage}
+              maxLength={MAX_MESSAGE_LENGTH}
               multiline
               textAlignVertical="top"
             />
 
             <View style={styles.charCountRow}>
-              <Text style={styles.charCount}>{message.length} characters</Text>
-              {message.length > 0 && message.length < 20 && (
-                <Text style={styles.charError}>Minimum 20 characters required</Text>
+              <Text style={styles.charCount}>{message.length}/{MAX_MESSAGE_LENGTH}</Text>
+              {message.length > 0 && message.length < MIN_MESSAGE_LENGTH && (
+                <Text style={styles.charError}>Minimum {MIN_MESSAGE_LENGTH} characters required</Text>
+              )}
+              {message.length > MAX_MESSAGE_LENGTH && (
+                <Text style={styles.charError}>Maximum {MAX_MESSAGE_LENGTH} characters</Text>
               )}
             </View>
 
@@ -417,7 +422,7 @@ export default function FeedScreen() {
               <NeoButton
                 title="Send request"
                 onPress={handleLike}
-                disabled={message.length < 20}
+                disabled={message.length < MIN_MESSAGE_LENGTH || message.length > MAX_MESSAGE_LENGTH}
                 style={{ flex: 1, marginLeft: 12 }}
               />
             </View>

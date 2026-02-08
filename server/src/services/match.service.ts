@@ -6,14 +6,29 @@
 import { Prisma, Match } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
+import { publicUserMatchSelect } from '../utils/publicUser.js';
+import { sanitizeText } from '../utils/sanitizeText.js';
+import { filterLocationByPrivacy } from '../utils/locationPrivacy.js';
+import { signProfilePicture } from '../utils/profilePicture.js';
 
 type MatchWithUsers = Prisma.MatchGetPayload<{
     include: {
-        user1: { select: { id: true; name: true; profilePicture: true } };
-        user2: { select: { id: true; name: true; profilePicture: true } };
+        user1: { select: typeof publicUserMatchSelect };
+        user2: { select: typeof publicUserMatchSelect };
         messages: true;
     }
 }>;
+
+function computeAge(birthDate: Date | null): number | null {
+    if (!birthDate) return null;
+    const now = new Date();
+    let age = now.getUTCFullYear() - birthDate.getUTCFullYear();
+    const m = now.getUTCMonth() - birthDate.getUTCMonth();
+    if (m < 0 || (m === 0 && now.getUTCDate() < birthDate.getUTCDate())) {
+        age--;
+    }
+    return age;
+}
 
 export class MatchService {
     /**
@@ -139,15 +154,18 @@ export class MatchService {
 
             // Create Reply Message (from Accepter)
             if (replyMessage && replyMessage.trim().length > 0 && likedId) {
+                const sanitizedReply = sanitizeText(replyMessage);
+                if (sanitizedReply.length > 0) {
                 console.log('Creating reply message with senderId:', likedId);
                 await tx.message.create({
                     data: {
                         match: { connect: { id: newMatch.id } },
                         sender: { connect: { id: likedId } },
-                        content: replyMessage,
+                        content: sanitizedReply,
                         createdAt: new Date(now.getTime() + 1),
                     }
                 });
+                }
             }
 
             // 4. Archive Like
@@ -160,10 +178,14 @@ export class MatchService {
         });
 
         // Cache invalidation AFTER transaction succeeds (prevents inconsistency on rollback)
+        // Non-critical: If Redis is down, caches will just stay stale for 5 minutes
         await Promise.all([
             redis.del(`feed:${outerLikerId}`),
             redis.del(`feed:${outerLikedId}`)
-        ]);
+        ]).catch(err => {
+            console.warn('Cache invalidation failed (non-critical):', err.message);
+            // Not throwing - match was created successfully, cache will expire naturally
+        });
 
         return match;
     }
@@ -199,8 +221,11 @@ export class MatchService {
     /**
      * Get User's Matches (Active connections).
      */
-    async getMatches(userId: string): Promise<MatchWithUsers[]> {
-        return await prisma.match.findMany({
+    async getMatches(userId: string, limit = 20, cursor?: string): Promise<{ data: MatchWithUsers[]; nextCursor: string | null }> {
+        const matches = await prisma.match.findMany({
+            take: limit,
+            skip: cursor ? 1 : 0,
+            cursor: cursor ? { id: cursor } : undefined,
             where: {
                 OR: [
                     { user1Id: userId },
@@ -209,17 +234,43 @@ export class MatchService {
                 status: 'active',
             },
             include: {
-                user1: { select: { id: true, name: true, profilePicture: true } },
-                user2: { select: { id: true, name: true, profilePicture: true } },
+                user1: { select: { ...publicUserMatchSelect, birthDate: true, city: true, country: true, locationSharing: true } },
+                user2: { select: { ...publicUserMatchSelect, birthDate: true, city: true, country: true, locationSharing: true } },
                 messages: {
                     take: 1,
-                    orderBy: { createdAt: 'desc' }
+                    orderBy: { createdAt: 'desc' },
+                    select: { id: true, content: true, senderId: true, createdAt: true, readAt: true }, // TODO [POST-MVP]: Implement proper read receipts and unread counts server-side.
                 }
             },
             orderBy: {
                 createdAt: 'desc',
             }
         });
+
+        const transformed = await Promise.all(matches.map(async (m: any) => {
+            const age1 = computeAge(m.user1.birthDate as any);
+            const age2 = computeAge(m.user2.birthDate as any);
+            const sanitizedUser1 = filterLocationByPrivacy(m.user1);
+            const sanitizedUser2 = filterLocationByPrivacy(m.user2);
+            const { birthDate: _b1, city: _c1, country: _ct1, ...u1 } = sanitizedUser1 as any;
+            const { birthDate: _b2, city: _c2, country: _ct2, ...u2 } = sanitizedUser2 as any;
+            return {
+                ...m,
+                user1: {
+                    ...u1,
+                    profilePicture: await signProfilePicture(u1.profilePicture),
+                    age: age1
+                },
+                user2: {
+                    ...u2,
+                    profilePicture: await signProfilePicture(u2.profilePicture),
+                    age: age2
+                }
+            };
+        }));
+
+        const nextCursor = matches.length === limit ? matches[matches.length - 1].id : null;
+        return { data: transformed, nextCursor };
     }
 }
 

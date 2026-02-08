@@ -63,6 +63,7 @@ export async function updateLocationHandler(req: FastifyRequest, reply: FastifyR
     // ---- Verify timestamp (allow 15 minutes for clock skew) ----
     // Mobile devices may have clock drift or network delays
     // 15 minutes is industry standard (AWS, OAuth 2.0)
+    // TODO [POST-MVP]: Consider tightening to 60-90s with explicit clock-skew messaging.
     const TIMESTAMP_WINDOW_MS = 15 * 60 * 1000;  // 15 minutes
     const now = Date.now();
     const payloadTime = new Date(timestamp).getTime();
@@ -84,6 +85,7 @@ export async function updateLocationHandler(req: FastifyRequest, reply: FastifyR
     // ---- Reverse geocode (server-side) ----
     // Convert lat/lon to city/country using OpenStreetMap Nominatim
     // This prevents clients from faking city names
+    // TODO [POST-MVP]: Add request timeout (~3s) around reverseGeocode to avoid long hangs.
     const { city, country, success, error: geocodingError } = await reverseGeocode(latitude, longitude);
 
     // Monitor geocoding failures for alerting

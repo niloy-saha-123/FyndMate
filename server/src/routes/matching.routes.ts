@@ -42,7 +42,12 @@ export default async function matchingRoutes(app: FastifyInstance) {
 
         try {
             const result = await likeService.createLike(user.id, likedId, liked, message);
-            return reply.send(result);
+            const matched = (result as any).user1Id !== undefined && (result as any).user2Id !== undefined;
+            return reply.send({
+                matched,
+                match: matched ? result : null,
+                like: matched ? null : result,
+            });
         } catch (error: any) {
             request.log.error(error);
             return reply.status(400).send({ error: error.message });
@@ -136,9 +141,11 @@ export default async function matchingRoutes(app: FastifyInstance) {
     // Matches
     app.get('/matches', async (request, reply) => {
         const user = request.user!;
+        const { limit, cursor } = request.query as { limit?: string; cursor?: string };
+        const parsedLimit = limit ? Math.min(parseInt(limit, 10) || 20, 50) : 20;
         try {
-            const matches = await matchService.getMatches(user.id);
-            return reply.send({ data: matches });
+            const { data, nextCursor } = await matchService.getMatches(user.id, parsedLimit, cursor);
+            return reply.send({ data, nextCursor });
         } catch (error: any) {
             request.log.error(error);
             return reply.status(500).send({ error: 'Failed to fetch matches' });
@@ -146,6 +153,7 @@ export default async function matchingRoutes(app: FastifyInstance) {
     });
 
     app.post('/matches/:matchId/unmatch', async (request, reply) => {
+        // TODO [POST-MVP]: Add RESTful DELETE /api/matches/:matchId alias and deprecate this POST.
         const user = request.user!;
 
         const paramsResult = matchIdParamSchema.safeParse(request.params);

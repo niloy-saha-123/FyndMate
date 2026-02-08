@@ -7,9 +7,17 @@ import { FastifyInstance } from 'fastify';
 import { signupUser } from "../services/auth.service.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
 import { prisma } from "../lib/prisma.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 
 export default async function authRoutes(app: FastifyInstance) {
-  app.post("/signup", async (request, reply) => {
+  app.post("/signup", {
+    preHandler: [
+      rateLimit({ limit: 10, windowSec: 24 * 60 * 60, keyPrefix: 'signup' })
+    ]
+  }, async (request, reply) => {
+    // TODO [POST-MVP]: Gate signup with CAPTCHA (hCaptcha/reCAPTCHA).
+    // TODO [POST-MVP]: Enforce verified email before feed visibility.
+    // TODO [POST-MVP]: Monitor signup patterns for bot detection and abuse scoring.
     try {
       const { email, password, name } = request.body as any;
 

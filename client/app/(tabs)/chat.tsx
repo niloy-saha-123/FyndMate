@@ -211,7 +211,7 @@ export default function ChatTab() {
 
             {/* Chat Info */}
             <View style={styles.chatInfo}>
-              <Text style={styles.chatName}>{otherUser?.name ?? "Unknown user"}</Text>
+              <Text style={styles.chatName}>{otherUser?.name ?? 'Unknown user'}</Text>
               <Text
                 numberOfLines={1}
                 style={[

@@ -46,7 +46,7 @@ function getDevServerHost(): string | null {
 
     // Method 3: Legacy fallback for older SDKs (unlikely to work in SDK 54+)
     const legacyHost = (Constants as any).manifest?.debuggerHost ||
-                       (Constants as any).manifest2?.debuggerHost;
+                       (Constants as any).manifest2?.debuggerHost; // TODO [POST-MVP]: Remove as any by properly typing manifest debuggerHost access.
     if (legacyHost) {
       return legacyHost.split(':')[0];
     }

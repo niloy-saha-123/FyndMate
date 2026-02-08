@@ -8,11 +8,25 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 
 /**
  * List of sensitive fields that should NEVER be exposed to clients.
+ * 
+ * CURRENT FIELDS (implemented):
+ * - latitude: User's actual GPS latitude
+ * - longitude: User's actual GPS longitude  
+ * - locationSecret: HMAC secret for location update validation
+ * 
+ * TODO [PREMIUM FEATURE]: When implementing radius-based matching, add:
+ * - searchLatitude: User's search center latitude
+ * - searchLongitude: User's search center longitude
+ * These fields are used for internal distance calculations ONLY.
+ * They must NEVER be exposed in API responses.
  */
 const SENSITIVE_LOCATION_FIELDS = [
     'latitude',
     'longitude',
     'locationSecret',
+    // TODO [PREMIUM]: Uncomment when fields are added to schema:
+    // 'searchLatitude',
+    // 'searchLongitude',
 ] as const;
 
 /**
@@ -36,7 +50,7 @@ function sanitizeObject(obj: any): any {
         const sanitized: any = {};
         for (const key in obj) {
             // Skip sensitive fields
-            if (SENSITIVE_LOCATION_FIELDS.includes(key as any)) {
+    if (SENSITIVE_LOCATION_FIELDS.includes(key as any)) { // TODO [POST-MVP]: unify with locationPrivacy.ts and remove as any.
                 continue;
             }
             // Recursively sanitize nested objects
@@ -95,9 +109,23 @@ export async function sanitizeLocationResponse(
                 ? JSON.stringify(sanitized)  // Return as string if input was string/Buffer
                 : sanitized;                  // Return as object if input was object
         } catch (error) {
-            // If anything fails, return original payload
-            request.log.warn({ error, payloadType: typeof payload }, 'Failed to sanitize location response');
-            return payload;
+            // CRITICAL SECURITY: Fail-closed on sanitization error
+            // Never return unsanitized data with potential lat/long/locationSecret exposure
+            request.log.error({ 
+                error, 
+                payloadType: typeof payload,
+                route: request.url,
+                method: request.method
+            }, '🚨 CRITICAL: Failed to sanitize location response - failing closed');
+            
+            // Fail closed without double-sending: set status and return safe payload
+            reply.status(500);
+            return {
+                error: 'Internal server error',
+                message: process.env.NODE_ENV === 'development' 
+                    ? 'Response sanitization failed' 
+                    : undefined
+            };
         }
     }
 

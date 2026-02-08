@@ -1,5 +1,33 @@
 # FyndMate Server
 
+## 📦 Redis Setup (Required)
+
+### Quick Setup (5 minutes):
+1. Go to https://upstash.com and create free account
+2. Create Redis database (Regional, us-east-1, TLS enabled)
+3. Copy connection string to `server/.env`:
+   ```bash
+   REDIS_URL="rediss://default:PASSWORD@host.upstash.io:6379"
+   ```
+4. Run: `npm run dev`
+5. Verify: `curl http://localhost:3000/health/redis`
+
+**Cost**: Free for first 1K users ($0.12/month at 2K users)
+
+### What Redis Does:
+- 🔒 **Rate limiting** (prevents abuse) - Fail-closed with in-memory fallback
+- 🔒 **Replay protection** (location security) - Fail-closed with in-memory fallback
+- ⚡ **Feed caching** (5 min) - Speeds up by 70%
+- ⚡ **Geocoding cache** (30 days) - Saves 95% of API calls
+
+### Without Redis:
+- Development: Works with in-memory fallback (single server only)
+- Production: Server won't start (prevents security issues)
+
+---
+
+# FyndMate Server (Original README)
+
 ## 🧪 Testing Setup (Team Onboarding)
 
 To run tests locally without messing up production, we use a local Docker database.

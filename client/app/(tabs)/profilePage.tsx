@@ -101,6 +101,7 @@ export default function ProfilePage() {
 
   const [formData, setFormData] = useState({
     fullName: profile?.fullName ?? '',
+    birthDate: profile?.birthDate ?? '',
     bio: profile?.bio ?? '',
     skills: profile?.skills ?? [],
     interests: profile?.interests ?? [],
@@ -110,11 +111,14 @@ export default function ProfilePage() {
   });
 
   const MAX_BIO_LENGTH = 300;
+  const MAX_SKILLS = 10;
+  const MAX_INTERESTS = 10;
 
   const handleEditToggle = useCallback(() => {
     if (isEditing) {
       setFormData({
         fullName: profile?.fullName ?? '',
+        birthDate: profile?.birthDate ?? '',
         bio: profile?.bio ?? '',
         skills: profile?.skills ?? [],
         interests: profile?.interests ?? [],
@@ -144,21 +148,29 @@ export default function ProfilePage() {
   }, [session, formData, refreshProfile]);
 
   const toggleSkill = useCallback((skill: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      skills: prev.skills.includes(skill)
-        ? prev.skills.filter((s) => s !== skill)
-        : [...prev.skills, skill],
-    }));
+    setFormData((prev) => {
+      if (prev.skills.includes(skill)) {
+        return { ...prev, skills: prev.skills.filter((s) => s !== skill) };
+      }
+      if (prev.skills.length >= MAX_SKILLS) {
+        Alert.alert('Limit reached', `You can select up to ${MAX_SKILLS} skills.`);
+        return prev;
+      }
+      return { ...prev, skills: [...prev.skills, skill] };
+    });
   }, []);
 
   const toggleInterest = useCallback((interest: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      interests: prev.interests.includes(interest)
-        ? prev.interests.filter((i) => i !== interest)
-        : [...prev.interests, interest],
-    }));
+    setFormData((prev) => {
+      if (prev.interests.includes(interest)) {
+        return { ...prev, interests: prev.interests.filter((i) => i !== interest) };
+      }
+      if (prev.interests.length >= MAX_INTERESTS) {
+        Alert.alert('Limit reached', `You can select up to ${MAX_INTERESTS} interests.`);
+        return prev;
+      }
+      return { ...prev, interests: [...prev.interests, interest] };
+    });
   }, []);
 
   const handlePickImage = useCallback(async () => {
@@ -361,10 +373,9 @@ export default function ProfilePage() {
             <TextInput
               style={[styles.input, styles.bioInput]}
               value={formData.bio}
+              maxLength={MAX_BIO_LENGTH}
               onChangeText={(text) => {
-                if (text.length <= MAX_BIO_LENGTH) {
-                  setFormData((prev) => ({ ...prev, bio: text }));
-                }
+                setFormData((prev) => ({ ...prev, bio: text }));
               }}
               placeholder="Tell others about yourself, your projects, and what you're looking for..."
               placeholderTextColor={COLORS.textLight}

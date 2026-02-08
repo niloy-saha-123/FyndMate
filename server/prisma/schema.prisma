@@ -8,6 +8,7 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+
 model User {
   id                          String                        @id @default(uuid())
   supabaseId                  String                        @unique
@@ -36,6 +37,15 @@ model User {
   locationSharing             String                        @default("off")
   longitude                   Float?
   locationPermission          String?
+  // TODO [PREMIUM FEATURE]: Add radius-based matching fields:
+  //   searchLatitude            Float?       // User's search center (can differ from actual location)
+  //   searchLongitude           Float?       // For "search in New York" while living elsewhere
+  //   searchCity                String?      // Display "Currently searching in X"
+  //   searchCountry             String?      // Display country
+  //   searchRadiusKm            Int?         // User's preferred radius (5, 10, 25, 50 km)
+  //   searchSetAt               DateTime?    // When they set custom search location
+  // NOTE: These fields separate "where I am" from "where I'm searching"
+  // SECURITY: These are INTERNAL ONLY for distance calculations, NEVER expose in API responses
   pushToken                   String?
   pushTokenUpdatedAt          DateTime?                     @db.Timestamp(6)
   location                    String?                       @default("Unknown")
