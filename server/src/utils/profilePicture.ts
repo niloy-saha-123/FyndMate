@@ -12,7 +12,7 @@ export async function signProfilePicture(profilePicture?: string | null): Promis
 
   const { data, error } = await supabaseAdmin.storage
     .from(BUCKET_NAME)
-    .createSignedUrl(path, 300); // 5 minutes
+    .createSignedUrl(path, 1800); // 30 minutes (outlives the 5-min feed cache)
 
   if (error || !data?.signedUrl) {
     return null;

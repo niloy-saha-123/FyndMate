@@ -59,31 +59,19 @@ export async function buildApp() {
   });
 
   // Redis health check endpoint
-  // TODO [1K Users]: Protect this endpoint with authentication
-  // TODO [2K Users]: Add detailed metrics (memory usage, connection pool, etc.)
+  // Redacted response: exposes only status, no internal details (failure counts, errors, store sizes)
   app.get('/health/redis', async (req, reply) => {
     try {
       const { rateLimiter } = await import('./rate-limiting/index.js');
       const healthStatus = (rateLimiter as any).getHealthStatus();
-      
+
       return {
         status: healthStatus.redis.healthy ? 'healthy' : 'degraded',
-        redis: {
-          healthy: healthStatus.redis.healthy,
-          consecutiveFailures: healthStatus.redis.consecutiveFailures,
-          lastChecked: healthStatus.redis.lastChecked,
-          lastError: healthStatus.redis.lastError,
-        },
-        fallback: {
-          active: !healthStatus.redis.healthy,
-          inMemoryStoreSize: healthStatus.inMemoryStoreSize,
-        },
         timestamp: new Date().toISOString(),
       };
     } catch (err) {
       return reply.status(503).send({
         status: 'error',
-        error: err instanceof Error ? err.message : 'Unknown error',
         timestamp: new Date().toISOString(),
       });
     }

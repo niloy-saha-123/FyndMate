@@ -85,12 +85,6 @@ export class FeedService {
      * Aggregates all exclusions to return fresh profiles.
      */
     async getFeed(userId: string, limit = 20, cursor?: string): Promise<FeedUserWithAge[]> {
-        // Validation: UUID format check (Supabase/Prisma uses UUIDs)
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(userId)) {
-            throw new Error("Invalid user ID format.");
-        }
-
         // Cache Hit: Return cached feed if this is an initial load (no cursor)
         const cacheKey = `feed:${userId}`;
         if (!cursor) {
@@ -178,9 +172,7 @@ export class FeedService {
             where: {
                 id: { notIn: Array.from(excludedIds) },
                 banned: false,
-                // In development, show all users for testing
-                // In production, only show users who have completed onboarding
-                ...(process.env.NODE_ENV === 'production' 
+                ...(process.env.NODE_ENV === 'production'
                     ? { onboardingCompleted: true }
                     : {}),
             },

@@ -45,29 +45,46 @@ export async function authMiddleware(
       return reply.status(401).send({ error: 'Invalid or expired token' });
     }
 
-    // TODO [POST-MVP]: Stop fabricating placeholder emails; require email or store null explicitly.
-    const email = data.user.email || `${data.user.id}@placeholder.local`;
-    const name = data.user.user_metadata?.full_name ||
-      data.user.user_metadata?.name ||
-      email.split('@')[0];
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-
-    // Idempotent resolution: upsert avoids race conditions on concurrent first requests
-    const finalUser = await prisma.user.upsert({
+    // Look up existing user — no write needed for returning users
+    let finalUser = await prisma.user.findUnique({
       where: { supabaseId: data.user.id },
-      update: {
-        email,
-        name,
-        timezone,
-      },
-      create: {
-        supabaseId: data.user.id,
-        email,
-        name,
-        timezone,
-      },
       select: { id: true, email: true, banned: true },
     });
+
+    // First request only: create user record with Supabase metadata defaults
+    if (!finalUser) {
+      // TODO [POST-MVP]: Stop fabricating placeholder emails; require email or store null explicitly.
+      const email = data.user.email || `${data.user.id}@placeholder.local`;
+      const name = data.user.user_metadata?.full_name ||
+        data.user.user_metadata?.name ||
+        email.split('@')[0];
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+      try {
+        finalUser = await prisma.user.create({
+          data: {
+            supabaseId: data.user.id,
+            email,
+            name,
+            timezone,
+          },
+          select: { id: true, email: true, banned: true },
+        });
+      } catch (createErr: any) {
+        // Race condition: another concurrent request created the user first
+        if (createErr.code === 'P2002') {
+          finalUser = await prisma.user.findUnique({
+            where: { supabaseId: data.user.id },
+            select: { id: true, email: true, banned: true },
+          });
+          if (!finalUser) {
+            return reply.status(500).send({ error: 'Authentication failed' });
+          }
+        } else {
+          throw createErr;
+        }
+      }
+    }
 
     if (finalUser.banned) {
       return reply.status(403).send({ error: 'Account is banned' });
