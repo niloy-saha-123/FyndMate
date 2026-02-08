@@ -131,7 +131,7 @@ export default function ChatTab() {
     return null;
   }
 
-  const renderChatItem = ({ item }: { item: any }) => {
+    const renderChatItem = ({ item }: { item: any }) => {
     const isUser1 = item.user1Id === user?.id;
     const otherUser = isUser1 ? item.user2 : item.user1;
     const isBlocked = item.status === 'blocked';

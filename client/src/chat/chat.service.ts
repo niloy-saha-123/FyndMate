@@ -9,7 +9,7 @@ export async function getMyMatches(userId: string) {
 
     const unreadCount =
       match.messages?.filter(
-        m => m.readAt === null && m.senderId !== userId
+        (m: any) => m.readAt === null && m.senderId !== userId
       ).length ?? 0;
 
     return {

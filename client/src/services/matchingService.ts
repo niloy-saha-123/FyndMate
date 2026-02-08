@@ -37,6 +37,8 @@ export interface UserProfile {
     locationSharing?: string | null;
     // UI-specific field (may not be returned by all endpoints)
     age?: number | null;
+    lookingFor?: string[];
+    githubUsername?: string | null;
 }
 
 export interface Like {
