@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { prisma } from '../lib/prisma.js';
 import { signProfilePicture } from '../utils/profilePicture.js';
+import { computeAge } from '../utils/computeAge.js';
 
 const MAX_BIO_LENGTH = 300;
 const MAX_SKILLS = 10;
@@ -27,16 +28,6 @@ const updateProfileSchema = z.object({
   locationSharing: z.string().max(20).optional(),
   onboardingCompleted: z.boolean().optional(),
 });
-
-function computeAge(birthDate: Date): number {
-  const now = new Date();
-  let age = now.getUTCFullYear() - birthDate.getUTCFullYear();
-  const m = now.getUTCMonth() - birthDate.getUTCMonth();
-  if (m < 0 || (m === 0 && now.getUTCDate() < birthDate.getUTCDate())) {
-    age--;
-  }
-  return age;
-}
 
 const selectFields = {
   id: true,
@@ -103,7 +94,7 @@ export default async function profileRoutes(app: FastifyInstance) {
     }
 
     const age = computeAge(new Date(finalBirthDate));
-    if (age < MIN_AGE) {
+    if (age !== null && age < MIN_AGE) {
       return reply.status(400).send({ error: `You must be at least ${MIN_AGE} years old.` });
     }
 

@@ -9,17 +9,7 @@ import { redis } from '../lib/redis.js';
 import { filterLocationArrayByPrivacy } from '../utils/locationPrivacy.js';
 import { publicUserFeedSelect, type PublicFeedUser } from '../utils/publicUser.js';
 import { signProfilePicture } from '../utils/profilePicture.js';
-
-function computeAge(birthDate: Date | null): number | null {
-    if (!birthDate) return null;
-    const now = new Date();
-    let age = now.getUTCFullYear() - birthDate.getUTCFullYear();
-    const m = now.getUTCMonth() - birthDate.getUTCMonth();
-    if (m < 0 || (m === 0 && now.getUTCDate() < birthDate.getUTCDate())) {
-        age--;
-    }
-    return age;
-}
+import { computeAge } from '../utils/computeAge.js';
 
 // TODO [100K Users]: Add CDN-level caching for feed results (CloudFront, Fastly) with geographic distribution
 // TODO [100K Users]: Implement cache stampede protection (locking) to prevent thundering herd on cache misses
