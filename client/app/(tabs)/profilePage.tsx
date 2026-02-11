@@ -16,6 +16,9 @@ import {
   ActivityIndicator,
   Pressable,
   Linking,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +32,12 @@ import { NeoCard } from '../../src/components/NeoCard';
 import { NeoButton } from '../../src/components/NeoButton';
 import { NeoChip, ChipContainer } from '../../src/components/NeoChip';
 import { useProfilePictureUpload } from '../../src/hooks/useProfilePictureUpload';
+import {
+  PROFILE_BIO_MAX_LENGTH,
+  PROFILE_MAX_SKILLS,
+  PROFILE_MAX_INTERESTS,
+  PROFILE_TAG_MAX_LENGTH,
+} from '../../src/constants/validation';
 
 // Available skills/interests for selection
 const AVAILABLE_SKILLS = [
@@ -92,12 +101,22 @@ const COMMITMENT_LEVELS = [
 export default function ProfilePage() {
   const { top, bottom } = useSafeAreaInsets();
   const { profile, refreshProfile, session } = useAuth();
-  const { upload, uploading, progress, error: uploadError } = useProfilePictureUpload();
+  const { upload, uploading, progress, error: uploadError, rateLimit } = useProfilePictureUpload();
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [photo, setPhoto] = useState<string | null>(profile?.profilePicture ?? null);
+
+  // Custom skill/interest input state
+  const [customSkill, setCustomSkill] = useState('');
+  const [customInterest, setCustomInterest] = useState('');
+  const [skillError, setSkillError] = useState<string | null>(null);
+  const [interestError, setInterestError] = useState<string | null>(null);
+  
+  // Modal visibility states
+  const [skillModalVisible, setSkillModalVisible] = useState(false);
+  const [interestModalVisible, setInterestModalVisible] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: profile?.fullName ?? '',
@@ -109,10 +128,6 @@ export default function ProfilePage() {
     commitment: profile?.commitment ?? '',
     githubUsername: profile?.githubUsername ?? '',
   });
-
-  const MAX_BIO_LENGTH = 300;
-  const MAX_SKILLS = 10;
-  const MAX_INTERESTS = 10;
 
   const handleEditToggle = useCallback(() => {
     if (isEditing) {
@@ -127,6 +142,11 @@ export default function ProfilePage() {
         githubUsername: profile?.githubUsername ?? '',
       });
       setPhoto(profile?.profilePicture ?? null);
+      // Reset custom inputs and errors
+      setCustomSkill('');
+      setCustomInterest('');
+      setSkillError(null);
+      setInterestError(null);
     }
     setIsEditing(!isEditing);
   }, [isEditing, profile]);
@@ -150,12 +170,14 @@ export default function ProfilePage() {
   const toggleSkill = useCallback((skill: string) => {
     setFormData((prev) => {
       if (prev.skills.includes(skill)) {
+        setSkillError(null);
         return { ...prev, skills: prev.skills.filter((s) => s !== skill) };
       }
-      if (prev.skills.length >= MAX_SKILLS) {
-        Alert.alert('Limit reached', `You can select up to ${MAX_SKILLS} skills.`);
+      if (prev.skills.length >= PROFILE_MAX_SKILLS) {
+        setSkillError(`Maximum limit of ${PROFILE_MAX_SKILLS} skills reached`);
         return prev;
       }
+      setSkillError(null);
       return { ...prev, skills: [...prev.skills, skill] };
     });
   }, []);
@@ -163,17 +185,77 @@ export default function ProfilePage() {
   const toggleInterest = useCallback((interest: string) => {
     setFormData((prev) => {
       if (prev.interests.includes(interest)) {
+        setInterestError(null);
         return { ...prev, interests: prev.interests.filter((i) => i !== interest) };
       }
-      if (prev.interests.length >= MAX_INTERESTS) {
-        Alert.alert('Limit reached', `You can select up to ${MAX_INTERESTS} interests.`);
+      if (prev.interests.length >= PROFILE_MAX_INTERESTS) {
+        setInterestError(`Maximum limit of ${PROFILE_MAX_INTERESTS} interests reached`);
         return prev;
       }
+      setInterestError(null);
       return { ...prev, interests: [...prev.interests, interest] };
     });
   }, []);
 
+  const addCustomSkill = useCallback(() => {
+    const trimmed = customSkill.trim();
+    if (!trimmed) return;
+    
+    if (trimmed.length > PROFILE_TAG_MAX_LENGTH) {
+      setSkillError(`Skill must be ${PROFILE_TAG_MAX_LENGTH} characters or less`);
+      return;
+    }
+    
+    if (formData.skills.includes(trimmed)) {
+      setSkillError('This skill is already added');
+      return;
+    }
+    
+    if (formData.skills.length >= PROFILE_MAX_SKILLS) {
+      setSkillError(`Maximum limit of ${PROFILE_MAX_SKILLS} skills reached`);
+      return;
+    }
+    
+    setFormData((prev) => ({ ...prev, skills: [...prev.skills, trimmed] }));
+    setCustomSkill('');
+    setSkillError(null);
+  }, [customSkill, formData.skills]);
+
+  const addCustomInterest = useCallback(() => {
+    const trimmed = customInterest.trim();
+    if (!trimmed) return;
+    
+    if (trimmed.length > PROFILE_TAG_MAX_LENGTH) {
+      setInterestError(`Interest must be ${PROFILE_TAG_MAX_LENGTH} characters or less`);
+      return;
+    }
+    
+    if (formData.interests.includes(trimmed)) {
+      setInterestError('This interest is already added');
+      return;
+    }
+    
+    if (formData.interests.length >= PROFILE_MAX_INTERESTS) {
+      setInterestError(`Maximum limit of ${PROFILE_MAX_INTERESTS} interests reached`);
+      return;
+    }
+    
+    setFormData((prev) => ({ ...prev, interests: [...prev.interests, trimmed] }));
+    setCustomInterest('');
+    setInterestError(null);
+  }, [customInterest, formData.interests]);
+
   const handlePickImage = useCallback(async () => {
+    // Check if rate limited before proceeding
+    if (rateLimit.isLimited) {
+      Alert.alert(
+        'Upload Limit Reached',
+        `You've reached the limit of 5 profile picture uploads per hour.\n\nPlease try again in ${rateLimit.retryAfterMinutes} minute${rateLimit.retryAfterMinutes !== 1 ? 's' : ''}.`,
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
     // Request permission first
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
@@ -214,9 +296,19 @@ export default function ProfilePage() {
       
       Alert.alert('Success', 'Profile picture updated!');
     } catch (error: any) {
-      Alert.alert('Upload Failed', error.message || 'Failed to upload profile picture');
+      // Check if it's a rate limit error (in case state wasn't updated yet)
+      if (error.name === 'RateLimitError' || error.message?.includes('Rate limit')) {
+        const minutes = error.retryAfterMinutes || Math.ceil((error.retryAfter || 3600) / 60);
+        Alert.alert(
+          'Upload Limit Reached',
+          `You've reached the limit of 5 profile picture uploads per hour.\n\nPlease try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`,
+          [{ text: 'OK', style: 'default' }]
+        );
+      } else {
+        Alert.alert('Upload Failed', error.message || 'Failed to upload profile picture');
+      }
     }
-  }, [upload, session, refreshProfile]);
+  }, [upload, session, refreshProfile, rateLimit]);
 
   const handleLogout = useCallback(async () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -271,9 +363,12 @@ export default function ProfilePage() {
         {/* Profile Picture */}
         <View style={styles.profilePhotoSection}>
           <TouchableOpacity
-            style={styles.profilePhotoContainer}
+            style={[
+              styles.profilePhotoContainer,
+              rateLimit.isLimited && styles.profilePhotoDisabled,
+            ]}
             onPress={isEditing ? handlePickImage : undefined}
-            disabled={!isEditing || uploading}
+            disabled={!isEditing || uploading || rateLimit.isLimited}
           >
             {uploading ? (
               <View style={styles.emptyProfilePhoto}>
@@ -309,6 +404,15 @@ export default function ProfilePage() {
               </View>
             )}
           </TouchableOpacity>
+          {/* Rate Limit Warning */}
+          {rateLimit.isLimited && isEditing && (
+            <View style={styles.rateLimitBanner}>
+              <Ionicons name="time-outline" size={16} color="#F59E0B" />
+              <Text style={styles.rateLimitText}>
+                Upload limit reached. Try again in {rateLimit.retryAfterMinutes} min
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Name & Basic Info */}
@@ -364,24 +468,32 @@ export default function ProfilePage() {
           <View style={styles.labelRow}>
             <Text style={styles.sectionLabel}>BIO</Text>
             {isEditing && (
-              <Text style={styles.charCount}>
-                {formData.bio.length}/{MAX_BIO_LENGTH}
+              <Text style={[
+                styles.charCount,
+                formData.bio.length >= PROFILE_BIO_MAX_LENGTH && styles.charCountLimit,
+              ]}>
+                {formData.bio.length}/{PROFILE_BIO_MAX_LENGTH}
               </Text>
             )}
           </View>
           {isEditing ? (
-            <TextInput
-              style={[styles.input, styles.bioInput]}
-              value={formData.bio}
-              maxLength={MAX_BIO_LENGTH}
-              onChangeText={(text) => {
-                setFormData((prev) => ({ ...prev, bio: text }));
-              }}
-              placeholder="Tell others about yourself, your projects, and what you're looking for..."
-              placeholderTextColor={COLORS.textLight}
-              multiline
-              textAlignVertical="top"
-            />
+            <>
+              <TextInput
+                style={[styles.input, styles.bioInput]}
+                value={formData.bio}
+                maxLength={PROFILE_BIO_MAX_LENGTH}
+                onChangeText={(text) => {
+                  setFormData((prev) => ({ ...prev, bio: text }));
+                }}
+                placeholder="Tell others about yourself, your projects, and what you're looking for..."
+                placeholderTextColor={COLORS.textLight}
+                multiline
+                textAlignVertical="top"
+              />
+              {formData.bio.length >= PROFILE_BIO_MAX_LENGTH && (
+                <Text style={styles.charLimitWarning}>Maximum character limit reached</Text>
+              )}
+            </>
           ) : (
             <Text style={styles.bioText}>{profile?.bio || 'No bio yet. Tap Edit to add one!'}</Text>
           )}
@@ -389,44 +501,142 @@ export default function ProfilePage() {
 
         {/* Skills Section */}
         <NeoCard style={styles.section}>
-          <Text style={styles.sectionLabel}>SKILLS</Text>
+          <View style={styles.labelRow}>
+            <Text style={styles.sectionLabel}>SKILLS</Text>
+            {isEditing && (
+              <Text style={[
+                styles.charCount,
+                formData.skills.length >= PROFILE_MAX_SKILLS && styles.charCountLimit,
+              ]}>
+                {formData.skills.length}/{PROFILE_MAX_SKILLS}
+              </Text>
+            )}
+          </View>
+          {skillError && (
+            <Text style={styles.limitError}>{skillError}</Text>
+          )}
           <ChipContainer>
-            {(isEditing ? AVAILABLE_SKILLS : profile?.skills || []).map((skill) => {
-              const isSelected = formData.skills.includes(skill);
-              return (
-                <NeoChip
-                  key={skill}
-                  label={skill}
-                  variant="skill"
-                  selected={isSelected}
-                  onPress={isEditing ? () => toggleSkill(skill) : undefined}
-                />
-              );
-            })}
-            {!isEditing && (!profile?.skills || profile.skills.length === 0) && (
-              <Text style={styles.emptyText}>No skills added yet</Text>
+            {isEditing ? (
+              <>
+                {/* Show custom skills first */}
+                {formData.skills
+                  .filter((s) => !AVAILABLE_SKILLS.includes(s))
+                  .map((skill) => (
+                    <NeoChip
+                      key={skill}
+                      label={skill}
+                      variant="skill"
+                      selected
+                      onPress={() => toggleSkill(skill)}
+                    />
+                  ))}
+                {AVAILABLE_SKILLS.map((skill) => {
+                  const isSelected = formData.skills.includes(skill);
+                  return (
+                    <NeoChip
+                      key={skill}
+                      label={skill}
+                      variant="skill"
+                      selected={isSelected}
+                      onPress={() => toggleSkill(skill)}
+                    />
+                  );
+                })}
+                {/* Plus button chip */}
+                {formData.skills.length < PROFILE_MAX_SKILLS && (
+                  <TouchableOpacity
+                    style={styles.addChip}
+                    onPress={() => setSkillModalVisible(true)}
+                  >
+                    <Ionicons name="add" size={20} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              <>
+                {(profile?.skills || []).map((skill) => (
+                  <NeoChip
+                    key={skill}
+                    label={skill}
+                    variant="skill"
+                    selected
+                  />
+                ))}
+                {(!profile?.skills || profile.skills.length === 0) && (
+                  <Text style={styles.emptyText}>No skills added yet</Text>
+                )}
+              </>
             )}
           </ChipContainer>
         </NeoCard>
 
         {/* Interests Section */}
         <NeoCard style={styles.section}>
-          <Text style={styles.sectionLabel}>INTERESTS</Text>
+          <View style={styles.labelRow}>
+            <Text style={styles.sectionLabel}>INTERESTS</Text>
+            {isEditing && (
+              <Text style={[
+                styles.charCount,
+                formData.interests.length >= PROFILE_MAX_INTERESTS && styles.charCountLimit,
+              ]}>
+                {formData.interests.length}/{PROFILE_MAX_INTERESTS}
+              </Text>
+            )}
+          </View>
+          {interestError && (
+            <Text style={styles.limitError}>{interestError}</Text>
+          )}
           <ChipContainer>
-            {(isEditing ? AVAILABLE_INTERESTS : profile?.interests || []).map((interest) => {
-              const isSelected = formData.interests.includes(interest);
-              return (
-                <NeoChip
-                  key={interest}
-                  label={interest}
-                  variant="looking"
-                  selected={isSelected}
-                  onPress={isEditing ? () => toggleInterest(interest) : undefined}
-                />
-              );
-            })}
-            {!isEditing && (!profile?.interests || profile.interests.length === 0) && (
-              <Text style={styles.emptyText}>No interests added yet</Text>
+            {isEditing ? (
+              <>
+                {/* Show custom interests first */}
+                {formData.interests
+                  .filter((i) => !AVAILABLE_INTERESTS.includes(i))
+                  .map((interest) => (
+                    <NeoChip
+                      key={interest}
+                      label={interest}
+                      variant="looking"
+                      selected
+                      onPress={() => toggleInterest(interest)}
+                    />
+                  ))}
+                {AVAILABLE_INTERESTS.map((interest) => {
+                  const isSelected = formData.interests.includes(interest);
+                  return (
+                    <NeoChip
+                      key={interest}
+                      label={interest}
+                      variant="looking"
+                      selected={isSelected}
+                      onPress={() => toggleInterest(interest)}
+                    />
+                  );
+                })}
+                {/* Plus button chip */}
+                {formData.interests.length < PROFILE_MAX_INTERESTS && (
+                  <TouchableOpacity
+                    style={styles.addChip}
+                    onPress={() => setInterestModalVisible(true)}
+                  >
+                    <Ionicons name="add" size={20} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              <>
+                {(profile?.interests || []).map((interest) => (
+                  <NeoChip
+                    key={interest}
+                    label={interest}
+                    variant="looking"
+                    selected
+                  />
+                ))}
+                {(!profile?.interests || profile.interests.length === 0) && (
+                  <Text style={styles.emptyText}>No interests added yet</Text>
+                )}
+              </>
             )}
           </ChipContainer>
         </NeoCard>
@@ -564,6 +774,170 @@ export default function ProfilePage() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Add Custom Skill Modal */}
+      <Modal
+        visible={skillModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setSkillModalVisible(false);
+          setCustomSkill('');
+          setSkillError(null);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              setSkillModalVisible(false);
+              setCustomSkill('');
+              setSkillError(null);
+            }}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Custom Skill</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setSkillModalVisible(false);
+                  setCustomSkill('');
+                  setSkillError(null);
+                }}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              value={customSkill}
+              onChangeText={(text) => {
+                setCustomSkill(text);
+                setSkillError(null);
+              }}
+              placeholder="Enter skill name..."
+              placeholderTextColor={COLORS.textLight}
+              maxLength={PROFILE_TAG_MAX_LENGTH}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                addCustomSkill();
+                if (!skillError) {
+                  setSkillModalVisible(false);
+                }
+              }}
+            />
+            <Text style={styles.modalCharCount}>
+              {customSkill.length}/{PROFILE_TAG_MAX_LENGTH}
+            </Text>
+            {skillError && (
+              <Text style={styles.modalError}>{skillError}</Text>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.modalAddButton,
+                !customSkill.trim() && styles.modalAddButtonDisabled,
+              ]}
+              onPress={() => {
+                addCustomSkill();
+                if (!skillError && customSkill.trim()) {
+                  setSkillModalVisible(false);
+                }
+              }}
+              disabled={!customSkill.trim()}
+            >
+              <Ionicons name="add" size={20} color={COLORS.background} />
+              <Text style={styles.modalAddButtonText}>Add Skill</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Add Custom Interest Modal */}
+      <Modal
+        visible={interestModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setInterestModalVisible(false);
+          setCustomInterest('');
+          setInterestError(null);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              setInterestModalVisible(false);
+              setCustomInterest('');
+              setInterestError(null);
+            }}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Custom Interest</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setInterestModalVisible(false);
+                  setCustomInterest('');
+                  setInterestError(null);
+                }}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              value={customInterest}
+              onChangeText={(text) => {
+                setCustomInterest(text);
+                setInterestError(null);
+              }}
+              placeholder="Enter interest name..."
+              placeholderTextColor={COLORS.textLight}
+              maxLength={PROFILE_TAG_MAX_LENGTH}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                addCustomInterest();
+                if (!interestError) {
+                  setInterestModalVisible(false);
+                }
+              }}
+            />
+            <Text style={styles.modalCharCount}>
+              {customInterest.length}/{PROFILE_TAG_MAX_LENGTH}
+            </Text>
+            {interestError && (
+              <Text style={styles.modalError}>{interestError}</Text>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.modalAddButton,
+                !customInterest.trim() && styles.modalAddButtonDisabled,
+              ]}
+              onPress={() => {
+                addCustomInterest();
+                if (!interestError && customInterest.trim()) {
+                  setInterestModalVisible(false);
+                }
+              }}
+              disabled={!customInterest.trim()}
+            >
+              <Ionicons name="add" size={20} color={COLORS.background} />
+              <Text style={styles.modalAddButtonText}>Add Interest</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -648,6 +1022,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     ...SHADOWS.large,
   },
+  profilePhotoDisabled: {
+    opacity: 0.6,
+  },
   profilePhoto: {
     width: '100%',
     height: '100%',
@@ -669,6 +1046,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textLight,
     marginTop: 4,
+    fontWeight: '600',
+  },
+  rateLimitBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: BORDERS.thin,
+    borderColor: '#F59E0B',
+  },
+  rateLimitText: {
+    fontSize: 12,
+    color: '#92400E',
+    marginLeft: 6,
     fontWeight: '600',
   },
 
@@ -694,6 +1088,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textMuted,
     fontWeight: '700',
+  },
+  charCountLimit: {
+    color: COLORS.danger,
+  },
+  charLimitWarning: {
+    fontSize: 12,
+    color: COLORS.danger,
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  limitError: {
+    fontSize: 12,
+    color: COLORS.danger,
+    fontWeight: '600',
+    marginTop: 8,
   },
 
   // Inputs
@@ -847,5 +1256,99 @@ const styles = StyleSheet.create({
   settingsItemText: {
     fontSize: 16,
     fontWeight: '700',
+  },
+
+  // Add Chip (Plus Button)
+  addChip: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '85%',
+    maxWidth: 340,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.medium,
+    padding: 20,
+    borderWidth: BORDERS.medium,
+    borderColor: COLORS.border,
+    ...SHADOWS.large,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalInput: {
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.small,
+    padding: 14,
+    fontSize: 16,
+    fontWeight: '500',
+    color: COLORS.textPrimary,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+  },
+  modalCharCount: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    textAlign: 'right',
+    marginTop: 6,
+    fontWeight: '600',
+  },
+  modalError: {
+    fontSize: 12,
+    color: COLORS.danger,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  modalAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.small,
+    paddingVertical: 14,
+    marginTop: 16,
+    gap: 8,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    ...SHADOWS.small,
+  },
+  modalAddButtonDisabled: {
+    backgroundColor: COLORS.gray200,
+    opacity: 0.6,
+  },
+  modalAddButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.background,
   },
 });

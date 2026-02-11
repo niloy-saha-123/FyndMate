@@ -7,6 +7,12 @@
  */
 
 import { z } from 'zod';
+import {
+    INTRO_MESSAGE_MIN_LENGTH,
+    INTRO_MESSAGE_MAX_LENGTH,
+    REPLY_MESSAGE_MIN_LENGTH,
+    REPLY_MESSAGE_MAX_LENGTH,
+} from './validation-constants.js';
 
 // ============================================
 // LIKES SCHEMAS
@@ -22,8 +28,8 @@ export const createLikeSchema = z.object({
         message: 'liked must be a boolean',
     }),
     message: z.string()
-        .min(10, 'Message must be at least 10 characters')
-        .max(500, 'Message cannot exceed 500 characters')
+        .min(INTRO_MESSAGE_MIN_LENGTH, `Intro message must be at least ${INTRO_MESSAGE_MIN_LENGTH} characters`)
+        .max(INTRO_MESSAGE_MAX_LENGTH, `Intro message cannot exceed ${INTRO_MESSAGE_MAX_LENGTH} characters`)
         .optional(),
 }).refine((data) => {
     // If liked is true, message is required
@@ -42,8 +48,8 @@ export const createLikeSchema = z.object({
  */
 export const acceptLikeSchema = z.object({
     replyMessage: z.string()
-        .min(1, 'Reply message cannot be empty')
-        .max(500, 'Reply message cannot exceed 500 characters')
+        .min(REPLY_MESSAGE_MIN_LENGTH, `Reply message must be at least ${REPLY_MESSAGE_MIN_LENGTH} character`)
+        .max(REPLY_MESSAGE_MAX_LENGTH, `Reply message cannot exceed ${REPLY_MESSAGE_MAX_LENGTH} characters`)
         .optional(),
 });
 

@@ -22,6 +22,29 @@
  */
 
 import { apiClient } from '../lib/apiClient';
+import {
+    LIKES_RATE_LIMIT,
+    LIKES_RATE_LIMIT_WINDOW_HOURS,
+} from '../constants/validation';
+
+// Re-export for convenience
+export { LIKES_RATE_LIMIT, LIKES_RATE_LIMIT_WINDOW_HOURS };
+
+/**
+ * Custom error class for rate limit exceeded
+ */
+export class LikesRateLimitError extends Error {
+  public retryAfter: number;
+  public retryAfterHours: number;
+
+  constructor(retryAfterSeconds: number, message?: string) {
+    const hours = Math.ceil(retryAfterSeconds / 3600);
+    super(message || `You've reached your daily limit of ${LIKES_RATE_LIMIT} collaboration requests. Try again in ${hours} hour${hours !== 1 ? 's' : ''}.`);
+    this.name = 'LikesRateLimitError';
+    this.retryAfter = retryAfterSeconds;
+    this.retryAfterHours = hours;
+  }
+}
 
 export interface UserProfile {
     id: string;
@@ -73,9 +96,25 @@ export async function getDiscoveryFeed(limit = 20, cursor?: string): Promise<Use
  * @param likedId ID of user to like/pass
  * @param liked true = LIKE, false = PASS
  * @param message Optional Intro Message (Required if liked=true)
+ * @throws LikesRateLimitError when rate limit (30/day) is exceeded
  */
 export async function sendLike(likedId: string, liked: boolean, message?: string) {
-    return apiClient.post('/api/likes', { likedId, liked, message });
+    try {
+        return await apiClient.post('/api/likes', { likedId, liked, message });
+    } catch (error: any) {
+        // Check if error message indicates rate limiting
+        const errorMessage = error?.message?.toLowerCase() || '';
+        if (
+            errorMessage.includes('too many requests') ||
+            errorMessage.includes('rate limit') ||
+            errorMessage.includes('429')
+        ) {
+            // Extract retry time from error message if available, default to 24 hours
+            const retryAfter = 24 * 60 * 60; // Default 24 hours in seconds
+            throw new LikesRateLimitError(retryAfter);
+        }
+        throw error;
+    }
 }
 
 /**

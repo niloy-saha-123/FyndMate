@@ -5,6 +5,7 @@ import { StyleSheet } from 'react-native';
 import { AuthProvider } from "../src/auth/AuthProvider";
 import { ApiClientInitializer } from "../src/components/ApiClientInitializer";
 import { NotificationProvider } from '@/src/notifications/NotificationProvider';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { supabase } from "../src/auth/supabaseClient";
 import { useEffect } from 'react';
 
@@ -30,22 +31,24 @@ export default function RootLayout() {
   */
 
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <ApiClientInitializer>
-          <SafeAreaView style={styles.statusbar}>
-            <Stack>
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="login" options={{ headerShown: false }} />
-              <Stack.Screen name="auth" options={{ headerShown: false }} />
-              <Stack.Screen name="app-gate" options={{ headerShown: false }} />
-              <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            </Stack>
-          </SafeAreaView>
-        </ApiClientInitializer>
-      </NotificationProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <NotificationProvider>
+          <ApiClientInitializer>
+            <SafeAreaView style={styles.statusbar}>
+              <Stack>
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="auth" options={{ headerShown: false }} />
+                <Stack.Screen name="app-gate" options={{ headerShown: false }} />
+                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              </Stack>
+            </SafeAreaView>
+          </ApiClientInitializer>
+        </NotificationProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

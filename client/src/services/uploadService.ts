@@ -48,6 +48,24 @@ export interface UploadError {
   error: string;
   details?: string;
   remainingUploads?: number;
+  retryAfter?: number;
+}
+
+/**
+ * Custom error class for rate limit exceeded
+ * Contains retry information for UI display
+ */
+export class RateLimitError extends Error {
+  public retryAfter: number;
+  public retryAfterMinutes: number;
+
+  constructor(retryAfterSeconds: number, message?: string) {
+    const minutes = Math.ceil(retryAfterSeconds / 60);
+    super(message || `Rate limit exceeded. Try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`);
+    this.name = 'RateLimitError';
+    this.retryAfter = retryAfterSeconds;
+    this.retryAfterMinutes = minutes;
+  }
 }
 
 /**
@@ -83,6 +101,7 @@ export async function requestUploadUrl(
 ): Promise<UploadRequestResponse> {
   // Retry network requests up to 3 times with exponential backoff
   // This handles temporary network issues (WiFi drops, 4G->WiFi switches, etc.)
+  // NOTE: 429 rate limit errors are NOT retried - they are thrown immediately
   return await pRetry(
     async () => {
       const response = await fetch(`${API_BASE_URL}/api/upload/profile-picture/request`, {
@@ -94,6 +113,13 @@ export async function requestUploadUrl(
         body: JSON.stringify({ fileExtension }),
       });
 
+      // Handle rate limiting (429) - do not retry, throw immediately
+      if (response.status === 429) {
+        const retryAfterHeader = response.headers.get('Retry-After');
+        const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 3600;
+        throw new RateLimitError(retryAfterSeconds);
+      }
+
       if (!response.ok) {
         const error: UploadError = await response.json();
         throw new Error(error.details || error.error || 'Failed to request upload URL');
@@ -103,7 +129,11 @@ export async function requestUploadUrl(
     },
     {
       retries: 3,
+      // Don't retry rate limit errors
+      shouldRetry: (error) => !(error instanceof RateLimitError),
       onFailedAttempt: (error) => {
+        // Skip logging for rate limit errors (they won't be retried anyway)
+        if (error instanceof RateLimitError) return;
         console.log(
           `Request upload URL attempt ${error.attemptNumber} failed. ` +
           `${error.retriesLeft} retries left.`

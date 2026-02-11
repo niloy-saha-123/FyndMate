@@ -33,6 +33,12 @@ import { COLORS, SHADOWS, BORDERS, RADIUS } from '@/src/theme/colors';
 import { NeoCard } from '@/src/components/NeoCard';
 import { NeoButton } from '@/src/components/NeoButton';
 import { NeoChip, ChipContainer } from '@/src/components/NeoChip';
+import {
+  INTRO_MESSAGE_MIN_LENGTH,
+  INTRO_MESSAGE_MAX_LENGTH,
+  isIntroMessageValid,
+  getIntroMessageError,
+} from '@/src/constants/validation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -42,10 +48,12 @@ export default function FeedScreen() {
   const { profiles, loading, error, hasMore, fetchFeed, swipe } = useFeed();
 
   const [message, setMessage] = useState('');
-  const MAX_MESSAGE_LENGTH = 500;
-  const MIN_MESSAGE_LENGTH = 10;
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // Computed validation state
+  const introMessageError = getIntroMessageError(message);
+  const isIntroValid = isIntroMessageValid(message);
 
   useEffect(() => {
     // Fetch once on mount. Avoid depending on `fetchFeed` which recreates
@@ -64,7 +72,7 @@ export default function FeedScreen() {
 
   const handleLike = async () => {
     if (!currentProfile) return;
-    if (message.length < MIN_MESSAGE_LENGTH || message.length > MAX_MESSAGE_LENGTH) {
+    if (!isIntroValid) {
       return;
     }
     await swipe(currentProfile.id, true, message);
@@ -392,23 +400,28 @@ export default function FeedScreen() {
 
             {/* Message Input */}
             <TextInput
-              style={styles.messageInput}
+              style={[
+                styles.messageInput,
+                message.length > INTRO_MESSAGE_MAX_LENGTH && styles.messageInputError
+              ]}
               placeholder="Explain what you're building or learning and why you want to collaborate."
               placeholderTextColor={COLORS.textLight}
               value={message}
               onChangeText={setMessage}
-              maxLength={MAX_MESSAGE_LENGTH}
+              maxLength={INTRO_MESSAGE_MAX_LENGTH + 50} // Allow slight overflow to show error
               multiline
               textAlignVertical="top"
             />
 
             <View style={styles.charCountRow}>
-              <Text style={styles.charCount}>{message.length}/{MAX_MESSAGE_LENGTH}</Text>
-              {message.length > 0 && message.length < MIN_MESSAGE_LENGTH && (
-                <Text style={styles.charError}>Minimum {MIN_MESSAGE_LENGTH} characters required</Text>
-              )}
-              {message.length > MAX_MESSAGE_LENGTH && (
-                <Text style={styles.charError}>Maximum {MAX_MESSAGE_LENGTH} characters</Text>
+              <Text style={[
+                styles.charCount,
+                message.length > INTRO_MESSAGE_MAX_LENGTH && styles.charCountError
+              ]}>
+                {message.length}/{INTRO_MESSAGE_MAX_LENGTH}
+              </Text>
+              {introMessageError && (
+                <Text style={styles.charError}>{introMessageError}</Text>
               )}
             </View>
 
@@ -422,7 +435,7 @@ export default function FeedScreen() {
               <NeoButton
                 title="Send request"
                 onPress={handleLike}
-                disabled={message.length < MIN_MESSAGE_LENGTH || message.length > MAX_MESSAGE_LENGTH}
+                disabled={!isIntroValid}
                 style={{ flex: 1, marginLeft: 12 }}
               />
             </View>
@@ -849,6 +862,10 @@ const styles = StyleSheet.create({
     minHeight: 120,
     ...SHADOWS.medium,
   },
+  messageInputError: {
+    borderColor: COLORS.danger,
+    borderWidth: 2,
+  },
   charCountRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -860,10 +877,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textMuted,
   },
+  charCountError: {
+    color: COLORS.danger,
+  },
   charError: {
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.danger,
+    flexShrink: 1,
   },
   modalActions: {
     flexDirection: 'row',

@@ -16,6 +16,10 @@ import {
     matchIdParamSchema,
     blockUserSchema,
 } from '../schemas/matching.schema.js';
+import {
+    LIKES_RATE_LIMIT,
+    LIKES_RATE_LIMIT_WINDOW_SECONDS,
+} from '../schemas/validation-constants.js';
 
 export default async function matchingRoutes(app: FastifyInstance) {
     app.addHook('preHandler', authMiddleware);
@@ -23,7 +27,7 @@ export default async function matchingRoutes(app: FastifyInstance) {
     // Likes
     app.post('/likes', {
         preHandler: [
-            rateLimit({ limit: 100, windowSec: 12 * 60 * 60, keyPrefix: 'swipe' })
+            rateLimit({ limit: LIKES_RATE_LIMIT, windowSec: LIKES_RATE_LIMIT_WINDOW_SECONDS, keyPrefix: 'swipe' })
         ]
     }, async (request, reply) => {
         const user = request.user!;

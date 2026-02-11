@@ -21,6 +21,12 @@ import {
 } from "../../src/chat/chat.service";
 import { subscribeToMessages } from "../../src/chat/chat.realtime";
 import { useChatNotificationGuard } from "../../src/notifications/useChatNotificationGuard";
+import {
+  CHAT_MESSAGE_MIN_LENGTH,
+  CHAT_MESSAGE_MAX_LENGTH,
+  isChatMessageValid,
+  getChatMessageError,
+} from "../../src/constants/validation";
 
 
 interface Message {
@@ -120,7 +126,10 @@ export default function ChatScreen() {
   }
 
   async function handleSend() {
-    if (!text.trim() || !user || !matchId) return;
+    if (!user || !matchId) return;
+    
+    // Validate message
+    if (!isChatMessageValid(text)) return;
 
     const content = text.trim();
     setText("");
@@ -154,6 +163,9 @@ export default function ChatScreen() {
   if (!user) return <Text>Loading...</Text>;
 
   const isBlocked = matchStatus?.status === "blocked";
+  const messageError = getChatMessageError(text);
+  const isMessageTooLong = text.trim().length > CHAT_MESSAGE_MAX_LENGTH;
+  const canSend = isChatMessageValid(text) && !savingEdit;
 
   return (
     <KeyboardAvoidingView
@@ -218,26 +230,46 @@ export default function ChatScreen() {
         />
 
         {!isBlocked && (
-          <View style={styles.inputContainer}>
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              placeholder={editingMessage ? "Edit message…" : "Type a message…"}
-              style={styles.input}
-              multiline
-            />
-            <Pressable
-              onPress={handleSend}
-              disabled={!text.trim() || savingEdit}
-              style={[
-                styles.sendButton,
-                (!text.trim() || savingEdit) && styles.sendButtonDisabled
-              ]}
-            >
-              <Text style={styles.sendButtonText}>
-                {editingMessage ? "Save" : "Send"}
-              </Text>
-            </Pressable>
+          <View style={styles.inputWrapper}>
+            {/* Character counter and error */}
+            {text.length > 0 && (
+              <View style={styles.charCountContainer}>
+                <Text style={[
+                  styles.charCount,
+                  isMessageTooLong && styles.charCountError
+                ]}>
+                  {text.trim().length}/{CHAT_MESSAGE_MAX_LENGTH}
+                </Text>
+                {isMessageTooLong && (
+                  <Text style={styles.errorText}>Message too long</Text>
+                )}
+              </View>
+            )}
+            <View style={styles.inputContainer}>
+              <TextInput
+                value={text}
+                onChangeText={setText}
+                placeholder={editingMessage ? "Edit message…" : "Type a message…"}
+                style={[
+                  styles.input,
+                  isMessageTooLong && styles.inputError
+                ]}
+                multiline
+                maxLength={CHAT_MESSAGE_MAX_LENGTH + 50} // Allow slight overflow to show error
+              />
+              <Pressable
+                onPress={handleSend}
+                disabled={!canSend}
+                style={[
+                  styles.sendButton,
+                  !canSend && styles.sendButtonDisabled
+                ]}
+              >
+                <Text style={styles.sendButtonText}>
+                  {editingMessage ? "Save" : "Send"}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         )}
 
@@ -352,5 +384,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 12,
     textAlign: "center"
+  },
+
+  // Input validation styles
+  inputWrapper: {
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0"
+  },
+  charCountContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 4
+  },
+  charCount: {
+    fontSize: 12,
+    color: "#999"
+  },
+  charCountError: {
+    color: "#ff3b30",
+    fontWeight: "600"
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#ff3b30",
+    fontWeight: "500"
+  },
+  inputError: {
+    borderColor: "#ff3b30",
+    borderWidth: 2
   }
 });

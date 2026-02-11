@@ -13,6 +13,10 @@ import { filterLocationByPrivacy } from '../utils/locationPrivacy.js';
 import { signProfilePicture } from '../utils/profilePicture.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
 import { computeAge } from '../utils/computeAge.js';
+import {
+    INTRO_MESSAGE_MIN_LENGTH,
+    INTRO_MESSAGE_MAX_LENGTH,
+} from '../schemas/validation-constants.js';
 
 type ReceivedLike = Prisma.LikeGetPayload<{
     include: {
@@ -33,11 +37,11 @@ export class LikeService {
 
         if (liked) {
             const sanitizedMessage = message ? sanitizeText(message) : '';
-            if (!sanitizedMessage || sanitizedMessage.length < 10) {
-                throw new Error("Intro message must be at least 10 characters.");
+            if (!sanitizedMessage || sanitizedMessage.length < INTRO_MESSAGE_MIN_LENGTH) {
+                throw new Error(`Intro message must be at least ${INTRO_MESSAGE_MIN_LENGTH} characters.`);
             }
-            if (sanitizedMessage.length > 500) {
-                throw new Error("Intro message cannot exceed 500 characters.");
+            if (sanitizedMessage.length > INTRO_MESSAGE_MAX_LENGTH) {
+                throw new Error(`Intro message cannot exceed ${INTRO_MESSAGE_MAX_LENGTH} characters.`);
             }
             message = sanitizedMessage;
         }

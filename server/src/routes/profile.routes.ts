@@ -9,19 +9,21 @@ import { authMiddleware } from '../middleware/auth.middleware.js';
 import { prisma } from '../lib/prisma.js';
 import { signProfilePicture } from '../utils/profilePicture.js';
 import { computeAge } from '../utils/computeAge.js';
-
-const MAX_BIO_LENGTH = 300;
-const MAX_SKILLS = 10;
-const MAX_INTERESTS = 10;
-const MAX_TAG_LENGTH = 30;
-const MIN_AGE = 13;
+import {
+  PROFILE_BIO_MAX_LENGTH,
+  PROFILE_MAX_SKILLS,
+  PROFILE_MAX_INTERESTS,
+  PROFILE_TAG_MAX_LENGTH,
+  PROFILE_NAME_MAX_LENGTH,
+  PROFILE_MIN_AGE,
+} from '../schemas/validation-constants.js';
 
 const updateProfileSchema = z.object({
-  fullName: z.string().min(1).max(100).optional(),
+  fullName: z.string().min(1).max(PROFILE_NAME_MAX_LENGTH).optional(),
   birthDate: z.coerce.date().optional(),
-  bio: z.string().max(MAX_BIO_LENGTH).optional(),
-  skills: z.array(z.string().max(MAX_TAG_LENGTH)).max(MAX_SKILLS).optional(),
-  interests: z.array(z.string().max(MAX_TAG_LENGTH)).max(MAX_INTERESTS).optional(),
+  bio: z.string().max(PROFILE_BIO_MAX_LENGTH).optional(),
+  skills: z.array(z.string().max(PROFILE_TAG_MAX_LENGTH)).max(PROFILE_MAX_SKILLS).optional(),
+  interests: z.array(z.string().max(PROFILE_TAG_MAX_LENGTH)).max(PROFILE_MAX_INTERESTS).optional(),
   experience: z.string().max(200).optional(),
   commitment: z.string().max(100).optional(),
   githubUsername: z.string().max(100).optional(),
@@ -94,8 +96,8 @@ export default async function profileRoutes(app: FastifyInstance) {
     }
 
     const age = computeAge(new Date(finalBirthDate));
-    if (age !== null && age < MIN_AGE) {
-      return reply.status(400).send({ error: `You must be at least ${MIN_AGE} years old.` });
+    if (age !== null && age < PROFILE_MIN_AGE) {
+      return reply.status(400).send({ error: `You must be at least ${PROFILE_MIN_AGE} years old.` });
     }
 
     // Map fullName to name for compatibility

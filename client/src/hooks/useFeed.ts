@@ -12,7 +12,15 @@
  */
 
 import { useState, useCallback } from 'react';
-import { getDiscoveryFeed, sendLike, UserProfile } from '../services/matchingService';
+import { Alert } from 'react-native';
+import { 
+    getDiscoveryFeed, 
+    sendLike, 
+    UserProfile, 
+    LikesRateLimitError,
+    LIKES_RATE_LIMIT,
+    LIKES_RATE_LIMIT_WINDOW_HOURS,
+} from '../services/matchingService';
 
 export function useFeed() {
     const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -112,7 +120,19 @@ export function useFeed() {
             // We usually put it back at the TOP (index 0) so the user sees it again.
             setProfiles(prev => [swipedProfile, ...prev]);
 
+            // 6. Handle rate limit error with user-friendly popup
+            if (err instanceof LikesRateLimitError) {
+                Alert.alert(
+                    "Can't Send Collaboration Request",
+                    `You've reached your daily limit of ${LIKES_RATE_LIMIT} collaboration requests.\n\nPlease try again in ${err.retryAfterHours} hour${err.retryAfterHours !== 1 ? 's' : ''}.`,
+                    [{ text: 'OK', style: 'default' }]
+                );
+                setError(`Daily limit reached (${LIKES_RATE_LIMIT}/${LIKES_RATE_LIMIT_WINDOW_HOURS}hr)`);
+                return { matched: false, rateLimited: true };
+            }
+
             setError("Failed to record swipe. Please try again.");
+            return { matched: false, error: true };
         }
     };
 

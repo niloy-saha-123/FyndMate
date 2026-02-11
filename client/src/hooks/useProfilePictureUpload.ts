@@ -21,8 +21,8 @@
  * ```
  */
 
-import { useState, useCallback } from 'react';
-import { uploadProfilePicture, validateImage } from '../services/uploadService';
+import { useState, useCallback, useEffect } from 'react';
+import { uploadProfilePicture, validateImage, RateLimitError } from '../services/uploadService';
 import { useAuth } from '../auth/AuthProvider';
 
 export interface UploadProgress {
@@ -30,11 +30,19 @@ export interface UploadProgress {
   progress: number;
 }
 
+export interface RateLimitState {
+  isLimited: boolean;
+  retryAfterSeconds: number;
+  retryAfterMinutes: number;
+  resetTime: Date | null;
+}
+
 export interface UploadHookState {
   uploading: boolean;
   progress: UploadProgress | null;
   error: string | null;
   lastUploadUrl: string | null;
+  rateLimit: RateLimitState;
 }
 
 /**
@@ -51,7 +59,50 @@ export function useProfilePictureUpload() {
     progress: null,
     error: null,
     lastUploadUrl: null,
+    rateLimit: {
+      isLimited: false,
+      retryAfterSeconds: 0,
+      retryAfterMinutes: 0,
+      resetTime: null,
+    },
   });
+
+  // Auto-clear rate limit when timer expires
+  useEffect(() => {
+    if (!state.rateLimit.isLimited || !state.rateLimit.resetTime) return;
+
+    const now = new Date();
+    const msUntilReset = state.rateLimit.resetTime.getTime() - now.getTime();
+
+    if (msUntilReset <= 0) {
+      // Already expired, clear immediately
+      setState(prev => ({
+        ...prev,
+        rateLimit: {
+          isLimited: false,
+          retryAfterSeconds: 0,
+          retryAfterMinutes: 0,
+          resetTime: null,
+        },
+      }));
+      return;
+    }
+
+    // Set timer to clear rate limit when it expires
+    const timer = setTimeout(() => {
+      setState(prev => ({
+        ...prev,
+        rateLimit: {
+          isLimited: false,
+          retryAfterSeconds: 0,
+          retryAfterMinutes: 0,
+          resetTime: null,
+        },
+      }));
+    }, msUntilReset);
+
+    return () => clearTimeout(timer);
+  }, [state.rateLimit.isLimited, state.rateLimit.resetTime]);
 
   /**
    * Reset hook state to initial values
@@ -62,6 +113,12 @@ export function useProfilePictureUpload() {
       progress: null,
       error: null,
       lastUploadUrl: null,
+      rateLimit: {
+        isLimited: false,
+        retryAfterSeconds: 0,
+        retryAfterMinutes: 0,
+        resetTime: null,
+      },
     });
   }, []);
 
@@ -92,6 +149,14 @@ export function useProfilePictureUpload() {
   ): Promise<string> => {
     if (!accessToken) {
       throw new Error('Not authenticated. Please login first.');
+    }
+
+    // Check if rate limited
+    if (state.rateLimit.isLimited) {
+      throw new RateLimitError(
+        state.rateLimit.retryAfterSeconds,
+        `Rate limit in effect. Try again in ${state.rateLimit.retryAfterMinutes} minute${state.rateLimit.retryAfterMinutes !== 1 ? 's' : ''}.`
+      );
     }
 
     // Reset state
@@ -139,6 +204,27 @@ export function useProfilePictureUpload() {
       return publicUrl;
 
     } catch (error) {
+      // Handle rate limit errors specially
+      if (error instanceof RateLimitError) {
+        const resetTime = new Date(Date.now() + error.retryAfter * 1000);
+        
+        setState(prev => ({
+          ...prev,
+          uploading: false,
+          progress: null,
+          error: error.message,
+          lastUploadUrl: null,
+          rateLimit: {
+            isLimited: true,
+            retryAfterSeconds: error.retryAfter,
+            retryAfterMinutes: error.retryAfterMinutes,
+            resetTime,
+          },
+        }));
+
+        throw error;
+      }
+
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
 
       setState(prev => ({
@@ -151,7 +237,7 @@ export function useProfilePictureUpload() {
 
       throw error;
     }
-  }, [accessToken, validateImageFile]);
+  }, [accessToken, state.rateLimit, validateImageFile]);
 
   /**
    * Retry last upload (if it failed)
@@ -161,8 +247,14 @@ export function useProfilePictureUpload() {
     if (state.uploading) {
       throw new Error('Upload already in progress');
     }
+    if (state.rateLimit.isLimited) {
+      throw new RateLimitError(
+        state.rateLimit.retryAfterSeconds,
+        `Rate limit in effect. Try again in ${state.rateLimit.retryAfterMinutes} minute${state.rateLimit.retryAfterMinutes !== 1 ? 's' : ''}.`
+      );
+    }
     return upload(imageUri);
-  }, [state.uploading, upload]);
+  }, [state.uploading, state.rateLimit, upload]);
 
   return {
     // State
@@ -170,6 +262,7 @@ export function useProfilePictureUpload() {
     progress: state.progress,
     error: state.error,
     lastUploadUrl: state.lastUploadUrl,
+    rateLimit: state.rateLimit,
 
     // Actions
     upload,
