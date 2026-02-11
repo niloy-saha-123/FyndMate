@@ -9,7 +9,8 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  Alert
+  Alert,
+  Image
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useAuth } from "../../src/auth/AuthProvider";
@@ -27,16 +28,41 @@ import {
   isChatMessageValid,
   getChatMessageError,
 } from "../../src/constants/validation";
+import { formatRelativeTime, formatDateSection } from "../../src/utils/timeFormatting";
+import { groupMessagesWithBurstOptimization } from "../../src/utils/messageGrouping";
+import { getOptimizedImageUrl, ImageSizes } from "../../src/utils/imageOptimization";
+import { COLORS } from "../../src/theme/colors";
+import { Ionicons } from "@expo/vector-icons";
+import { ChatDateHeader } from "../../src/components/ChatDateHeader";
+import { ProfileModal } from "../../src/components/ProfileModal";
+import { getUserProfile, UserProfileData } from "../../src/services/userProfile.service";
 
+
+interface Sender {
+  id: string;
+  name: string;
+  profilePicture: string | null;
+}
 
 interface Message {
   id: string;
   matchId: string;
   senderId: string;
+  sender: Sender;
   content: string;
   createdAt: string;
   editedAt?: string | null;
 }
+
+type GroupedItem = 
+  | { type: "date"; date: string }
+  | { 
+      type: "message"; 
+      data: Message; 
+      showTimestamp: boolean;
+      isFirstInSequence: boolean;
+      isLastInSequence: boolean;
+    };
 
 type RealtimeEvent = "upsert" | "delete" | "match_inactive";
 
@@ -59,8 +85,11 @@ export default function ChatScreen() {
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<UserProfileData | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
 
-  const flatListRef = useRef<FlatList<Message>>(null);
+  const flatListRef = useRef<FlatList<GroupedItem>>(null);
 
   useEffect(() => {
     if (!matchId || !user) return;
@@ -69,7 +98,10 @@ export default function ChatScreen() {
       .then(setMatchStatus)
       .catch(console.error);
 
-    getMessages(matchId).then(setMessages).catch(console.error);
+    getMessages(matchId).then(data => {
+      console.log('Messages loaded:', data); // Debug log
+      setMessages(data);
+    }).catch(console.error);
 
     const unsubscribe = subscribeToMessages(
       matchId,
@@ -167,6 +199,9 @@ export default function ChatScreen() {
   const isMessageTooLong = text.trim().length > CHAT_MESSAGE_MAX_LENGTH;
   const canSend = isChatMessageValid(text) && !savingEdit;
 
+  // Group messages with burst optimization
+  const groupedMessages = groupMessagesWithBurstOptimization(messages, formatDateSection);
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -184,47 +219,99 @@ export default function ChatScreen() {
 
         <FlatList
           ref={flatListRef}
-          data={messages}
-          keyExtractor={item => item.id}
+          data={groupedMessages}
+          keyExtractor={(item: GroupedItem, index: number) => 
+            item.type === "date" ? `date-${item.date}-${index}` : `msg-${item.data.id}`
+          }
           contentContainerStyle={styles.messageList}
-          renderItem={({ item }) => {
-            const isMyMessage = item.senderId === user.id;
+          renderItem={({ item, index }: { item: GroupedItem; index: number }) => {
+            if (item.type === "date") {
+              return <ChatDateHeader date={item.date} />;
+            }
+
+            const message = item.data;
+            const isMyMessage = message.senderId === user.id;
+            const showTimestamp = item.showTimestamp;
+            const showAvatar = !isMyMessage; // Show avatar for every message from other users
+            const showName = !isMyMessage && item.isFirstInSequence;
 
             return (
-              <Pressable
-                onLongPress={() => {
-                  if (!canEditMessage(item) || isBlocked) return;
-                  setSelectedMessage(item);
-                  setActionModalVisible(true);
-                }}
-                style={[
-                  styles.messageBubble,
-                  isMyMessage ? styles.myMessage : styles.theirMessage
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.messageText,
-                    isMyMessage
-                      ? styles.myMessageText
-                      : styles.theirMessageText
-                  ]}
-                >
-                  {item.content}
-                </Text>
-
-                <View style={{ flexDirection: "row", gap: 6 }}>
-                  <Text style={styles.timestamp}>
-                    {new Date(item.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit"
-                    })}
-                  </Text>
-                  {item.editedAt && (
-                    <Text style={styles.edited}>edited</Text>
+              <View style={[
+                styles.messageContainer,
+                isMyMessage ? styles.myMessageContainer : styles.theirMessageContainer
+              ]}>
+                {showName && (
+                  <Text style={styles.senderName}>{message.sender.name}</Text>
+                )}
+                
+                <View style={[
+                  styles.messageRow,
+                  isMyMessage ? styles.myMessageRow : styles.theirMessageRow
+                ]}>
+                  {showAvatar && (
+                    <Pressable 
+                      onPress={async () => {
+                        setLoadingProfile(true);
+                        try {
+                          console.log('Fetching profile for user:', message.sender.id); // Debug log
+                          const profileData = await getUserProfile(message.sender.id);
+                          console.log('Profile data received:', profileData); // Debug log
+                          setSelectedProfile(profileData);
+                          setProfileModalVisible(true);
+                        } catch (error: any) {
+                          console.error("Failed to load profile:", error);
+                          const errorMessage = error?.message || error?.toString() || "Unknown error";
+                          Alert.alert("Error", `Could not load profile information: ${errorMessage}`);
+                        } finally {
+                          setLoadingProfile(false);
+                        }
+                      }}
+                      style={styles.avatarContainer}
+                      disabled={loadingProfile}
+                    >
+                      {message.sender.profilePicture ? (
+                        <Image
+                          source={{ uri: getOptimizedImageUrl(
+                            message.sender.profilePicture,
+                            ImageSizes.AVATAR_CHAT.width,
+                            ImageSizes.AVATAR_CHAT.quality
+                          ) }}
+                          style={styles.avatar}
+                        />
+                      ) : (
+                        <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                          <Ionicons name="person" size={20} color={COLORS.border} />
+                        </View>
+                      )}
+                    </Pressable>
                   )}
+                  
+                  <View style={[
+                    styles.messageBubble,
+                    isMyMessage ? styles.myBubble : styles.theirBubble
+                  ]}>
+                    <Text style={[
+                      styles.messageText,
+                      isMyMessage ? styles.myMessageText : styles.theirMessageText
+                    ]}>
+                      {message.content}
+                    </Text>
+                    
+                    {message.editedAt && (
+                      <Text style={styles.editedText}>(edited)</Text>
+                    )}
+                  </View>
                 </View>
-              </Pressable>
+                
+                {showTimestamp && (
+                  <Text style={[
+                    styles.timestamp,
+                    isMyMessage ? styles.myTimestamp : styles.theirTimestamp
+                  ]}>
+                    {formatRelativeTime(message.createdAt)}
+                  </Text>
+                )}
+              </View>
             );
           }}
         />
@@ -296,6 +383,32 @@ export default function ChatScreen() {
             </View>
           </Pressable>
         </Modal>
+
+        {/* Profile Modal */}
+        <ProfileModal
+          visible={profileModalVisible && selectedProfile !== null}
+          onClose={() => {
+            setProfileModalVisible(false);
+            setSelectedProfile(null);
+          }}
+          profile={selectedProfile || {
+            id: '',
+            name: '',
+            profilePicture: null,
+            bio: null,
+            skills: [],
+            interests: [],
+            experience: null,
+            commitment: null,
+            age: null,
+            gender: null,
+            city: null,
+            country: null,
+            githubUsername: null,
+            lookingFor: [],
+            birthDate: null,
+          }}
+        />
       </View>
     </KeyboardAvoidingView>
   );
@@ -304,6 +417,105 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f5f5f5" },
   messageList: { padding: 16 },
+
+  // Message containers
+  messageContainer: {
+    marginBottom: 12,
+  },
+  myMessageContainer: {
+    alignItems: "flex-end",
+  },
+  theirMessageContainer: {
+    alignItems: "flex-start",
+  },
+
+  // Sender name
+  senderName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 4,
+    marginLeft: 48, // Account for avatar width + spacing
+  },
+
+  // Message row layout
+  messageRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+  },
+  myMessageRow: {
+    justifyContent: "flex-end",
+  },
+  theirMessageRow: {
+    justifyContent: "flex-start",
+  },
+
+  // Avatar
+  avatarContainer: {
+    marginRight: 8,
+    marginBottom: 4,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "#e0e0e0",
+  },
+  avatarPlaceholder: {
+    backgroundColor: "#f0f0f0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Message bubbles
+  messageBubble: {
+    maxWidth: "75%",
+    padding: 12,
+    borderRadius: 18,
+  },
+  myBubble: {
+    backgroundColor: "#007AFF",
+    borderBottomRightRadius: 6,
+  },
+  theirBubble: {
+    backgroundColor: "#fff",
+    borderBottomLeftRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+
+  // Message text
+  messageText: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  myMessageText: {
+    color: "#fff",
+  },
+  theirMessageText: {
+    color: "#000",
+  },
+  editedText: {
+    fontSize: 11,
+    color: "#ccc",
+    fontStyle: "italic",
+    marginTop: 2,
+  },
+
+  // Timestamps
+  timestamp: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+  myTimestamp: {
+    color: "#999",
+    marginRight: 8,
+  },
+  theirTimestamp: {
+    color: "#999",
+    marginLeft: 48, // Align with message start
+  },
 
   blockedBanner: {
     backgroundColor: "#ff3b30",
@@ -315,31 +527,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600"
   },
-
-  messageBubble: {
-    maxWidth: "75%",
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 8
-  },
-  myMessage: {
-    backgroundColor: "#007AFF",
-    alignSelf: "flex-end",
-    borderBottomRightRadius: 4
-  },
-  theirMessage: {
-    backgroundColor: "#fff",
-    alignSelf: "flex-start",
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: "#e0e0e0"
-  },
-
-  messageText: { fontSize: 16 },
-  myMessageText: { color: "#fff" },
-  theirMessageText: { color: "#000" },
-  timestamp: { fontSize: 11, color: "#ccc" },
-  edited: { fontSize: 11, color: "#ccc", fontStyle: "italic" },
 
   inputContainer: {
     flexDirection: "row",

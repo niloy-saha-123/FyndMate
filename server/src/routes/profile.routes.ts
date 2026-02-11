@@ -52,7 +52,25 @@ const selectFields = {
   locationSharing: true,
 };
 
+const publicProfileSelect = {
+  id: true,
+  name: true,
+  profilePicture: true,
+  bio: true,
+  skills: true,
+  interests: true,
+  experience: true,
+  commitment: true,
+  birthDate: true,
+  gender: true,
+  city: true,
+  country: true,
+  githubUsername: true,
+  lookingFor: true,
+};
+
 export default async function profileRoutes(app: FastifyInstance) {
+  // Get current user's profile
   app.get('/profile/me', { preHandler: [authMiddleware] }, async (request, reply) => {
     const userId = request.user!.id;
     const user = await prisma.user.findUnique({
@@ -65,6 +83,53 @@ export default async function profileRoutes(app: FastifyInstance) {
     return reply.send({ ...user, profilePicture, age });
   });
 
+  // Get another user's public profile
+  app.get('/users/:userId', { preHandler: [authMiddleware] }, async (request, reply) => {
+    const paramsSchema = z.object({
+      userId: z.string().uuid(),
+    });
+    
+    const paramsResult = paramsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      return reply.status(400).send({ error: 'Invalid user ID' });
+    }
+    
+    const { userId } = paramsResult.data;
+    const requestingUserId = request.user!.id;
+    
+    // Verify the users have a match/connection
+    const matchExists = await prisma.match.findFirst({
+      where: {
+        AND: [
+          { status: 'active' },
+          {
+            OR: [
+              { user1Id: requestingUserId, user2Id: userId },
+              { user1Id: userId, user2Id: requestingUserId }
+            ]
+          }
+        ]
+      }
+    });
+    
+    if (!matchExists) {
+      return reply.status(403).send({ error: 'Not authorized to view this profile' });
+    }
+    
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: publicProfileSelect,
+    });
+    
+    if (!user) return reply.status(404).send({ error: 'User not found' });
+    
+    const age = user.birthDate ? computeAge(new Date(user.birthDate)) : null;
+    const profilePicture = await signProfilePicture(user.profilePicture);
+    
+    return reply.send({ ...user, profilePicture, age });
+  });
+
+  // Update current user's profile
   app.patch('/profile/me', { preHandler: [authMiddleware] }, async (request, reply) => {
     const userId = request.user!.id;
     const parse = updateProfileSchema.safeParse(request.body);

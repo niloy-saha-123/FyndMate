@@ -26,6 +26,7 @@ import {
 import { supabase } from '../../src/auth/supabaseClient';
 import { COLORS, SHADOWS, BORDERS, RADIUS } from '../../src/theme/colors';
 import { NeoCard } from '../../src/components/NeoCard';
+import { formatRelativeTime } from '../../src/utils/timeFormatting';
 
 export default function ChatTab() {
   const { top, bottom } = useSafeAreaInsets();
@@ -211,7 +212,14 @@ export default function ChatTab() {
 
             {/* Chat Info */}
             <View style={styles.chatInfo}>
-              <Text style={styles.chatName}>{otherUser?.name ?? 'Unknown user'}</Text>
+              <View style={styles.chatHeader}>
+                <Text style={styles.chatName}>{otherUser?.name ?? 'Unknown user'}</Text>
+                {item.lastMessage && (
+                  <Text style={styles.lastMessageTime}>
+                    {formatRelativeTime(item.lastMessage.createdAt)}
+                  </Text>
+                )}
+              </View>
               <Text
                 numberOfLines={1}
                 style={[
@@ -372,11 +380,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  chatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   chatName: {
     fontSize: 15,
     fontWeight: '700',
     color: COLORS.textPrimary,
-    marginBottom: 4,
+  },
+  lastMessageTime: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    fontWeight: '500',
   },
   chatMessage: {
     fontSize: 14,

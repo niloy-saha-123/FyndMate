@@ -6,6 +6,7 @@
 
 import { prisma } from '../lib/prisma.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
+import { signProfilePicture } from '../utils/profilePicture.js';
 
 const MAX_MESSAGE_LENGTH = 2000;
 const EDIT_WINDOW_MS = 3 * 60 * 1000; // 3 minutes (matches RLS policy)
@@ -33,24 +34,52 @@ export class MessageService {
   }
 
   /**
-   * Get messages for a match. User must be a participant.
+   * Get messages for a match with sender profile info. User must be a participant.
    */
   async getMessages(matchId: string, userId: string) {
     await this.ensureMatchParticipant(matchId, userId);
 
-    return prisma.message.findMany({
+    const messages = await prisma.message.findMany({
       where: { matchId },
       orderBy: { createdAt: 'asc' },
-      select: {
-        id: true,
-        matchId: true,
-        senderId: true,
-        content: true,
-        createdAt: true,
-        readAt: true,
-        editedAt: true,
-      },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            profilePicture: true,
+          }
+        }
+      }
     });
+
+    // Transform to include only necessary sender info and sign profile pictures
+    return Promise.all(messages.map(async (msg) => {
+      console.log('Processing message:', msg.id, 'senderId:', msg.senderId, 'sender:', msg.sender); // Debug log
+      let signedProfilePicture = null;
+      try {
+        signedProfilePicture = await signProfilePicture(msg.sender.profilePicture);
+      } catch (error) {
+        console.error('Failed to sign profile picture:', error);
+        // Fallback to original URL if signing fails
+        signedProfilePicture = msg.sender.profilePicture;
+      }
+      
+      return {
+        id: msg.id,
+        matchId: msg.matchId,
+        senderId: msg.senderId,
+        sender: {
+          id: msg.sender.id,
+          name: msg.sender.name,
+          profilePicture: signedProfilePicture,
+        },
+        content: msg.content,
+        createdAt: msg.createdAt,
+        readAt: msg.readAt,
+        editedAt: msg.editedAt,
+      };
+    }));
   }
 
   /**
