@@ -174,7 +174,7 @@ export default function ChatTab() {
                 text: 'Block user',
                 style: 'destructive',
                 onPress: async () => {
-                  await blockMatch(item.id, user.id);
+                  await blockMatch(item.id);
                   const fresh = await getMyMatches(user.id);
                   setMatches(fresh);
                 },

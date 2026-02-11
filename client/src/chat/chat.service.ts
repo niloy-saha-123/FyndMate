@@ -1,4 +1,3 @@
-import { supabase } from "../auth/supabaseClient";
 import { apiClient } from "../lib/apiClient";
 
 export async function getMyMatches(userId: string) {
@@ -20,105 +19,45 @@ export async function getMyMatches(userId: string) {
   });
 }
 
-export async function unblockMatch(matchId: string) {
-  const { data, error } = await supabase
-    .from("Match")
-    .update({
-      status: "active",
-      blockedBy: null
-    })
-    .eq("id", matchId)
-    .select();
+export async function getMatchStatus(
+  matchId: string
+): Promise<{ status: string; blockedBy: string | null }> {
+  return apiClient.get(`/api/matches/${matchId}`);
+}
 
-  if (error) throw error;
-  return data;
+export async function unblockMatch(matchId: string) {
+  return apiClient.post(`/api/matches/${matchId}/unblock`);
 }
 
 export async function getMessages(matchId: string) {
-  const { data, error } = await supabase
-    .from("Message")
-    .select("*")
-    .eq("matchId", matchId)
-    .order("createdAt", { ascending: true });
-
-  if (error) throw error;
-  return data;
+  return apiClient.get<any[]>(`/api/matches/${matchId}/messages`);
 }
 
-export async function sendMessage(
-    matchId: string,
-    content: string,
-    senderId: string
-  ){
-
-  const { data: match, error: matchError } = await supabase
-    .from("Match")
-    .select("status, blockedBy")
-    .eq("id", matchId)
-    .single();
-
-  if (matchError) throw matchError;
-  
-  if (match.status !== "active") {
-    throw new Error("Cannot send message - match is not active");
-  }
-
-  const { data, error } = await supabase
-    .from("Message")
-    .insert({ matchId, content, senderId })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+export async function sendMessage(matchId: string, content: string) {
+  const message = await apiClient.post<{
+    id: string;
+    matchId: string;
+    senderId: string;
+    content: string;
+    createdAt: string;
+    readAt: null;
+    editedAt: null;
+  }>(`/api/matches/${matchId}/messages`, { content });
+  return message;
 }
 
-export async function editMessage(messageId: string, content: string){
-  const { data, error } = await supabase
-    .from("Message")
-    .update({
-      content,
-      editedAt: new Date().toISOString(),
-    })
-    .eq("id", messageId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+export async function editMessage(messageId: string, content: string, matchId: string) {
+  const message = await apiClient.patch(
+    `/api/matches/${matchId}/messages/${messageId}`,
+    { content }
+  );
+  return message;
 }
 
 export async function hideMatch(matchId: string) {
-  const { error } = await supabase
-    .from("Match")
-    .update({ status: "hidden" })
-    .eq("id", matchId);
-
-  if (error) throw error;
+  return apiClient.post(`/api/matches/${matchId}/hide`);
 }
 
-export async function blockMatch(matchId: string, userId: string) {
-  console.log("Attempting to block match:", matchId, "by user:", userId);
-  
-  const { data, error } = await supabase
-    .from("Match")
-    .update({
-      status: "blocked",
-      blockedBy: userId
-    })
-    .eq("id", String(matchId)) 
-    .select();
-
-  if (error) {
-    console.error("Block error:", error);
-    throw error;
-  }
-  
-  console.log("Block result:", data);
-  
-  if (!data || data.length === 0) {
-    console.warn("No match was updated - check if match exists and RLS allows access");
-  }
-  
-  return data;
+export async function blockMatch(matchId: string) {
+  return apiClient.post(`/api/matches/${matchId}/block`);
 }

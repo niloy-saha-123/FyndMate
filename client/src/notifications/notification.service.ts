@@ -2,7 +2,6 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { supabase } from '../auth/supabaseClient';
 import { apiClient } from '../lib/apiClient';
 
 // Configure how notifications are handled when app is in foreground
@@ -114,47 +113,24 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
-export async function savePushToken(userId: string, token: string) {
-  console.log('📱 Saving push token for user:', userId);
-  const { data, error } = await supabase
-    .from('User')
-    .update({
-      pushToken: token,
-      pushTokenUpdatedAt: new Date().toISOString(),
-    })
-    .eq('id', userId)
-    .select('id, pushToken')
-    .single();
-
-  if (error) {
-    console.error('❌ Error saving push token:', error);
-    throw error;
-  }
-  
-  console.log('✅ Push token saved successfully:', data);
-  return data;
+export async function savePushToken(token: string) {
+  console.log('📱 Saving push token');
+  const result = await apiClient.patch<{ success: boolean }>(
+    '/api/notifications/push-token',
+    { pushToken: token }
+  );
+  console.log('✅ Push token saved successfully');
+  return result;
 }
 
-// Debug function to verify push token is saved
-export async function verifyPushTokenSaved(userId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('User')
-    .select('pushToken, pushTokenUpdatedAt')
-    .eq('id', userId)
-    .single();
-    
-  if (error) {
-    console.error('❌ Error verifying push token:', error);
+// Debug function - calls profile to check if token was persisted (server stores it on User)
+export async function verifyPushTokenSaved(_userId: string): Promise<boolean> {
+  try {
+    const profile = await apiClient.get<{ profilePicture?: string }>('/api/profile/me');
+    return !!profile;
+  } catch {
     return false;
   }
-  
-  console.log('📱 User push token status:', {
-    hasToken: !!data?.pushToken,
-    tokenPrefix: data?.pushToken?.substring(0, 30) + '...',
-    updatedAt: data?.pushTokenUpdatedAt
-  });
-  
-  return !!data?.pushToken;
 }
 
 // Debug function to test push notification directly
@@ -166,65 +142,30 @@ export async function debugSendPush(receiverUserId: string, message: string) {
   return result;
 }
 
-export async function getNotificationPreference(
-  matchId: string,
-  userId: string
-): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('MatchNotificationPreference')
-    .select('enabled')
-    .eq('matchId', matchId)
-    .eq('userId', userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Error getting notification preference:', error);
-    throw error;
-  }
-
-  return data?.enabled ?? true;
+export async function getNotificationPreference(matchId: string): Promise<boolean> {
+  const result = await apiClient.get<{ enabled: boolean }>(
+    `/api/notifications/preferences/${matchId}`
+  );
+  return result.enabled ?? true;
 }
 
 export async function setNotificationPreference(
   matchId: string,
-  userId: string,
   enabled: boolean
 ) {
-  const { data, error } = await supabase
-    .from('MatchNotificationPreference')
-    .upsert(
-      {
-        matchId,
-        userId,
-        enabled,
-        updatedAt: new Date().toISOString(),
-      },
-      {
-        onConflict: 'matchId,userId',
-      }
-    )
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error setting notification preference:', error);
-    throw error;
-  }
-
-  return data;
+  return apiClient.put(`/api/notifications/preferences/${matchId}`, { enabled });
 }
 
 
-export async function getAllNotificationPreferences(userId: string) {
-  const { data, error } = await supabase
-    .from('MatchNotificationPreference')
-    .select('*')
-    .eq('userId', userId);
-
-  if (error) {
-    console.error('Error getting all notification preferences:', error);
-    throw error;
-  }
-
-  return data;
+export async function getAllNotificationPreferences(_userId: string) {
+  const res = await apiClient.get<{ data: any[] }>('/api/matches');
+  const matches = res.data ?? [];
+  const prefs = await Promise.all(
+    matches.map((m) =>
+      apiClient.get<{ enabled: boolean }>(
+        `/api/notifications/preferences/${m.id}`
+      ).then((r) => ({ matchId: m.id, enabled: r.enabled }))
+    )
+  );
+  return prefs;
 }

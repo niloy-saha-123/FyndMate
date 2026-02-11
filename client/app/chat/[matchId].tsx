@@ -16,10 +16,10 @@ import { useAuth } from "../../src/auth/AuthProvider";
 import {
   getMessages,
   sendMessage,
-  editMessage
+  editMessage,
+  getMatchStatus,
 } from "../../src/chat/chat.service";
 import { subscribeToMessages } from "../../src/chat/chat.realtime";
-import { supabase } from "../../src/auth/supabaseClient";
 import { useChatNotificationGuard } from "../../src/notifications/useChatNotificationGuard";
 
 
@@ -59,14 +59,9 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!matchId || !user) return;
 
-    supabase
-      .from("Match")
-      .select("status, blockedBy")
-      .eq("id", matchId)
-      .single()
-      .then(({ data }) => {
-        if (data) setMatchStatus(data);
-      });
+    getMatchStatus(matchId)
+      .then(setMatchStatus)
+      .catch(console.error);
 
     getMessages(matchId).then(setMessages).catch(console.error);
 
@@ -117,11 +112,10 @@ export default function ChatScreen() {
 
   function canEditMessage(message: Message): boolean {
     if (!user) return false;
-
-    const FIVE_MIN = 5 * 60 * 1000;
+    const EDIT_WINDOW_MS = 3 * 60 * 1000;
     return (
       message.senderId === user.id &&
-      Date.now() - new Date(message.createdAt).getTime() < FIVE_MIN
+      Date.now() - new Date(message.createdAt).getTime() < EDIT_WINDOW_MS
     );
   }
 
@@ -134,11 +128,11 @@ export default function ChatScreen() {
     try {
       if (editingMessage) {
         setSavingEdit(true);
-        await editMessage(editingMessage.id, content);
+        await editMessage(editingMessage.id, content, matchId);
         setEditingMessage(null);
         setSavingEdit(false);
       } else {
-        await sendMessage(matchId, content, user.id);
+        await sendMessage(matchId, content);
       }
     } catch (err: any) {
       if (err.message?.toLowerCase().includes("permission")) {

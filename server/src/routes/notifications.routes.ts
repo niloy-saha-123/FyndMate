@@ -6,6 +6,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.middleware.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import { prisma } from '../lib/prisma.js';
 
 const sendPushSchema = z.object({
@@ -94,4 +95,134 @@ export default async function notificationRoutes(app: FastifyInstance) {
       return reply.status(500).send({ error: 'Failed to send push' });
     }
   });
+
+  // PATCH /api/notifications/push-token - Save push token for current user
+  const pushTokenSchema = z.object({
+    pushToken: z.string().min(1, 'Push token is required').max(500, 'Token too long'),
+  });
+
+  app.patch(
+    '/notifications/push-token',
+    {
+      preHandler: [
+        authMiddleware,
+        rateLimit({ limit: 5, windowSec: 3600, keyPrefix: 'push_token' }),
+      ],
+    },
+    async (request, reply) => {
+      const userId = request.user!.id;
+      const parse = pushTokenSchema.safeParse(request.body);
+      if (!parse.success) {
+        const first = parse.error.issues[0];
+        return reply.status(400).send({ error: first?.message || 'Invalid payload' });
+      }
+
+      const { pushToken } = parse.data;
+
+      try {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            pushToken,
+            pushTokenUpdatedAt: new Date(),
+          },
+        });
+        return reply.send({ success: true });
+      } catch (err: any) {
+        request.log.error(err, 'Failed to save push token');
+        return reply.status(500).send({ error: 'Failed to save push token' });
+      }
+    }
+  );
+
+  // GET /api/notifications/preferences/:matchId - Get notification preference for a match
+  app.get(
+    '/notifications/preferences/:matchId',
+    {
+      preHandler: [authMiddleware],
+    },
+    async (request, reply) => {
+      const userId = request.user!.id;
+      const matchId = (request.params as { matchId?: string }).matchId;
+
+      if (!matchId) {
+        return reply.status(400).send({ error: 'Match ID is required' });
+      }
+
+      const match = await prisma.match.findUnique({
+        where: { id: matchId },
+        select: { user1Id: true, user2Id: true },
+      });
+
+      if (
+        !match ||
+        (match.user1Id !== userId && match.user2Id !== userId)
+      ) {
+        return reply.status(403).send({ error: 'Not authorized' });
+      }
+
+      const pref = await prisma.matchNotificationPreference.findUnique({
+        where: {
+          matchId_userId: { matchId, userId },
+        },
+        select: { enabled: true },
+      });
+
+      return reply.send({ enabled: pref?.enabled ?? true });
+    }
+  );
+
+  // PUT /api/notifications/preferences/:matchId - Set notification preference
+  const preferenceSchema = z.object({
+    enabled: z.boolean(),
+  });
+
+  app.put(
+    '/notifications/preferences/:matchId',
+    {
+      preHandler: [authMiddleware],
+    },
+    async (request, reply) => {
+      const userId = request.user!.id;
+      const matchId = (request.params as { matchId?: string }).matchId;
+
+      if (!matchId) {
+        return reply.status(400).send({ error: 'Match ID is required' });
+      }
+
+      const parse = preferenceSchema.safeParse(request.body);
+      if (!parse.success) {
+        const first = parse.error.issues[0];
+        return reply.status(400).send({ error: first?.message || 'Invalid payload' });
+      }
+
+      const match = await prisma.match.findUnique({
+        where: { id: matchId },
+        select: { user1Id: true, user2Id: true },
+      });
+
+      if (
+        !match ||
+        (match.user1Id !== userId && match.user2Id !== userId)
+      ) {
+        return reply.status(403).send({ error: 'Not authorized' });
+      }
+
+      const { enabled } = parse.data;
+
+      try {
+        await prisma.matchNotificationPreference.upsert({
+          where: {
+            matchId_userId: { matchId, userId },
+          },
+          create: { matchId, userId, enabled },
+          update: { enabled, updatedAt: new Date() },
+        });
+        return reply.send({ success: true, enabled });
+      } catch (err: any) {
+        request.log.error(err, 'Failed to update notification preference');
+        return reply.status(500).send({ error: 'Failed to update preference' });
+      }
+    }
+  );
 }

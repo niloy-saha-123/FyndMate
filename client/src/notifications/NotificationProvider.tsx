@@ -27,7 +27,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const token = await registerForPushNotifications();
       if (token) {
         console.log('📱 Push token refreshed:', token);
-        await savePushToken(user.id, token);
+        await savePushToken(token);
         console.log('✅ Push token saved to database');
       }
     } catch (error) {
@@ -43,7 +43,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       .then(async token => {
         if (token) {
           console.log('📱 Push token:', token);
-          await savePushToken(user.id, token);
+          await savePushToken(token);
           console.log('✅ Push token saved for user:', user.id);
         } else {
           console.log('⚠️ No push token received (emulator or permissions denied)');

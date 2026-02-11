@@ -262,6 +262,85 @@ export class MatchService {
         const nextCursor = matches.length === limit ? matches[matches.length - 1].id : null;
         return { data: transformed, nextCursor };
     }
+
+    /**
+     * Get match status (status, blockedBy) for a participant.
+     */
+    async getMatchStatus(matchId: string, userId: string): Promise<{ status: string; blockedBy: string | null }> {
+        const match = await prisma.match.findUnique({
+            where: { id: matchId },
+            select: { status: true, blockedBy: true, user1Id: true, user2Id: true },
+        });
+
+        if (
+            !match ||
+            (match.user1Id !== userId && match.user2Id !== userId)
+        ) {
+            throw new Error('Not authorized');
+        }
+
+        return { status: match.status, blockedBy: match.blockedBy };
+    }
+
+    /**
+     * Block a match (set status to 'blocked', blockedBy to requesting user).
+     * Only participants can block.
+     */
+    async blockMatch(matchId: string, userId: string) {
+        const match = await prisma.match.findUnique({ where: { id: matchId } });
+
+        if (
+            !match ||
+            match.status === 'unmatched' ||
+            (match.user1Id !== userId && match.user2Id !== userId)
+        ) {
+            throw new Error('Not authorized');
+        }
+
+        return prisma.match.update({
+            where: { id: matchId },
+            data: { status: 'blocked', blockedBy: userId },
+        });
+    }
+
+    /**
+     * Unblock a match. Only the user who blocked can unblock.
+     */
+    async unblockMatch(matchId: string, userId: string) {
+        const match = await prisma.match.findUnique({ where: { id: matchId } });
+
+        if (!match) {
+            throw new Error('Match not found');
+        }
+        if (match.blockedBy !== userId) {
+            throw new Error('Not authorized');
+        }
+
+        return prisma.match.update({
+            where: { id: matchId },
+            data: { status: 'active', blockedBy: null },
+        });
+    }
+
+    /**
+     * Hide a match from the requesting user's chat list.
+     * Only participants can hide.
+     */
+    async hideMatch(matchId: string, userId: string) {
+        const match = await prisma.match.findUnique({ where: { id: matchId } });
+
+        if (
+            !match ||
+            (match.user1Id !== userId && match.user2Id !== userId)
+        ) {
+            throw new Error('Not authorized');
+        }
+
+        return prisma.match.update({
+            where: { id: matchId },
+            data: { status: 'hidden' },
+        });
+    }
 }
 
 export const matchService = new MatchService();
