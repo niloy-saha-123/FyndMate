@@ -15,6 +15,7 @@ import {
   PROFILE_MAX_INTERESTS,
   PROFILE_TAG_MAX_LENGTH,
   PROFILE_NAME_MAX_LENGTH,
+  PROFILE_GITHUB_MAX_LENGTH,
   PROFILE_MIN_AGE,
 } from '../schemas/validation-constants.js';
 
@@ -25,8 +26,8 @@ const updateProfileSchema = z.object({
   skills: z.array(z.string().max(PROFILE_TAG_MAX_LENGTH)).max(PROFILE_MAX_SKILLS).optional(),
   interests: z.array(z.string().max(PROFILE_TAG_MAX_LENGTH)).max(PROFILE_MAX_INTERESTS).optional(),
   experience: z.string().max(200).optional(),
-  commitment: z.string().max(100).optional(),
-  githubUsername: z.string().max(100).optional(),
+  commitment: z.string().max(PROFILE_GITHUB_MAX_LENGTH).optional(),
+  githubUsername: z.string().max(PROFILE_GITHUB_MAX_LENGTH).optional(),
   locationSharing: z.string().max(20).optional(),
   onboardingCompleted: z.boolean().optional(),
 });
@@ -69,7 +70,11 @@ export default async function profileRoutes(app: FastifyInstance) {
     const parse = updateProfileSchema.safeParse(request.body);
     if (!parse.success) {
       const first = parse.error.issues[0];
-      return reply.status(400).send({ error: first?.message || 'Invalid payload' });
+      return reply.status(400).send({
+        error: first?.message || 'Invalid payload',
+        message: first?.message || 'Invalid payload',
+        field: first?.path?.join('.') || 'unknown',
+      });
     }
 
     const data = parse.data;

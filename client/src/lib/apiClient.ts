@@ -136,24 +136,39 @@ function buildHeaders(requireAuth = true): HeadersInit {
 }
 
 /**
+ * Structured API error for validation and other server errors.
+ * Includes optional field for highlighting invalid form inputs.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode?: number,
+    public readonly field?: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+/**
  * Handle response, checking for 401 unauthorized.
+ * Throws ApiError (with field when present) for 4xx/5xx so callers can highlight form inputs.
  */
 async function handleResponse<T>(response: Response): Promise<T> {
   if (response.status === 401) {
-    // Token expired or invalid - trigger logout flow
     handleUnauthorized();
     throw new Error('Session expired. Please login again.');
   }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || error.message || `HTTP ${response.status}`);
+    const body = await response.json().catch(() => ({ error: 'Request failed' }));
+    const message = body.error || body.message || `HTTP ${response.status}`;
+    const field = body.field;
+    throw new ApiError(message, response.status, field);
   }
 
-  // Handle empty responses (204 No Content, etc.)
   const text = await response.text();
   if (!text) return {} as T;
-  
   return JSON.parse(text) as T;
 }
 

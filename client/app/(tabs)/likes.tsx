@@ -44,6 +44,10 @@ export default function LikesScreen() {
         setReplyText('');
     };
 
+    const handleQuickAccept = async (item: Like) => {
+        await onAccept(item.id);
+    };
+
     const handleDecline = async (likeId: string) => {
         await onDecline(likeId);
     };
@@ -54,9 +58,10 @@ export default function LikesScreen() {
         return (
             <NeoCard style={styles.requestCard}>
                 {/* Star Badge */}
-                <View style={styles.starBadge}>
+                {/* Star Badge - REMOVED as per user request */}
+                {/* <View style={styles.starBadge}>
                     <Ionicons name="star" size={12} color={COLORS.textPrimary} />
-                </View>
+                </View> */}
 
                 {/* Header */}
                 <View style={styles.requestHeader}>
@@ -90,7 +95,7 @@ export default function LikesScreen() {
                 {/* Actions */}
                 <View style={styles.requestActions}>
                     <NeoButton
-                        title="Chat first"
+                        title="Reply"
                         onPress={() => setSelectedLike(item)}
                         variant="secondary"
                         size="small"
@@ -98,7 +103,7 @@ export default function LikesScreen() {
                     />
                     <NeoButton
                         title="Accept"
-                        onPress={() => setSelectedLike(item)}
+                        onPress={() => handleQuickAccept(item)}
                         size="small"
                         style={{ flex: 1, marginLeft: 8 }}
                     />

@@ -22,6 +22,7 @@ export const publicUserFeedSelect = {
   country: true,
   locationSharing: true,
   githubUsername: true,
+  gender: true,
 } as const;
 
 // Minimal fields for likes inbox preview

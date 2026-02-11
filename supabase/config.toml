@@ -110,7 +110,7 @@ file_size_limit = "50MiB"
 # Configuration ensures consistency between local dev and production
 [storage.buckets.profile-pictures]
 public = true  # Profile pictures must be publicly accessible (like Tinder/social apps)
-file_size_limit = "10MiB"  # Max 10MB per image (reasonable for profile photos)
+file_size_limit = "5MiB"  # Max 5MB per image (matches production Supabase & server validation)
 allowed_mime_types = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
 # Objects will be stored in Docker volume (persists across container restarts)
 

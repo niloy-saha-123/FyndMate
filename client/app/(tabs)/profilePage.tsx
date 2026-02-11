@@ -20,6 +20,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -37,6 +38,8 @@ import {
   PROFILE_MAX_SKILLS,
   PROFILE_MAX_INTERESTS,
   PROFILE_TAG_MAX_LENGTH,
+  PROFILE_NAME_MAX_LENGTH,
+  PROFILE_GITHUB_MAX_LENGTH,
 } from '../../src/constants/validation';
 
 // Available skills/interests for selection
@@ -113,13 +116,13 @@ export default function ProfilePage() {
   const [customInterest, setCustomInterest] = useState('');
   const [skillError, setSkillError] = useState<string | null>(null);
   const [interestError, setInterestError] = useState<string | null>(null);
-  
+
   // Modal visibility states
   const [skillModalVisible, setSkillModalVisible] = useState(false);
   const [interestModalVisible, setInterestModalVisible] = useState(false);
 
   const [formData, setFormData] = useState({
-    fullName: profile?.fullName ?? '',
+    name: profile?.name ?? '',
     birthDate: profile?.birthDate ?? '',
     bio: profile?.bio ?? '',
     skills: profile?.skills ?? [],
@@ -132,7 +135,7 @@ export default function ProfilePage() {
   const handleEditToggle = useCallback(() => {
     if (isEditing) {
       setFormData({
-        fullName: profile?.fullName ?? '',
+        name: profile?.name ?? '',
         birthDate: profile?.birthDate ?? '',
         bio: profile?.bio ?? '',
         skills: profile?.skills ?? [],
@@ -150,6 +153,18 @@ export default function ProfilePage() {
     }
     setIsEditing(!isEditing);
   }, [isEditing, profile]);
+
+  // Auto-cancel editing when navigating away
+  useFocusEffect(
+    useCallback(() => {
+      // Return cleanup function to run on blur
+      return () => {
+        if (isEditing) {
+          handleEditToggle();
+        }
+      };
+    }, [isEditing, handleEditToggle])
+  );
 
   const handleSave = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -200,22 +215,22 @@ export default function ProfilePage() {
   const addCustomSkill = useCallback(() => {
     const trimmed = customSkill.trim();
     if (!trimmed) return;
-    
+
     if (trimmed.length > PROFILE_TAG_MAX_LENGTH) {
       setSkillError(`Skill must be ${PROFILE_TAG_MAX_LENGTH} characters or less`);
       return;
     }
-    
+
     if (formData.skills.includes(trimmed)) {
       setSkillError('This skill is already added');
       return;
     }
-    
+
     if (formData.skills.length >= PROFILE_MAX_SKILLS) {
       setSkillError(`Maximum limit of ${PROFILE_MAX_SKILLS} skills reached`);
       return;
     }
-    
+
     setFormData((prev) => ({ ...prev, skills: [...prev.skills, trimmed] }));
     setCustomSkill('');
     setSkillError(null);
@@ -224,22 +239,22 @@ export default function ProfilePage() {
   const addCustomInterest = useCallback(() => {
     const trimmed = customInterest.trim();
     if (!trimmed) return;
-    
+
     if (trimmed.length > PROFILE_TAG_MAX_LENGTH) {
       setInterestError(`Interest must be ${PROFILE_TAG_MAX_LENGTH} characters or less`);
       return;
     }
-    
+
     if (formData.interests.includes(trimmed)) {
       setInterestError('This interest is already added');
       return;
     }
-    
+
     if (formData.interests.length >= PROFILE_MAX_INTERESTS) {
       setInterestError(`Maximum limit of ${PROFILE_MAX_INTERESTS} interests reached`);
       return;
     }
-    
+
     setFormData((prev) => ({ ...prev, interests: [...prev.interests, trimmed] }));
     setCustomInterest('');
     setInterestError(null);
@@ -258,7 +273,7 @@ export default function ProfilePage() {
 
     // Request permission first
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (!permissionResult.granted) {
       Alert.alert(
         'Permission Required',
@@ -284,16 +299,16 @@ export default function ProfilePage() {
     try {
       // Upload the image
       const publicUrl = await upload(imageUri);
-      
+
       // Update local state with new photo
       setPhoto(publicUrl);
-      
+
       // Update profile in database
       if (session?.user?.id) {
         await updateProfile(session.user.id, { profilePicture: publicUrl });
         await refreshProfile();
       }
-      
+
       Alert.alert('Success', 'Profile picture updated!');
     } catch (error: any) {
       // Check if it's a rate limit error (in case state wasn't updated yet)
@@ -373,9 +388,7 @@ export default function ProfilePage() {
             {uploading ? (
               <View style={styles.emptyProfilePhoto}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.addPhotoText}>
-                  {progress?.step === 'uploading' ? 'Uploading...' : 'Processing...'}
-                </Text>
+                <Text style={styles.addPhotoText}>Uploading...</Text>
               </View>
             ) : photo ? (
               <Image
@@ -417,18 +430,36 @@ export default function ProfilePage() {
 
         {/* Name & Basic Info */}
         <NeoCard style={styles.section}>
-          <Text style={styles.sectionLabel}>NAME</Text>
+          <View style={styles.labelRow}>
+            <Text style={styles.sectionLabel}>NAME</Text>
+            {isEditing && (
+              <Text style={[
+                styles.charCount,
+                formData.name.length >= PROFILE_NAME_MAX_LENGTH && styles.charCountLimit,
+              ]}>
+                {formData.name.length}/{PROFILE_NAME_MAX_LENGTH}
+              </Text>
+            )}
+          </View>
           {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={formData.fullName}
-              onChangeText={(text) => setFormData((prev) => ({ ...prev, fullName: text }))}
-              placeholder="Your name"
-              placeholderTextColor={COLORS.textLight}
-            />
+            <>
+              <TextInput
+                style={styles.input}
+                value={formData.name}
+                onChangeText={(text) => setFormData((prev) => ({ ...prev, name: text }))}
+                placeholder="Your name"
+                placeholderTextColor={COLORS.textLight}
+                maxLength={PROFILE_NAME_MAX_LENGTH}
+              />
+              {formData.name.length >= PROFILE_NAME_MAX_LENGTH && (
+                <Text style={styles.charLimitWarning}>
+                  Name cannot exceed {PROFILE_NAME_MAX_LENGTH} characters
+                </Text>
+              )}
+            </>
           ) : (
             <Text style={styles.displayName}>
-              {profile?.fullName || 'Add your name'}
+              {profile?.name || 'Add your name'}
               {age && <Text style={styles.ageText}>, {age}</Text>}
             </Text>
           )}
@@ -491,7 +522,9 @@ export default function ProfilePage() {
                 textAlignVertical="top"
               />
               {formData.bio.length >= PROFILE_BIO_MAX_LENGTH && (
-                <Text style={styles.charLimitWarning}>Maximum character limit reached</Text>
+                <Text style={styles.charLimitWarning}>
+                  Bio cannot exceed {PROFILE_BIO_MAX_LENGTH} characters
+                </Text>
               )}
             </>
           ) : (
@@ -709,21 +742,29 @@ export default function ProfilePage() {
         <NeoCard style={styles.section}>
           <Text style={styles.sectionLabel}>GITHUB</Text>
           {isEditing ? (
-            <View style={styles.inputWithIcon}>
-              <Ionicons name="logo-github" size={20} color={COLORS.textLight} />
-              <TextInput
-                style={styles.inputWithIconText}
-                value={formData.githubUsername}
-                onChangeText={(text) =>
-                  setFormData((prev) => ({ ...prev, githubUsername: text }))
-                }
-                placeholder="your-github-username"
-                placeholderTextColor={COLORS.textLight}
-                autoCapitalize="none"
-              />
+            <View>
+              <View style={styles.inputWithIcon}>
+                <Ionicons name="logo-github" size={20} color={COLORS.textLight} />
+                <TextInput
+                  style={styles.inputWithIconText}
+                  value={formData.githubUsername}
+                  onChangeText={(text) =>
+                    setFormData((prev) => ({ ...prev, githubUsername: text }))
+                  }
+                  placeholder="your-github-username"
+                  placeholderTextColor={COLORS.textLight}
+                  autoCapitalize="none"
+                  maxLength={PROFILE_GITHUB_MAX_LENGTH}
+                />
+              </View>
+              {formData.githubUsername.length >= PROFILE_GITHUB_MAX_LENGTH && (
+                <Text style={styles.charLimitWarning}>
+                  GitHub username cannot exceed {PROFILE_GITHUB_MAX_LENGTH} characters
+                </Text>
+              )}
             </View>
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.githubRow}
               onPress={() => {
                 if (profile?.githubUsername) {

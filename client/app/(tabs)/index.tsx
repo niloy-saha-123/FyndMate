@@ -8,12 +8,11 @@
  * - Skip, Request, and Save actions
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -22,6 +21,7 @@ import {
   Dimensions,
   Linking,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -45,41 +45,42 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function FeedScreen() {
   const { top, bottom } = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
-  const { profiles, loading, error, hasMore, fetchFeed, swipe } = useFeed();
+  const { profiles, loading, error, hasMore, fetchFeed, swipe, swipeError, clearSwipeError } = useFeed();
 
   const [message, setMessage] = useState('');
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  
+
   // Computed validation state
   const introMessageError = getIntroMessageError(message);
   const isIntroValid = isIntroMessageValid(message);
 
-  useEffect(() => {
-    // Fetch once on mount. Avoid depending on `fetchFeed` which recreates
-    // when internal hook state changes and can cause an infinite fetch loop.
-    fetchFeed();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // useFeed loads cache + fetches 5 on mount. No explicit fetch needed.
 
   const currentProfile = profiles[currentIndex];
 
   const handleSkip = async () => {
     if (!currentProfile) return;
     await swipe(currentProfile.id, false);
-    // Note: Don't increment currentIndex - swipe() removes the profile from array
   };
 
   const handleLike = async () => {
     if (!currentProfile) return;
-    if (!isIntroValid) {
-      return;
+    if (!isIntroValid) return;
+    const result = await swipe(currentProfile.id, true, message);
+    if (result && (result.matched || !result.error)) {
+      setMessage('');
+      setShowRequestModal(false);
     }
-    await swipe(currentProfile.id, true, message);
-    setMessage('');
-    setShowRequestModal(false);
-    // Note: Don't increment currentIndex - swipe() removes the profile from array
+    // On error, modal stays open so user can fix validation (e.g. field 'message') and retry
   };
+
+  const handleRetrySwipe = async () => {
+    if (!swipeError) return;
+    await swipe(swipeError.profileId, swipeError.liked, swipeError.message);
+  };
+
+  const showSwipeRetry = swipeError && currentProfile && swipeError.profileId === currentProfile.id;
 
   const handleSave = () => {
     // Visual feedback - bookmark functionality
@@ -184,6 +185,25 @@ export default function FeedScreen() {
           exiting={FadeOutLeft.duration(200)}
         >
           <NeoCard style={styles.profileCard}>
+            {/* Swipe failure retry banner */}
+            {showSwipeRetry && (
+              <View style={styles.swipeErrorBanner}>
+                <Ionicons name="alert-circle" size={20} color={COLORS.danger} />
+                <Text style={styles.swipeErrorText}>Couldn&apos;t send. Tap Retry to try again.</Text>
+                <TouchableOpacity
+                  style={styles.swipeRetryButton}
+                  onPress={handleRetrySwipe}
+                >
+                  <Text style={styles.swipeRetryButtonText}>Retry</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.swipeDismissButton}
+                  onPress={clearSwipeError}
+                >
+                  <Ionicons name="close" size={20} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            )}
             {/* Card Header */}
             <View style={styles.cardHeader}>
               <View style={styles.cardBadge}>
@@ -192,12 +212,14 @@ export default function FeedScreen() {
               <Ionicons name="star" size={16} color={COLORS.accent} />
             </View>
 
-            {/* Profile Image */}
+            {/* Profile Image - progressive load with placeholder → sharp transition */}
             <View style={styles.imageContainer}>
               {currentProfile.profilePicture ? (
                 <Image
                   source={{ uri: currentProfile.profilePicture }}
                   style={styles.profileImage}
+                  contentFit="cover"
+                  transition={300}
                 />
               ) : (
                 <View style={[styles.profileImage, styles.noPhotoPlaceholder]}>
@@ -209,19 +231,13 @@ export default function FeedScreen() {
 
             {/* Basic Info */}
             <View style={styles.infoSection}>
-              <Text style={styles.profileName}>{currentProfile.name}</Text>
-              <Text style={styles.profileMeta}>
-                {currentProfile.age ? `${currentProfile.age}` : ''}
+              <Text style={styles.profileName}>
+                {currentProfile.name}
+                {(currentProfile.age != null || currentProfile.gender)
+                  ? ` | ${[currentProfile.age, currentProfile.gender].filter(Boolean).join(' · ')}`
+                  : ''}
               </Text>
             </View>
-
-            {/* Hatched Divider */}
-            <LinearGradient
-              colors={['#F9A8D4', '#F472B6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.hatchedDivider}
-            />
 
             {/* Bio */}
             <View style={styles.sectionPadding}>
@@ -252,15 +268,15 @@ export default function FeedScreen() {
               )}
             </View>
 
-            {/* Looking For */}
-            {currentProfile.lookingFor && currentProfile.lookingFor.length > 0 && (
+            {/* Looking For (interests as fallback when lookingFor not in API) */}
+            {((currentProfile.lookingFor ?? currentProfile.interests ?? []).length > 0) && (
               <View style={styles.sectionPadding}>
                 <View style={styles.sectionHeader}>
                   <View style={styles.geoCircleSmall} />
                   <Text style={styles.sectionTitle}>Looking for</Text>
                 </View>
                 <ChipContainer>
-                  {currentProfile.lookingFor.map((item: string, idx: number) => (
+                  {(currentProfile.lookingFor ?? currentProfile.interests ?? []).map((item: string, idx: number) => (
                     <NeoChip key={idx} label={item} variant="looking" />
                   ))}
                 </ChipContainer>
@@ -287,8 +303,22 @@ export default function FeedScreen() {
               </View>
             )}
 
+            {/* Location - at bottom (city and country only) */}
+            {(currentProfile.city || currentProfile.country) && (
+              <View style={styles.sectionPadding}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="location-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                  <Text style={styles.sectionTitle}>Location</Text>
+                </View>
+                <Text style={styles.profileLocation}>
+                  {[currentProfile.city, currentProfile.country].filter(Boolean).join(', ')}
+                </Text>
+              </View>
+            )}
+
             {/* CTA at bottom of card */}
-            <View style={styles.cardCTA}>
+            {/* CTA at bottom of card - REMOVED as per user request */}
+            {/* <View style={styles.cardCTA}>
               <Text style={styles.ctaText}>
                 Want to collaborate with {currentProfile.name?.split(' ')[0]}?
               </Text>
@@ -298,7 +328,7 @@ export default function FeedScreen() {
                 icon={<Ionicons name="star" size={16} color="#FDE047" />}
                 fullWidth
               />
-            </View>
+            </View> */}
           </NeoCard>
         </Animated.View>
       </ScrollView>
@@ -315,15 +345,9 @@ export default function FeedScreen() {
           <NeoButton
             title="Request"
             onPress={openRequestModal}
-            icon={<Ionicons name="star" size={16} color="#FDE047" />}
             style={{ flex: 2, marginHorizontal: 12 }}
           />
-          <TouchableOpacity
-            onPress={handleSave}
-            style={[styles.bookmarkButton, SHADOWS.medium]}
-          >
-            <Ionicons name="bookmark-outline" size={20} color={COLORS.textPrimary} />
-          </TouchableOpacity>
+          {/* Bookmark button removed as per user request */}
         </View>
       </LinearGradient>
 
@@ -358,6 +382,8 @@ export default function FeedScreen() {
                 <Image
                   source={{ uri: currentProfile.profilePicture || '' }}
                   style={styles.modalAvatar}
+                  contentFit="cover"
+                  transition={200}
                 />
               ) : (
                 <View style={[styles.modalAvatar, styles.noPhotoPlaceholderSmall]}>
@@ -420,8 +446,10 @@ export default function FeedScreen() {
               ]}>
                 {message.length}/{INTRO_MESSAGE_MAX_LENGTH}
               </Text>
-              {introMessageError && (
-                <Text style={styles.charError}>{introMessageError}</Text>
+              {(introMessageError || (swipeError?.field === 'message' && swipeError?.profileId === currentProfile?.id && swipeError?.errorMessage)) && (
+                <Text style={styles.charError}>
+                  {introMessageError || swipeError?.errorMessage}
+                </Text>
               )}
             </View>
 
@@ -442,11 +470,6 @@ export default function FeedScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-
-      {/* Debug info */}
-      <Text style={styles.debugText}>
-        {profiles.length - currentIndex - 1} profiles remaining
-      </Text>
     </View>
   );
 }
@@ -519,6 +542,40 @@ const styles = StyleSheet.create({
   profileCard: {
     marginBottom: 16,
   },
+  swipeErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: RADIUS.small,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.danger,
+    gap: 10,
+  },
+  swipeErrorText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.danger,
+  },
+  swipeRetryButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: RADIUS.small,
+  },
+  swipeRetryButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.surface,
+  },
+  swipeDismissButton: {
+    padding: 4,
+  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -590,20 +647,16 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 4,
   },
+  profileLocation: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
   profileMeta: {
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.skillText,
-  },
-
-  // Divider
-  hatchedDivider: {
-    height: 20,
-    marginHorizontal: 16,
-    borderRadius: 4,
-    borderLeftWidth: BORDERS.medium,
-    borderRightWidth: BORDERS.medium,
-    borderColor: COLORS.border,
   },
 
   // Sections
@@ -888,18 +941,5 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     flexDirection: 'row',
-  },
-
-  // Debug
-  debugText: {
-    position: 'absolute',
-    bottom: 70,
-    alignSelf: 'center',
-    fontSize: 12,
-    color: COLORS.textLight,
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
   },
 });

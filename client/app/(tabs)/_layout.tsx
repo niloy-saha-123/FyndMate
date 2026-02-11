@@ -22,14 +22,14 @@ export default function TabLayout() {
   if (!user) return <Redirect href="/login" />;
 
   if (profile && !profile.onboardingCompleted) {
-    const destination = !profile.fullName
+    const destination = !profile.name
       ? "/onboarding/name"
       : !profile.birthDate
-      ? "/onboarding/birthdate"
-      : "/onboarding/gender";
+        ? "/onboarding/birthdate"
+        : "/onboarding/gender";
     return <Redirect href={destination} />;
   }
-  
+
   return (
     <Tabs
       screenOptions={{
@@ -52,7 +52,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="likes"
         options={{
-          title: 'Likes',
+          title: 'Requests',
           // TODO: Pass badge state here
           // tabBarBadge: hasNewLikes ? " " : undefined, 
         }}

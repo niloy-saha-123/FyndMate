@@ -22,6 +22,7 @@
  */
 
 import { z } from 'zod';
+import { PROFILE_PICTURE_MAX_SIZE_MB } from './validation-constants.js';
 
 /**
  * Allowed file extensions for profile pictures
@@ -64,7 +65,7 @@ export const requestUploadSchema = z.object({
     .number()
     .int()
     .positive()
-    .max(5 * 1024 * 1024, 'File size cannot exceed 5MB')
+    .max(PROFILE_PICTURE_MAX_SIZE_MB * 1024 * 1024, `File size cannot exceed ${PROFILE_PICTURE_MAX_SIZE_MB}MB`)
     .optional(),
 });
 

@@ -1,140 +1,236 @@
 /**
  * @file client/src/hooks/useFeed.ts
  * @description Custom hook to manage the Discovery Feed state and logic.
- * 
+ *
  * RESPONSIBILITIES:
- * 1. Fetching profiles with pagination (cursors).
- * 2. Manages "Swiping" state (removing users from local list instantly).
- * 3. Handling "End of Feed" state.
- * 4. Error states.
- * 
- * NOTE: Token is automatically attached via apiClient from auth context.
+ * 1. Incremental loading: Fetch 5 first, load more as user swipes.
+ * 2. Offline cache: Persist to AsyncStorage, show cached when offline.
+ * 3. Swipe state, error handling, end-of-feed.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
-import { 
-    getDiscoveryFeed, 
-    sendLike, 
-    UserProfile, 
-    LikesRateLimitError,
-    LIKES_RATE_LIMIT,
-    LIKES_RATE_LIMIT_WINDOW_HOURS,
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getDiscoveryFeed,
+  sendLike,
+  UserProfile,
+  LikesRateLimitError,
+  LIKES_RATE_LIMIT,
+  LIKES_RATE_LIMIT_WINDOW_HOURS,
 } from '../services/matchingService';
+import { getUserFriendlyErrorMessage } from '../utils/errorMessages';
+import { ApiError } from '../lib/apiClient';
+
+const FEED_CACHE_KEY = 'fyndmate_feed_cache';
+const BATCH_SIZE = 5;
+const LOAD_MORE_THRESHOLD = 2;
+const MAX_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 500;
+
+type FeedCache = {
+  profiles: UserProfile[];
+  cursor: string | undefined;
+  hasMore: boolean;
+  timestamp: number;
+};
+
+export type SwipeError = {
+  profileId: string;
+  liked: boolean;
+  message?: string;
+  field?: string;
+  errorMessage?: string;
+};
+
+function persistCache(profiles: UserProfile[], cursor: string | undefined, hasMore: boolean) {
+  const payload: FeedCache = {
+    profiles,
+    cursor,
+    hasMore,
+    timestamp: Date.now(),
+  };
+  AsyncStorage.setItem(FEED_CACHE_KEY, JSON.stringify(payload)).catch(() => {});
+}
+
+async function loadCache(): Promise<FeedCache | null> {
+  try {
+    const raw = await AsyncStorage.getItem(FEED_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as FeedCache;
+    if (!parsed.profiles || !Array.isArray(parsed.profiles)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 export function useFeed() {
-    const [profiles, setProfiles] = useState<UserProfile[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [cursor, setCursor] = useState<string | undefined>(undefined);
-    const [hasMore, setHasMore] = useState(true);
-    const MAX_ATTEMPTS = 2;
-    const RETRY_DELAY_MS = 500;
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [hasMore, setHasMore] = useState(true);
+  const [swipeError, setSwipeError] = useState<SwipeError | null>(null);
+  const initialLoadDone = useRef(false);
 
-    // Initial Fetch
-    const fetchFeed = useCallback(async (reset = false) => {
-        if (loading || (!hasMore && !reset)) return;
+  const fetchFeed = useCallback(
+    async (reset = false) => {
+      if (loading) return;
+      if (!reset && !hasMore) return;
 
+      if (reset) {
+        setHasMore(true);
+        setCursor(undefined);
+      }
+      const currentCursor = reset ? undefined : cursor;
+
+      // Try cache first on initial load - show immediately, no loading spinner
+      if (reset && !currentCursor) {
+        const cached = await loadCache();
+        if (cached && cached.profiles.length > 0) {
+          setProfiles(cached.profiles);
+          setCursor(cached.cursor);
+          setHasMore(cached.hasMore);
+          setError(null);
+          // Fetch fresh in background (don't set loading - user sees cache)
+        } else {
+          setLoading(true);
+        }
+      } else {
         setLoading(true);
-        setError(null);
-        
-        // If resetting, also reset hasMore so we can fetch fresh data
+      }
+      setError(null);
+
+      let attempts = 0;
+      let data: UserProfile[] = [];
+      let lastError: unknown = null;
+
+      while (attempts < MAX_ATTEMPTS) {
+        try {
+          data = await getDiscoveryFeed(BATCH_SIZE, currentCursor);
+          lastError = null;
+          break;
+        } catch (err) {
+          lastError = err;
+          attempts += 1;
+          if (attempts >= MAX_ATTEMPTS) break;
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempts));
+        }
+      }
+
+      if (lastError) {
+        // On fetch failure: use cache if we have it (offline)
         if (reset) {
-            setHasMore(true);
-            setCursor(undefined);
-        }
-
-        const currentCursor = reset ? undefined : cursor;
-
-        let attempts = 0;
-        let data: UserProfile[] = [];
-        let lastError: any = null;
-
-        while (attempts < MAX_ATTEMPTS) {
-            try {
-                data = await getDiscoveryFeed(20, currentCursor);
-                lastError = null;
-                break;
-            } catch (err) {
-                lastError = err;
-                attempts += 1;
-                if (attempts >= MAX_ATTEMPTS) break;
-                await new Promise(res => setTimeout(res, RETRY_DELAY_MS * attempts));
-            }
-        }
-
-        if (lastError) {
-            console.error('Feed fetch failed after retries', lastError);
-            // TODO: Add telemetry (e.g., Sentry) and optional offline queue for feed fetch failures.
-            setError(lastError.message || 'Failed to load feed');
+          const cached = await loadCache();
+          if (cached && cached.profiles.length > 0) {
+            setProfiles(cached.profiles);
+            setCursor(cached.cursor);
+            setHasMore(cached.hasMore);
+            setError(null);
             setLoading(false);
             return;
+          }
         }
-
-            if (data.length < 20) {
-                setHasMore(false); // No more to fetch
-            } else {
-                setHasMore(true);
-            }
-
-            // If resetting, replace list. Else, append.
-            // DEDUPLICATION: Ensure no dupes if cursor reused (safety)
-            setProfiles(prev => {
-                const newList = reset ? data : [...prev, ...data];
-                // Optional: Filter dupes by ID here if needed
-                return newList;
-            });
-
-            // Update cursor to last item's ID
-            if (data.length > 0) {
-                setCursor(data[data.length - 1].id);
-            }
+        setError(getUserFriendlyErrorMessage(lastError as Error));
         setLoading(false);
-    }, [cursor, loading, hasMore]);
+        return;
+      }
 
-    // Swipe Action (Like or Pass)
-    const swipe = async (likedId: string, liked: boolean, message?: string) => {
-        // 1. Find the profile BEFORE removing it (for rollback)
-        const swipedProfile = profiles.find(p => p.id === likedId);
+      const newHasMore = data.length >= BATCH_SIZE;
+      setHasMore(newHasMore);
 
-        if (!swipedProfile) return; // Should not happen
+      setProfiles((prev) => {
+        const newList = reset ? data : [...prev, ...data];
+        const newCursor = data.length > 0 ? data[data.length - 1].id : currentCursor;
+        setCursor(newCursor);
+        persistCache(newList, newCursor, newHasMore);
+        return newList;
+      });
 
-        // 2. Optimistic Update: Remove from screen immediately
-        setProfiles(prev => prev.filter(p => p.id !== likedId));
+      setLoading(false);
+    },
+    [cursor, loading, hasMore]
+  );
 
-        try {
-            // 3. API Call
-            const result = await sendLike(likedId, liked, message);
+  // Load more when running low (called after swipe)
+  const swipe = useCallback(
+    async (likedId: string, liked: boolean, message?: string) => {
+      setSwipeError(null);
+      const swipedProfile = profiles.find((p) => p.id === likedId);
+      if (!swipedProfile) return;
 
-            // 4. Check for Instant Match
-            if (result.matched) {
-                console.log("IT'S A MATCH!", result.match);
-                return { matched: true, match: result.match };
-            }
-            return { matched: false };
+      setProfiles((prev) => prev.filter((p) => p.id !== likedId));
 
-        } catch (err) {
-            console.error("Swipe failed:", err);
+      try {
+        const result = await sendLike(likedId, liked, message);
 
-            // 5. ROLLBACK: Put the card back!
-            // We usually put it back at the TOP (index 0) so the user sees it again.
-            setProfiles(prev => [swipedProfile, ...prev]);
-
-            // 6. Handle rate limit error with user-friendly popup
-            if (err instanceof LikesRateLimitError) {
-                Alert.alert(
-                    "Can't Send Collaboration Request",
-                    `You've reached your daily limit of ${LIKES_RATE_LIMIT} collaboration requests.\n\nPlease try again in ${err.retryAfterHours} hour${err.retryAfterHours !== 1 ? 's' : ''}.`,
-                    [{ text: 'OK', style: 'default' }]
-                );
-                setError(`Daily limit reached (${LIKES_RATE_LIMIT}/${LIKES_RATE_LIMIT_WINDOW_HOURS}hr)`);
-                return { matched: false, rateLimited: true };
-            }
-
-            setError("Failed to record swipe. Please try again.");
-            return { matched: false, error: true };
+        if (result.matched) {
+          return { matched: true, match: result.match };
         }
-    };
 
-    return { profiles, loading, error, hasMore, fetchFeed, swipe };
+        // Persist updated list (profile already removed above)
+        const updated = profiles.filter((p) => p.id !== likedId);
+        persistCache(updated, cursor, hasMore);
+
+        // Load more when running low
+        if (updated.length <= LOAD_MORE_THRESHOLD && hasMore && !loading) {
+          fetchFeed(false);
+        }
+
+        return { matched: false };
+      } catch (err) {
+        setProfiles((prev) => [swipedProfile, ...prev]);
+
+        if (err instanceof LikesRateLimitError) {
+          Alert.alert(
+            "Can't Send Collaboration Request",
+            `You've reached your daily limit of ${LIKES_RATE_LIMIT} collaboration requests.\n\nPlease try again in ${err.retryAfterHours} hour${err.retryAfterHours !== 1 ? 's' : ''}.`,
+            [{ text: 'OK', style: 'default' }]
+          );
+          setError(`Daily limit reached (${LIKES_RATE_LIMIT}/${LIKES_RATE_LIMIT_WINDOW_HOURS}hr)`);
+          return { matched: false, rateLimited: true };
+        }
+
+        const apiErr = err instanceof ApiError ? err : null;
+        setSwipeError({
+          profileId: likedId,
+          liked,
+          message,
+          field: apiErr?.field,
+          errorMessage: apiErr?.message ?? (err instanceof Error ? err.message : undefined),
+        });
+        return { matched: false, error: true };
+      }
+    },
+    [profiles, cursor, hasMore, loading, fetchFeed]
+  );
+
+  const clearSwipeError = useCallback(() => setSwipeError(null), []);
+
+  // Initial load: try cache first, then fetch
+  useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+
+    let mounted = true;
+
+    (async () => {
+      const cached = await loadCache();
+      if (mounted && cached && cached.profiles.length > 0) {
+        setProfiles(cached.profiles);
+        setCursor(cached.cursor);
+        setHasMore(cached.hasMore);
+      }
+      if (mounted) {
+        fetchFeed(true);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return { profiles, loading, error, hasMore, fetchFeed, swipe, swipeError, clearSwipeError };
 }

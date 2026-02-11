@@ -35,7 +35,9 @@ export const PROFILE_MAX_SKILLS = 15;
 export const PROFILE_MAX_INTERESTS = 15;
 export const PROFILE_TAG_MAX_LENGTH = 30;
 export const PROFILE_NAME_MAX_LENGTH = 100;
+export const PROFILE_GITHUB_MAX_LENGTH = 100;
 export const PROFILE_MIN_AGE = 13;
+export const PROFILE_PICTURE_MAX_SIZE_MB = 5;
 
 // ============================================
 // RATE LIMITS

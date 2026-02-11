@@ -28,6 +28,7 @@
 
 import pRetry from 'p-retry';
 import { getApiBaseUrl } from '../lib/apiClient';
+import { PROFILE_PICTURE_MAX_SIZE_MB } from '../constants/validation';
 
 // API base URL - use centralized resolver for consistent localhost handling
 const API_BASE_URL = getApiBaseUrl();
@@ -262,20 +263,15 @@ export async function uploadProfilePicture(
   onProgress?: (step: string, progress: number) => void
 ): Promise<string> {
   try {
-    // Step 1: Extract file extension and validate
     const fileExtension = getFileExtension(imageUri);
 
-    // Step 2: Request signed upload URL
-    // (Kabbo: This is very fast, ~100-200ms)
+    onProgress?.('uploading', 0);
     const uploadRequest = await requestUploadUrl(fileExtension, authToken);
 
-    // Step 3: Upload file to Supabase
-    // (Kabbo: This is the slow part, 1-3 seconds depending on image size and network)
     await uploadToSupabase(uploadRequest.signedUrl, imageUri);
 
-    // Step 4: Confirm upload and get final URL
-    // (Kabbo: Fast again, ~200-400ms)
     const confirmation = await confirmUpload(uploadRequest.uploadPath, authToken);
+    onProgress?.('complete', 100);
 
     return confirmation.publicUrl;
 
@@ -309,8 +305,8 @@ export async function validateImage(imageUri: string): Promise<{
     const blob = await response.blob();
     const sizeInMB = blob.size / (1024 * 1024);
 
-    if (sizeInMB > 5) {
-      return { valid: false, error: 'Image file is too large (max 5MB)' };
+    if (sizeInMB > PROFILE_PICTURE_MAX_SIZE_MB) {
+      return { valid: false, error: `Image file is too large (max ${PROFILE_PICTURE_MAX_SIZE_MB}MB)` };
     }
 
     return { valid: true, size: blob.size };

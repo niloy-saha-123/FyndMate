@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const fetchedProfile = await getOrCreateProfile(currentSession.user.id, {
-          fullName: currentSession.user.user_metadata?.full_name ?? "",
+          name: currentSession.user.user_metadata?.full_name ?? "",
           onboardingCompleted: false,
         });
         setProfile(fetchedProfile);

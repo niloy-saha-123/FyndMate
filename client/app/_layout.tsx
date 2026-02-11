@@ -1,4 +1,4 @@
-import { Stack, router } from 'expo-router';
+import { Stack } from 'expo-router';
 import 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native';
@@ -6,8 +6,7 @@ import { AuthProvider } from "../src/auth/AuthProvider";
 import { ApiClientInitializer } from "../src/components/ApiClientInitializer";
 import { NotificationProvider } from '@/src/notifications/NotificationProvider';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
-import { supabase } from "../src/auth/supabaseClient";
-import { useEffect } from 'react';
+import { OfflineBanner } from '../src/components/OfflineBanner';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -36,6 +35,7 @@ export default function RootLayout() {
         <NotificationProvider>
           <ApiClientInitializer>
             <SafeAreaView style={styles.statusbar}>
+              <OfflineBanner />
               <Stack>
                 <Stack.Screen name="index" options={{ headerShown: false }} />
                 <Stack.Screen name="login" options={{ headerShown: false }} />

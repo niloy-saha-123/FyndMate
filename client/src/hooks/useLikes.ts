@@ -12,6 +12,7 @@
 
 import { useState, useCallback } from 'react';
 import { getReceivedLikes, acceptLike, declineLike, Like } from '../services/matchingService';
+import { getUserFriendlyErrorMessage } from '../utils/errorMessages';
 
 export function useLikes() {
     const [likes, setLikes] = useState<Like[]>([]);
@@ -26,7 +27,7 @@ export function useLikes() {
             const data = await getReceivedLikes();
             setLikes(data);
         } catch (err: any) {
-            setError(err.message || 'Failed to load likes');
+            setError(getUserFriendlyErrorMessage(err));
         } finally {
             setLoading(false);
         }

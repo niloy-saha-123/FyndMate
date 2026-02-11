@@ -26,9 +26,11 @@ import {
     LIKES_RATE_LIMIT,
     LIKES_RATE_LIMIT_WINDOW_HOURS,
 } from '../constants/validation';
+import type { UserProfile } from '../types/profile';
 
 // Re-export for convenience
 export { LIKES_RATE_LIMIT, LIKES_RATE_LIMIT_WINDOW_HOURS };
+export type { UserProfile };
 
 /**
  * Custom error class for rate limit exceeded
@@ -44,24 +46,6 @@ export class LikesRateLimitError extends Error {
     this.retryAfter = retryAfterSeconds;
     this.retryAfterHours = hours;
   }
-}
-
-export interface UserProfile {
-    id: string;
-    name: string;
-    profilePicture: string | null;
-    bio: string | null;
-    skills: string[];
-    interests?: string[];
-    experience?: string | null;
-    commitment?: string | null;
-    city?: string | null;
-    country?: string | null;
-    locationSharing?: string | null;
-    // UI-specific field (may not be returned by all endpoints)
-    age?: number | null;
-    lookingFor?: string[];
-    githubUsername?: string | null;
 }
 
 export interface Like {
