@@ -10,10 +10,10 @@
  */
 
 // ============================================
-// CHAT MESSAGE LIMITS (Normal messages in chat)
+// MESSAGE LIMITS (Normal messages in messages)
 // ============================================
-export const CHAT_MESSAGE_MIN_LENGTH = 1;
-export const CHAT_MESSAGE_MAX_LENGTH = 2000;
+export const MESSAGE_MIN_LENGTH = 1;
+export const MESSAGE_MAX_LENGTH = 2000;
 
 // ============================================
 // INTRO MESSAGE LIMITS (Like requests in discovery feed)

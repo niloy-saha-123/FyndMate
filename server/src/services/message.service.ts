@@ -1,6 +1,6 @@
 /**
  * @file src/services/message.service.ts
- * @description Manages chat messages: send, edit, retrieve.
+ * @description Manages messages: send, edit, retrieve.
  * All operations verify match membership and enforce security rules.
  */
 

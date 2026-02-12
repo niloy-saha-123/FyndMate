@@ -1,7 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 
-export function useChatNotificationGuard(matchId: string) {
+export function useMessageNotificationGuard(matchId: string) {
   useEffect(() => {
     Notifications.setNotificationHandler({
       handleNotification: async (notification) => {
@@ -14,6 +14,7 @@ export function useChatNotificationGuard(matchId: string) {
             shouldShowList: false,
             shouldPlaySound: false,
             shouldSetBadge: false,
+            shouldShowAlert: false,
           };
         }
 
@@ -22,6 +23,7 @@ export function useChatNotificationGuard(matchId: string) {
           shouldShowList: true,
           shouldPlaySound: true,
           shouldSetBadge: true,
+          shouldShowAlert: true,
         };
       },
     });

@@ -1,6 +1,6 @@
 /**
- * @file src/routes/chat.routes.ts
- * @description API routes for chat messages and match status (block/unblock/hide).
+ * @file src/routes/message.routes.ts
+ * @description API routes for messages and match status (block/unblock/hide).
  */
 
 import { FastifyInstance } from 'fastify';
@@ -12,13 +12,13 @@ import {
     sendMessageSchema,
     editMessageSchema,
     messageIdParamSchema,
-} from '../schemas/chat.schema.js';
+} from '../schemas/message.schema.js';
 import { matchIdParamSchema } from '../schemas/matching.schema.js';
 
-export default async function chatRoutes(app: FastifyInstance) {
+export default async function messageRoutes(app: FastifyInstance) {
     app.addHook('preHandler', authMiddleware);
 
-    // --- Match status (for chat screen) ---
+    // --- Match status (for messages screen) ---
 
     // GET /api/matches/:matchId - Returns { status, blockedBy } for participants
     app.get(
@@ -55,7 +55,7 @@ export default async function chatRoutes(app: FastifyInstance) {
         '/matches/:matchId/messages',
         {
             preHandler: [
-                rateLimit({ limit: 60, windowSec: 60, keyPrefix: 'chat_msg' }),
+                rateLimit({ limit: 60, windowSec: 60, keyPrefix: 'message_msg' }),
             ],
         },
         async (request, reply) => {
@@ -88,7 +88,7 @@ export default async function chatRoutes(app: FastifyInstance) {
         '/matches/:matchId/messages',
         {
             preHandler: [
-                rateLimit({ limit: 60, windowSec: 60, keyPrefix: 'chat_msg' }),
+                rateLimit({ limit: 60, windowSec: 60, keyPrefix: 'message_msg' }),
             ],
         },
         async (request, reply) => {
@@ -141,7 +141,7 @@ export default async function chatRoutes(app: FastifyInstance) {
         '/matches/:matchId/messages/:messageId',
         {
             preHandler: [
-                rateLimit({ limit: 30, windowSec: 60, keyPrefix: 'chat_edit' }),
+                rateLimit({ limit: 30, windowSec: 60, keyPrefix: 'message_edit' }),
             ],
         },
         async (request, reply) => {

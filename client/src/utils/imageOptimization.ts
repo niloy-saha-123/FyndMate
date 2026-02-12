@@ -54,8 +54,8 @@ export const ImageSizes = {
   /** Tab bar avatar - 100px, 80% quality */
   AVATAR_SMALL: { width: 100, quality: 80 },
   
-  /** Chat avatar - 150px, 85% quality */
-  AVATAR_CHAT: { width: 150, quality: 85 },
+  /** Message avatar - 150px, 85% quality */
+  AVATAR_MESSAGE: { width: 150, quality: 85 },
 } as const;
 
 /**

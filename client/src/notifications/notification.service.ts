@@ -7,6 +7,7 @@ import { apiClient } from '../lib/apiClient';
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
+    shouldShowAlert: true,       // Required by NotificationBehavior typing
     shouldShowBanner: true,      // Show banner at top
     shouldShowList: true,        // Show in notification list
     shouldPlaySound: true,       // Play sound
@@ -153,7 +154,7 @@ export async function setNotificationPreference(
   matchId: string,
   enabled: boolean
 ) {
-  return apiClient.put(`/api/notifications/preferences/${matchId}`, { enabled });
+  return apiClient.patch(`/api/notifications/preferences/${matchId}`, { enabled });
 }
 
 

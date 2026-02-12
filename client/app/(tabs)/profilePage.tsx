@@ -355,13 +355,11 @@ export default function ProfilePage() {
   return (
     <View style={[styles.container, { paddingTop: top }]}>
       {/* Header */}
+      {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.geoCircle} />
-          <Text style={styles.headerTitle}>My Profile</Text>
-        </View>
+        <Text style={styles.headerTitle}>My Profile</Text>
         <TouchableOpacity
-          style={[styles.editButton, isEditing && styles.editButtonActive]}
+          style={styles.editButton}
           onPress={handleEditToggle}
         >
           <Text style={[styles.editButtonText, isEditing && styles.editButtonTextActive]}>
@@ -989,56 +987,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: COLORS.background,
-    borderBottomWidth: BORDERS.thin,
-    borderBottomColor: COLORS.border,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  geoCircle: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    marginRight: 8,
-    ...SHADOWS.small,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-  },
-  editButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.surface,
-    borderWidth: BORDERS.thin,
-    borderColor: COLORS.border,
-    ...SHADOWS.small,
-  },
-  editButtonActive: {
-    backgroundColor: COLORS.primary,
-  },
-  editButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  editButtonTextActive: {
-    color: COLORS.surface,
-  },
 
   // Scroll
   scrollView: {
@@ -1205,6 +1153,49 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
     fontStyle: 'italic',
     fontWeight: '500',
+  },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: BORDERS.thin,
+    borderBottomColor: COLORS.border,
+    position: 'relative',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: COLORS.textPrimary,
+    letterSpacing: -0.5,
+    textAlign: 'left',
+  },
+  editButton: {
+    position: 'absolute',
+    right: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    ...SHADOWS.small,
+  },
+  editButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  editButtonTextActive: {
+    color: COLORS.surface,
   },
 
   // Location

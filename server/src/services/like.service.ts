@@ -123,7 +123,7 @@ export class LikeService {
             throw new Error("You are already matched with this user.");
         }
 
-            const result = await prisma.like.create({
+        const result = await prisma.like.create({
             data: {
                 likerId,
                 likedId,
@@ -193,7 +193,7 @@ export class LikeService {
                 .map(async like => {
                     const age = computeAge(like.likerUser.birthDate as any);
                     const sanitizedUser = filterLocationByPrivacy(like.likerUser as any);
-                    const { birthDate, city, country, ...restUser } = sanitizedUser;
+                    const { birthDate, locationSharing, city, country, ...restUser } = sanitizedUser;
                     return {
                         ...like,
                         likerUser: {

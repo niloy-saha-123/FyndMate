@@ -10,10 +10,10 @@
  */
 
 // ============================================
-// CHAT MESSAGE LIMITS (Normal messages in chat)
+// MESSAGE LIMITS (Normal messages in messages)
 // ============================================
-export const CHAT_MESSAGE_MIN_LENGTH = 1;
-export const CHAT_MESSAGE_MAX_LENGTH = 2000;
+export const MESSAGE_MIN_LENGTH = 1;
+export const MESSAGE_MAX_LENGTH = 2000;
 
 // ============================================
 // INTRO MESSAGE LIMITS (Like requests in discovery feed)
@@ -50,11 +50,11 @@ export const LIKES_RATE_LIMIT_WINDOW_HOURS = 24;
 // ============================================
 
 /**
- * Check if a chat message is valid
+ * Check if a message is valid
  */
-export function isChatMessageValid(message: string): boolean {
+export function isMessageValid(message: string): boolean {
     const trimmed = message.trim();
-    return trimmed.length >= CHAT_MESSAGE_MIN_LENGTH && trimmed.length <= CHAT_MESSAGE_MAX_LENGTH;
+    return trimmed.length >= MESSAGE_MIN_LENGTH && trimmed.length <= MESSAGE_MAX_LENGTH;
 }
 
 /**
@@ -66,15 +66,15 @@ export function isIntroMessageValid(message: string): boolean {
 }
 
 /**
- * Get validation error message for chat messages
+ * Get validation error message for messages
  */
-export function getChatMessageError(message: string): string | null {
+export function getMessageError(message: string): string | null {
     const trimmed = message.trim();
     if (trimmed.length === 0) {
         return 'Message cannot be empty';
     }
-    if (trimmed.length > CHAT_MESSAGE_MAX_LENGTH) {
-        return `Message cannot exceed ${CHAT_MESSAGE_MAX_LENGTH} characters`;
+    if (trimmed.length > MESSAGE_MAX_LENGTH) {
+        return `Message cannot exceed ${MESSAGE_MAX_LENGTH} characters`;
     }
     return null;
 }

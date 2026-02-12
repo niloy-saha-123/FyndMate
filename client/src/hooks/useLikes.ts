@@ -43,7 +43,7 @@ export function useLikes() {
             const match = await acceptLike(likeId, replyMessage);
 
             // 3. Success Feedback
-            // Return match so UI can navigate to chat or show toast
+            // Return match so UI can navigate to messages or show toast
             return match;
         } catch (err) {
             console.error("Failed to accept like:", err);

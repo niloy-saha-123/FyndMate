@@ -151,7 +151,7 @@ CREATE POLICY "project_delete_own"
 -- 3. Person B sees Person A in their "Likes" section (with the message)
 -- 4. Person B does NOT see Person A in their feed (already liked by A)
 -- 5. Person A cannot see Person B until B accepts (no stalking pending likes)
--- 6. Person B accepts → Match created → Both move to Chat
+-- 6. Person B accepts → Match created → Both move to Messages
 -- 7. If Person B declines → Swipe is archived, A never reappears in B's feed
 --
 -- PASS/CROSS FLOW:
@@ -322,7 +322,7 @@ CREATE POLICY "message_delete_own"
 -- 1. Person A likes Person B with a proposal message
 -- 2. Person B sees Person A in "Likes" section with the message
 -- 3. Person A CANNOT see Person B until matched (no stalking pending likes)
--- 4. Person B accepts → Match created (server-side) → Both move to Chat
+-- 4. Person B accepts → Match created (server-side) → Both move to Messages
 -- 5. Person B declines → Swipe archived (server-side) → A never reappears
 --
 -- LOOK BACK FEATURE:

@@ -1,6 +1,6 @@
 /**
  * @file src/services/match.service.ts
- * @description Manages active connections, chat initiation, and unmatching logic.
+ * @description Manages active connections, message initiation, and unmatching logic.
  */
 
 import { Prisma, Match } from '@prisma/client';
@@ -128,7 +128,7 @@ export class MatchService {
             // 4. Create Initial Messages
             // Message 1: The Liker's Intro (User B)
             const now = new Date();
-            
+
             // Create Intro Message (from Liker)
             if (introContent && likerId) {
                 console.log('Creating intro message with senderId:', likerId);
@@ -146,15 +146,15 @@ export class MatchService {
             if (replyMessage && replyMessage.trim().length > 0 && likedId) {
                 const sanitizedReply = sanitizeText(replyMessage);
                 if (sanitizedReply.length > 0) {
-                console.log('Creating reply message with senderId:', likedId);
-                await tx.message.create({
-                    data: {
-                        match: { connect: { id: newMatch.id } },
-                        sender: { connect: { id: likedId } },
-                        content: sanitizedReply,
-                        createdAt: new Date(now.getTime() + 1),
-                    }
-                });
+                    console.log('Creating reply message with senderId:', likedId);
+                    await tx.message.create({
+                        data: {
+                            match: { connect: { id: newMatch.id } },
+                            sender: { connect: { id: likedId } },
+                            content: sanitizedReply,
+                            createdAt: new Date(now.getTime() + 1),
+                        }
+                    });
                 }
             }
 
@@ -242,8 +242,8 @@ export class MatchService {
             const age2 = computeAge(m.user2.birthDate as any);
             const sanitizedUser1 = filterLocationByPrivacy(m.user1);
             const sanitizedUser2 = filterLocationByPrivacy(m.user2);
-            const { birthDate: _b1, city: _c1, country: _ct1, ...u1 } = sanitizedUser1 as any;
-            const { birthDate: _b2, city: _c2, country: _ct2, ...u2 } = sanitizedUser2 as any;
+            const { birthDate: _b1, locationSharing: _ls1, city: _c1, country: _ct1, ...u1 } = sanitizedUser1 as any;
+            const { birthDate: _b2, locationSharing: _ls2, city: _c2, country: _ct2, ...u2 } = sanitizedUser2 as any;
 
             // Sign both profile pictures in parallel instead of sequentially
             const [pic1, pic2] = await Promise.all([
@@ -322,7 +322,7 @@ export class MatchService {
     }
 
     /**
-     * Hide a match from the requesting user's chat list.
+     * Hide a match from the requesting user's message list.
      * Only participants can hide.
      */
     async hideMatch(matchId: string, userId: string) {

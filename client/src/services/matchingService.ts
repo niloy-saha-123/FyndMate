@@ -6,7 +6,7 @@
  * 1. Discovery Feed: Fetching profiles to swipe on.
  * 2. Interaction: Sending Likes (with messages) or Passes.
  * 3. Inbox Management: Fetching/Accepting/Declining incoming likes.
- * 4. Chat Management: Fetching active matches and unmatching.
+ * 4. Message Management: Fetching active matches and unmatching.
  * 5. Safety: Blocking users.
  * 
  * BACKEND ENDPOINTS MAPPED:
@@ -127,7 +127,7 @@ export async function declineLike(likeId: string) {
 }
 
 /**
- * GET ACTIVE MATCHES (CHATS)
+ * GET ACTIVE MATCHES (MESSAGES)
  */
 export async function getMatches(limit = 20, cursor?: string): Promise<{ data: Match[]; nextCursor: string | null }> {
     const params = new URLSearchParams({ limit: limit.toString() });

@@ -159,23 +159,15 @@ export default function FeedScreen() {
     <View style={[styles.container, { paddingTop: top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.geoCircle} />
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Collab</Text>
-          <Text style={styles.headerSubtitle}>FIND COLLABORATORS IN TECH</Text>
         </View>
-        <Ionicons
-          name="sparkles"
-          size={20}
-          color={COLORS.accent}
-          style={styles.sparkle}
-        />
       </View>
 
       {/* Profile Card */}
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottom + 120 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottom + 80 }]}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View
@@ -203,38 +195,31 @@ export default function FeedScreen() {
                 </TouchableOpacity>
               </View>
             )}
-            {/* Card Header */}
-            <View style={styles.cardHeader}>
-              <View style={styles.cardBadge}>
-                <Text style={styles.cardBadgeText}>COLLAB</Text>
-              </View>
-              <Ionicons name="star" size={16} color={COLORS.accent} />
-            </View>
+
 
             {/* Profile Image - progressive load with placeholder → sharp transition */}
-            <View style={styles.imageContainer}>
-              {currentProfile.profilePicture ? (
-                <Image
-                  source={{ uri: currentProfile.profilePicture }}
-                  style={styles.profileImage}
-                  contentFit="cover"
-                  transition={300}
-                />
-              ) : (
-                <View style={[styles.profileImage, styles.noPhotoPlaceholder]}>
-                  <Ionicons name="person" size={80} color={COLORS.border} />
-                </View>
-              )}
-              <View style={styles.imageGeoCircle} />
+            <View style={{ paddingHorizontal: 12, paddingTop: 12 }}>
+              <View style={styles.imageContainer}>
+                {currentProfile.profilePicture ? (
+                  <Image
+                    source={{ uri: currentProfile.profilePicture }}
+                    style={styles.profileImage}
+                    contentFit="cover"
+                    transition={300}
+                  />
+                ) : (
+                  <View style={[styles.profileImage, styles.noPhotoPlaceholder]}>
+                    <Ionicons name="person" size={80} color={COLORS.border} />
+                  </View>
+                )}
+              </View>
             </View>
 
             {/* Basic Info */}
             <View style={styles.infoSection}>
               <Text style={styles.profileName}>
                 {currentProfile.name}
-                {(currentProfile.age != null || currentProfile.gender)
-                  ? ` | ${[currentProfile.age, currentProfile.gender].filter(Boolean).join(' · ')}`
-                  : ''}
+                {currentProfile.age != null ? ` | ${currentProfile.age}` : ''}
               </Text>
             </View>
 
@@ -328,24 +313,19 @@ export default function FeedScreen() {
                 fullWidth
               />
             </View> */}
+
+            {/* Action Buttons - at bottom of card */}
+            <View style={styles.cardActions}>
+              <NeoButton title="Skip" onPress={handleSkip} variant="secondary" />
+              <NeoButton
+                title="Request"
+                onPress={openRequestModal}
+                style={{ flex: 2, marginHorizontal: 12 }}
+              />
+            </View>
           </NeoCard>
         </Animated.View>
       </ScrollView>
-
-      {/* Bottom Action Bar */}
-      <View
-        style={[styles.actionBar, { paddingBottom: bottom + 16, backgroundColor: COLORS.surface }]}
-      >
-        <View style={styles.actionBarInner}>
-          <NeoButton title="Skip" onPress={handleSkip} variant="secondary" />
-          <NeoButton
-            title="Request"
-            onPress={openRequestModal}
-            style={{ flex: 2, marginHorizontal: 12 }}
-          />
-          {/* Bookmark button removed as per user request */}
-        </View>
-      </View>
 
       {/* Request Modal */}
       <Modal
@@ -489,7 +469,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     backgroundColor: COLORS.background,
     borderBottomWidth: BORDERS.thin,
     borderBottomColor: COLORS.border,
@@ -596,7 +576,7 @@ const styles = StyleSheet.create({
 
   // Image
   imageContainer: {
-    marginHorizontal: 16,
+    width: '100%',
     aspectRatio: 4 / 5,
     borderRadius: RADIUS.medium,
     overflow: 'hidden',
@@ -736,6 +716,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
+  // Card Actions (Skip/Request buttons)
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderTopWidth: BORDERS.thin,
+    borderTopColor: COLORS.border,
+    marginTop: 8,
+  },
+
   // Action Bar
   actionBar: {
     position: 'absolute',
@@ -744,8 +734,7 @@ const styles = StyleSheet.create({
     right: 0,
     paddingTop: 16,
     paddingHorizontal: 16,
-    borderTopWidth: BORDERS.medium,
-    borderTopColor: COLORS.border,
+
   },
   actionBarInner: {
     flexDirection: 'row',

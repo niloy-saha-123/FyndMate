@@ -58,9 +58,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="chat"
+        name="messages"
         options={{
-          title: 'Chat',
+          title: 'Messages',
           // TODO: Pass badge state here
           // tabBarBadge: hasNewMatches ? " " : undefined,
         }}

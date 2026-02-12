@@ -116,10 +116,7 @@ export default function LikesScreen() {
         <View style={[styles.container, { paddingTop: top }]}>
             {/* Header */}
             <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <View style={styles.geoCircle} />
-                    <Text style={styles.headerTitle}>Requests</Text>
-                </View>
+                <Text style={styles.headerTitle}>Requests</Text>
             </View>
 
             {/* Content */}
@@ -253,33 +250,20 @@ const styles = StyleSheet.create({
 
     // Header
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 16,
+        paddingVertical: 8,
         backgroundColor: COLORS.background,
         borderBottomWidth: BORDERS.thin,
         borderBottomColor: COLORS.border,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    geoCircle: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: COLORS.primary,
-        borderWidth: 2,
-        borderColor: COLORS.border,
-        marginRight: 8,
-        ...SHADOWS.small,
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
     },
     headerTitle: {
         fontSize: 24,
-        fontWeight: '800',
+        fontWeight: '900',
         color: COLORS.textPrimary,
+        letterSpacing: -0.5,
+        textAlign: 'left',
     },
 
     // List

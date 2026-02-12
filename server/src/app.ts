@@ -15,7 +15,7 @@ import { locationRoutes } from './routes/location.js';
 import authRoutes from './routes/auth.js';
 import feedRoutes from './routes/feed.routes.js';
 import matchingRoutes from './routes/matching.routes.js';
-import chatRoutes from './routes/chat.routes.js';
+import messageRoutes from './routes/message.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import notificationRoutes from './routes/notifications.routes.js';
 
@@ -83,7 +83,7 @@ export async function buildApp() {
   await app.register(authRoutes, { prefix: '/auth' });
   await app.register(feedRoutes, { prefix: '/api/feed' });
   await app.register(matchingRoutes, { prefix: '/api' });
-  await app.register(chatRoutes, { prefix: '/api' });
+  await app.register(messageRoutes, { prefix: '/api' });
   await app.register(locationRoutes, { prefix: '/api' });
   await app.register(profileRoutes, { prefix: '/api' });
   await app.register(notificationRoutes, { prefix: '/api' });

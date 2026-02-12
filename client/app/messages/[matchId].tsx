@@ -19,18 +19,17 @@ import {
   sendMessage,
   editMessage,
   getMatchStatus,
-} from "../../src/chat/chat.service";
-import { subscribeToMessages } from "../../src/chat/chat.realtime";
-import { useChatNotificationGuard } from "../../src/notifications/useChatNotificationGuard";
+} from "../../src/messages/message.service";
+import { subscribeToMessages } from "../../src/messages/message.realtime";
+import { useMessageNotificationGuard } from "../../src/notifications/useMessageNotificationGuard";
 import {
-  CHAT_MESSAGE_MIN_LENGTH,
-  CHAT_MESSAGE_MAX_LENGTH,
-  isChatMessageValid,
-  getChatMessageError,
+  MESSAGE_MAX_LENGTH,
+  isMessageValid,
+  getMessageError,
 } from "../../src/constants/validation";
-import { 
-  convertToLocalTime, 
-  formatRelativeTime, 
+import {
+  convertToLocalTime,
+  formatRelativeTime,
   formatDateSection,
   formatMessageTime,
   isLastInBurst
@@ -68,12 +67,12 @@ interface MatchUserInfo {
 
 type RealtimeEvent = "upsert" | "delete" | "match_inactive";
 
-export default function ChatScreen() {
+export default function MessageScreen() {
   const { matchId } = useLocalSearchParams<{ matchId?: string }>();
   const { user } = useAuth();
   const navigation = useNavigation();
 
-  // Hide default header initially to prevent flash of "chat/[matchId]"
+  // Hide default header initially to prevent flash of "messages/[matchId]"
   useEffect(() => {
     navigation.setOptions({
       headerShown: false
@@ -81,7 +80,7 @@ export default function ChatScreen() {
   }, [navigation]);
 
   if (matchId) {
-    useChatNotificationGuard(matchId);
+    useMessageNotificationGuard(matchId);
   }
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -113,9 +112,9 @@ export default function ChatScreen() {
     // Convert to local time and add metadata
     const withMetadata: MessageWithMetadata[] = messages.map((msg, index) => {
       const localCreatedAt = convertToLocalTime(msg.createdAt);
-      
+
       const shouldShowTs = isLastInBurst(messages, index);
-      
+
       return {
         ...msg,
         localCreatedAt,
@@ -125,11 +124,11 @@ export default function ChatScreen() {
     });
 
     setProcessedMessages(withMetadata);
-    
+
     // Set up delayed timestamps for messages that should show timestamps
     const newVisibleTimestamps = new Set(visibleTimestamps);
     const messagesToShowTimestamp = withMetadata.filter(msg => msg.showTimestamp);
-    
+
     messagesToShowTimestamp.forEach(msg => {
       if (!newVisibleTimestamps.has(msg.id)) {
         // Schedule timestamp to appear after 1 second delay
@@ -162,23 +161,23 @@ export default function ChatScreen() {
       if (msgs.length > 0) {
         // Find the other user (not the current user)
         const firstMessage = msgs[0];
-        const otherUserInfo = firstMessage.senderId === user.id 
-          ? msgs.find(m => m.senderId !== user.id)?.sender 
+        const otherUserInfo = firstMessage.senderId === user.id
+          ? msgs.find(m => m.senderId !== user.id)?.sender
           : firstMessage.sender;
-        
+
         if (otherUserInfo) {
           setOtherUser({
             id: otherUserInfo.id,
             name: otherUserInfo.name,
             profilePicture: otherUserInfo.profilePicture
           });
-          
+
           // Set the navigation header title
           navigation.setOptions({
             headerShown: true,
             title: otherUserInfo.name,
             headerTitle: () => (
-              <Pressable 
+              <Pressable
                 onPress={() => router.push(`/profile/${otherUserInfo.id}`)}
                 style={styles.headerTitleContainer}
               >
@@ -196,7 +195,7 @@ export default function ChatScreen() {
               </Pressable>
             ),
             headerRight: () => (
-              <Pressable 
+              <Pressable
                 onPress={() => setMenuVisible(true)}
                 style={styles.headerMenuButton}
               >
@@ -220,10 +219,10 @@ export default function ChatScreen() {
             });
           } else {
             Alert.alert(
-              "Chat unavailable",
+              "Conversation unavailable",
               "This conversation is no longer available."
             );
-            router.replace("/(tabs)/chat");
+            router.replace("/(tabs)/messages");
           }
           return;
         }
@@ -324,9 +323,9 @@ export default function ChatScreen() {
 
   async function handleSend() {
     if (!user || !matchId) return;
-    
+
     // Validate message
-    if (!isChatMessageValid(text)) return;
+    if (!isMessageValid(text)) return;
 
     const content = text.trim();
     setText("");
@@ -344,9 +343,9 @@ export default function ChatScreen() {
       if (err.message?.toLowerCase().includes("permission")) {
         Alert.alert(
           "Message not sent",
-          "You can no longer send messages in this chat."
+          "You can no longer send messages in this conversation."
         );
-        router.replace("/(tabs)/chat");
+        router.replace("/(tabs)/messages");
         return;
       }
 
@@ -360,9 +359,9 @@ export default function ChatScreen() {
   if (!user) return <Text>Loading...</Text>;
 
   const isBlocked = matchStatus?.status === "blocked";
-  const messageError = getChatMessageError(text);
-  const isMessageTooLong = text.trim().length > CHAT_MESSAGE_MAX_LENGTH;
-  const canSend = isChatMessageValid(text) && !savingEdit;
+  const messageError = getMessageError(text);
+  const isMessageTooLong = text.trim().length > MESSAGE_MAX_LENGTH;
+  const canSend = isMessageValid(text) && !savingEdit;
 
   return (
     <KeyboardAvoidingView
@@ -387,9 +386,9 @@ export default function ChatScreen() {
           renderItem={({ item, index }) => {
             const isMyMessage = item.senderId === user.id;
             const showAvatarAndName = !isMyMessage; // Only show for other user
-            
+
             // Show date section header when date changes
-            const showDateHeader = index === 0 || 
+            const showDateHeader = index === 0 ||
               (index > 0 && processedMessages[index - 1].dateString !== item.dateString);
 
             return (
@@ -399,13 +398,13 @@ export default function ChatScreen() {
                     <Text style={styles.dateHeaderText}>{item.dateString}</Text>
                   </View>
                 )}
-                
+
                 <View style={[
                   styles.messageContainer,
                   isMyMessage ? styles.myMessageContainer : styles.theirMessageContainer
                 ]}>
                   {showAvatarAndName && (
-                    <Pressable 
+                    <Pressable
                       onPress={() => router.push(`/profile/${item.sender.id}`)}
                       style={styles.avatarContainer}
                     >
@@ -421,7 +420,7 @@ export default function ChatScreen() {
                       )}
                     </Pressable>
                   )}
-                  
+
                   <Pressable
                     onLongPress={() => {
                       if (!canEditMessage(item) || isBlocked) return;
@@ -462,7 +461,7 @@ export default function ChatScreen() {
                   isMessageTooLong && styles.inputError
                 ]}
                 multiline
-                maxLength={CHAT_MESSAGE_MAX_LENGTH + 50} // Allow slight overflow to show error
+                maxLength={MESSAGE_MAX_LENGTH + 50} // Allow slight overflow to show error
               />
               <Pressable
                 onPress={handleSend}
@@ -517,14 +516,14 @@ export default function ChatScreen() {
               >
                 <Text style={[styles.menuText, styles.menuTextDestructive]}>Unmatch</Text>
               </Pressable>
-              
+
               <Pressable
                 style={styles.menuItem}
                 onPress={handleBlock}
               >
                 <Text style={[styles.menuText, styles.menuTextDestructive]}>Block</Text>
               </Pressable>
-              
+
               <Pressable
                 style={[styles.menuItem, styles.menuItemLast]}
                 onPress={handleReport}
@@ -674,15 +673,15 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: RADIUS.small,
   },
 
-  messageText: { 
+  messageText: {
     fontSize: 16,
     lineHeight: 22,
   },
-  myMessageText: { 
-    color: COLORS.surface 
+  myMessageText: {
+    color: COLORS.surface
   },
-  theirMessageText: { 
-    color: COLORS.textPrimary 
+  theirMessageText: {
+    color: COLORS.textPrimary
   },
 
   // Blocked Banner
@@ -727,14 +726,14 @@ const styles = StyleSheet.create({
     minWidth: 80, // Minimum width to prevent it from becoming too thin
     ...SHADOWS.small,
   },
-  sendButtonDisabled: { 
+  sendButtonDisabled: {
     backgroundColor: COLORS.gray200,
     ...SHADOWS.small,
   },
-  sendButtonText: { 
-    color: COLORS.surface, 
-    fontSize: 16, 
-    fontWeight: "600" 
+  sendButtonText: {
+    color: COLORS.surface,
+    fontSize: 16,
+    fontWeight: "600"
   },
 
   // Modal

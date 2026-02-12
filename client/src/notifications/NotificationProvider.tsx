@@ -10,7 +10,7 @@ interface NotificationContextType {
 }
 
 const NotificationContext = createContext<NotificationContextType>({
-  refreshPushToken: async () => {},
+  refreshPushToken: async () => { },
 });
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
@@ -22,7 +22,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const refreshPushToken = async () => {
     if (!user) return;
-    
+
     try {
       const token = await registerForPushNotifications();
       if (token) {
@@ -77,7 +77,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         };
 
         if (data?.matchId) {
-          router.push(`/chat/${data.matchId}`);
+          router.push(`/messages/${data.matchId}`);
         }
       });
 

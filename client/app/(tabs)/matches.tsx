@@ -1,6 +1,6 @@
 /**
  * @file client/app/(tabs)/matches.tsx
- * @description SKELETON SCREEN for the "Matches" List (Active Chats).
+ * @description SKELETON SCREEN for the "Matches" List (Active Messages).
  * 
  * TODO (DESIGN) - CRITICAL UI INSTRUCTIONS:
  * 1. **List Layout**:
@@ -76,7 +76,7 @@ export default function MatchesScreen() {
                 <View style={styles.info}>
                     <Text style={styles.name}>{otherUser.name || "Unknown User"}</Text>
                     {/* TODO (DESIGN): Truncate text with numberOfLines={1} */}
-                    <Text style={styles.lastMessage}>Tap to chat...</Text>
+                    <Text style={styles.lastMessage}>Send a message...</Text>
                 </View>
 
                 {/* 
@@ -85,8 +85,7 @@ export default function MatchesScreen() {
                    - Move them to "Long Press" menu OR Swipe-Left actions.
                 */}
                 <View style={styles.actions}>
-                    {/* Simulate Chat Navigation */}
-                    <Button title="Chat" onPress={() => console.log("Navigate to chat", item.id)} />
+                    <Button title="Message" onPress={() => console.log("Navigate to messages", item.id)} />
                     <Button title="💔" onPress={() => handleUnmatch(item.id, otherUser.name)} color="orange" />
                     <Button title="🚫" onPress={() => handleBlock(otherUser.id, otherUser.name)} color="red" />
                 </View>

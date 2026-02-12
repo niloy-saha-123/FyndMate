@@ -1,6 +1,6 @@
 /**
- * @file client/app/(tabs)/chat.tsx
- * @description Chats/Matches Screen with Neo-brutalist design
+ * @file client/app/(tabs)/messages.tsx
+ * @description Messages/Matches Screen with Neo-brutalist design
  */
 
 import { useEffect, useState } from 'react';
@@ -22,33 +22,33 @@ import {
   hideMatch,
   blockMatch,
   unblockMatch,
-} from '../../src/chat/chat.service';
+} from '../../src/messages/message.service';
 import { supabase } from '../../src/auth/supabaseClient';
 import { COLORS, SHADOWS, BORDERS, RADIUS } from '../../src/theme/colors';
 import { NeoCard } from '../../src/components/NeoCard';
 import { formatRelativeTime, convertToLocalTime } from '../../src/utils/timeFormatting';
 
-export default function ChatTab() {
+export default function MessagesTab() {
   const { top, bottom } = useSafeAreaInsets();
   const { user, loading } = useAuth();
   const [matches, setMatches] = useState<any[]>([]);
-  const [loadingChats, setLoadingChats] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(true);
 
   useEffect(() => {
     if (!user || loading) return;
 
-    setLoadingChats(true);
+    setLoadingMessages(true);
     getMyMatches(user.id)
       .then(setMatches)
       .catch(console.error)
-      .finally(() => setLoadingChats(false));
+      .finally(() => setLoadingMessages(false));
   }, [user, loading]);
 
   useEffect(() => {
     if (!user) return;
 
     const channel = supabase
-      .channel(`chat-list-${user.id}`)
+      .channel(`message-list-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -135,24 +135,24 @@ export default function ChatTab() {
     return null;
   }
 
-    const renderChatItem = ({ item }: { item: any }) => {
+  const renderMessageItem = ({ item }: { item: any }) => {
     const isUser1 = item.user1Id === user?.id;
     const otherUser = isUser1 ? item.user2 : item.user1;
     const isBlocked = item.status === 'blocked';
     const iBlockedThem = isBlocked && item.blockedBy === user.id;
     const theyBlockedMe = isBlocked && item.blockedBy !== user.id;
-    
+
     // Format last message time
-    const lastMessageTime = item.lastMessage?.createdAt 
+    const lastMessageTime = item.lastMessage?.createdAt
       ? formatRelativeTime(convertToLocalTime(item.lastMessage.createdAt))
       : '';
 
     return (
       <Pressable
-        onPress={() => router.push(`/chat/${item.id}`)}
+        onPress={() => router.push(`/messages/${item.id}`)}
         onLongPress={() => {
           if (iBlockedThem) {
-            Alert.alert('Chat options', 'What would you like to do?', [
+            Alert.alert('Message options', 'What would you like to do?', [
               {
                 text: 'Unblock user',
                 onPress: async () => {
@@ -162,7 +162,7 @@ export default function ChatTab() {
                 },
               },
               {
-                text: 'Remove from my chats',
+                text: 'Remove from my messages',
                 onPress: async () => {
                   await hideMatch(item.id);
                   setMatches((prev) => prev.filter((m) => m.id !== item.id));
@@ -171,9 +171,9 @@ export default function ChatTab() {
               { text: 'Cancel', style: 'cancel' },
             ]);
           } else if (!theyBlockedMe) {
-            Alert.alert('Chat options', 'What would you like to do?', [
+            Alert.alert('Message options', 'What would you like to do?', [
               {
-                text: 'Remove from my chats',
+                text: 'Remove from my messages',
                 onPress: async () => {
                   await hideMatch(item.id);
                   setMatches((prev) => prev.filter((m) => m.id !== item.id));
@@ -195,12 +195,12 @@ export default function ChatTab() {
       >
         <NeoCard
           style={[
-            styles.chatCard,
-            isBlocked && styles.chatCardBlocked,
+            styles.messageCard,
+            isBlocked && styles.messageCardBlocked,
           ]}
           shadowSize="small"
         >
-          <View style={styles.chatContent}>
+          <View style={styles.messageContent}>
             {/* Avatar */}
             <View style={styles.avatarContainer}>
               {otherUser?.profilePicture ? (
@@ -218,15 +218,15 @@ export default function ChatTab() {
               )}
             </View>
 
-            {/* Chat Info */}
-            <View style={styles.chatInfo}>
-              <Text style={styles.chatName}>{otherUser?.name ?? 'Unknown user'}</Text>
+            {/* Message Info */}
+            <View style={styles.messageInfo}>
+              <Text style={styles.messageName}>{otherUser?.name ?? 'Unknown user'}</Text>
               <Text
                 numberOfLines={1}
                 style={[
-                  styles.chatMessage,
-                  item.unreadCount > 0 && !isBlocked && styles.chatMessageUnread,
-                  isBlocked && styles.chatMessageBlocked,
+                  styles.messagePreview,
+                  item.unreadCount > 0 && !isBlocked && styles.messagePreviewUnread,
+                  isBlocked && styles.messagePreviewBlocked,
                 ]}
               >
                 {theyBlockedMe
@@ -240,7 +240,7 @@ export default function ChatTab() {
             </View>
 
             {/* Right Side - Time and Unread */}
-            <View style={styles.chatRight}>
+            <View style={styles.messageRight}>
               {item.lastMessage && (
                 <Text style={styles.lastMessageTime}>{lastMessageTime}</Text>
               )}
@@ -262,42 +262,34 @@ export default function ChatTab() {
     <View style={[styles.container, { paddingTop: top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Ionicons
-            name="chatbubble"
-            size={24}
-            color={COLORS.primaryGradient}
-            style={{ marginRight: 8 }}
-          />
-          <Text style={styles.headerTitle}>Chats</Text>
-        </View>
+        <Text style={styles.headerTitle}>Messages</Text>
       </View>
 
-      {/* Chat List */}
+      {/* Message List */}
       <FlatList
         data={matches}
         keyExtractor={(item) => item.id}
-        renderItem={renderChatItem}
+        renderItem={renderMessageItem}
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: bottom + 80 },
         ]}
         ListEmptyComponent={
-          loadingChats ? (
+          loadingMessages ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.loadingText}>Loading chats...</Text>
+              <Text style={styles.loadingText}>Loading messages...</Text>
             </View>
           ) : (
             <View style={styles.emptyContainer}>
               <NeoCard style={styles.emptyCard}>
                 <View style={styles.emptyIconContainer}>
                   <Ionicons
-                    name="chatbubbles-outline"
+                    name="mail-open-outline"
                     size={48}
                     color={COLORS.primary}
                   />
                 </View>
-                <Text style={styles.emptyTitle}>No chats yet</Text>
+                <Text style={styles.emptyTitle}>No messages yet</Text>
                 <Text style={styles.emptySubtitle}>
                   When you match with someone, your conversations will appear here.
                 </Text>
@@ -318,23 +310,20 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 8,
     backgroundColor: COLORS.background,
     borderBottomWidth: BORDERS.thin,
     borderBottomColor: COLORS.border,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '900',
     color: COLORS.textPrimary,
+    letterSpacing: -0.5,
+    textAlign: 'left',
   },
 
   // List
@@ -342,16 +331,16 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 
-  // Chat Card
-  chatCard: {
+  // Message Card
+  messageCard: {
     marginBottom: 12,
     padding: 12,
   },
-  chatCardBlocked: {
+  messageCardBlocked: {
     opacity: 0.6,
     backgroundColor: COLORS.gray100,
   },
-  chatContent: {
+  messageContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -385,33 +374,33 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
 
-  // Chat Info
-  chatInfo: {
+  // Message Info
+  messageInfo: {
     flex: 1,
     justifyContent: 'center',
   },
-  chatName: {
+  messageName: {
     fontSize: 15,
     fontWeight: '700',
     color: COLORS.textPrimary,
     marginBottom: 4,
   },
-  chatMessage: {
+  messagePreview: {
     fontSize: 14,
     fontWeight: '500',
     color: COLORS.textMuted,
   },
-  chatMessageUnread: {
+  messagePreviewUnread: {
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
-  chatMessageBlocked: {
+  messagePreviewBlocked: {
     fontStyle: 'italic',
     color: COLORS.textLight,
   },
 
   // Right Side
-  chatRight: {
+  messageRight: {
     alignItems: 'flex-end',
     justifyContent: 'center',
   },

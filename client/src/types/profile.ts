@@ -1,6 +1,6 @@
 /**
  * @file client/src/types/profile.ts
- * @description Shared UserProfile type - what others see (feed, matches, chat).
+ * @description Shared UserProfile type - what others see (feed, matches, messages).
  *
  * Use this everywhere we display or pass profile data.
  * onboardingCompleted is only for "me" (current user) - used for auth/routing.

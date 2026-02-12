@@ -1,6 +1,6 @@
 /**
- * @file tests/integration/routes/chat-routes.test.ts
- * @description Integration tests for chat routes: match status, messages, block, unblock, hide.
+ * @file tests/integration/routes/message-routes.test.ts
+ * @description Integration tests for message routes: match status, messages, block, unblock, hide.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -11,7 +11,7 @@ import { likeService } from '../../../src/services/like.service.js';
 import { matchService } from '../../../src/services/match.service.js';
 import { prisma } from '../../../src/lib/prisma.js';
 
-describe('Chat Routes', () => {
+describe('Message Routes', () => {
     let app: FastifyInstance;
 
     beforeAll(async () => {
