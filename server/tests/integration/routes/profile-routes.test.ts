@@ -15,6 +15,19 @@ describe('Profile Routes', () => {
     beforeAll(async () => {
         app = await buildApp();
         await app.ready();
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS public.deleted_account_retention (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id text NOT NULL,
+            supabase_id text NOT NULL,
+            email text,
+            deleted_at timestamptz NOT NULL DEFAULT now(),
+            retention_ends_at timestamptz NOT NULL,
+            quarantined_file_paths text[] NOT NULL DEFAULT '{}'::text[],
+            metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+            purged_at timestamptz
+          );
+        `);
     });
 
     afterAll(async () => {
@@ -336,5 +349,65 @@ describe('Profile Routes', () => {
         });
 
         expect(response.statusCode).toBe(400);
+    });
+
+    it('DELETE /api/profile/me deletes account', async () => {
+        const token = await getAuthToken('test-user', 'test@example.com');
+        const me = await prisma.user.findFirst({ orderBy: { createdAt: 'desc' } });
+
+        const response = await app.inject({
+            method: 'DELETE',
+            url: '/api/profile/me',
+            headers: {
+                authorization: `Bearer ${token}`,
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body).toEqual({ success: true });
+
+        const deleted = await prisma.user.findUnique({ where: { id: me!.id } });
+        expect(deleted).toBeNull();
+    });
+
+    it('DELETE /api/profile/me writes retention ledger row', async () => {
+        const token = await getAuthToken('test-user', 'test@example.com');
+        const me = await prisma.user.findFirst({ orderBy: { createdAt: 'desc' } });
+
+        const response = await app.inject({
+            method: 'DELETE',
+            url: '/api/profile/me',
+            headers: {
+                authorization: `Bearer ${token}`,
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+
+        const rows = await prisma.$queryRawUnsafe<Array<{
+            user_id: string;
+            supabase_id: string;
+            email: string;
+            retention_ends_at: Date;
+        }>>(
+            'SELECT user_id, supabase_id, email, retention_ends_at FROM public.deleted_account_retention WHERE user_id = $1',
+            me!.id
+        );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0].user_id).toBe(me!.id);
+        expect(rows[0].supabase_id).toBe(me!.supabaseId);
+        expect(rows[0].email).toBe(me!.email);
+        expect(new Date(rows[0].retention_ends_at).getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('DELETE /api/profile/me rejects without auth', async () => {
+        const response = await app.inject({
+            method: 'DELETE',
+            url: '/api/profile/me',
+        });
+
+        expect(response.statusCode).toBe(401);
     });
 });

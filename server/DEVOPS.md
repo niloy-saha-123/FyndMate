@@ -16,25 +16,47 @@
 
 ## 📋 Common Commands Cheat Sheet
 
-### 1. Running Tests (LOCAL DOCKER ONLY)
+### 1. Running Tests (Client + Server, Safe Local Setup)
+
+#### 1A. Client tests (no DB access)
 
 ```bash
-# Check current environment
-echo $DATABASE_URL
-
-# Run tests (uses .env.test automatically)
+cd client
+npm install
 npm test
 
-# Run specific test file
-npm test -- tests/unit/utils/computeAge.test.ts
+# watch mode
+npm run test:watch
 
-# Run tests with coverage
-npm test -- --coverage
+# run only component tests
+npm run test:components
 
-# SAFETY CHECK: Tests will auto-abort if DATABASE_URL doesn't contain "127.0.0.1" or "localhost"
+# run only unit tests
+npm run test:unit
 ```
 
-**Environment**: Uses `.env.test` → Local Docker (`127.0.0.1:54322`)
+Client tests are pure unit/component tests and must not hit Supabase/Postgres.
+
+#### 1B. Server tests (LOCAL DOCKER ONLY)
+
+```bash
+cd server
+
+# Ensure local Supabase + local Redis are running
+supabase start
+docker ps | grep fyndmate-redis || docker run -d --name fyndmate-redis -p 6379:6379 redis:7-alpine
+
+# Build .env.test and sync schema to local test DB
+npm run test:setup
+
+# Run all tests
+npm test
+
+# Run specific file
+npm test -- tests/unit/utils/computeAge.test.ts
+```
+
+**Environment**: Server tests use `.env.test` and local docker only (`127.0.0.1`/`localhost`).
 
 ---
 
@@ -132,6 +154,7 @@ DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 DIRECT_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 SUPABASE_URL="http://127.0.0.1:54321"
 SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
+REDIS_URL="redis://127.0.0.1:6379"
 ```
 
 **Used by**: `npm test` (Vitest auto-loads this)
@@ -214,20 +237,23 @@ npm test
 
 ---
 
-### Workflow 3: Running Tests
+### Workflow 3: Running Tests (Both Apps)
 
 ```bash
-# 1. Ensure Docker is running
+# 1. Ensure local services are running
 supabase status
+docker ps | grep fyndmate-redis || docker run -d --name fyndmate-redis -p 6379:6379 redis:7-alpine
 
-# 2. Sync local database with production schema (if needed)
-DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" npx prisma db push --skip-generate
-
-# 3. Run tests
+# 2. Server test setup + run (local DB only)
+cd server
+npm run test:setup
 npm test
-
-# 4. Run specific test suite
 npm test -- tests/integration/services/like.test.ts
+
+# 3. Client test run (no DB access)
+cd ../client
+npm install
+npm test
 ```
 
 ---

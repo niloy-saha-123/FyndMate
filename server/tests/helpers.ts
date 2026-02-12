@@ -88,6 +88,22 @@ export async function clearDatabase() {
     await prisma.experience.deleteMany();
     await prisma.project.deleteMany();
     await prisma.user.deleteMany();
+
+    // Cleanup retention ledger if present (raw table managed outside Prisma schema)
+    await prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1
+          FROM information_schema.tables
+          WHERE table_schema = 'public'
+            AND table_name = 'deleted_account_retention'
+        ) THEN
+          DELETE FROM public.deleted_account_retention;
+        END IF;
+      END
+      $$;
+    `);
 }
 
 /**
