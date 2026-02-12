@@ -9,9 +9,9 @@ export const COLORS = {
   primaryGradient: '#8B5CF6', // Purple (for gradients)
   
   // Secondary/Accent Colors
-  accent: '#EC4899',        // Pink
-  accentLight: '#F9A8D4',   // Light Pink
-  accentDark: '#BE185D',    // Dark Pink
+  accent: '#B86EAA',        // Muted pink-violet
+  accentLight: '#F4EAF2',   // Very light pink-violet
+  accentDark: '#7F3F74',    // Soft deep pink-violet
   
   yellow: '#FDE047',        // Yellow for stars/highlights
   
@@ -35,8 +35,8 @@ export const COLORS = {
   // Chip/Tag Colors
   skillBg: '#EDE9FE',       // Purple tint
   skillText: '#5B21B6',     // Dark purple
-  lookingBg: '#FCE7F3',     // Pink tint
-  lookingText: '#BE185D',   // Dark pink
+  lookingBg: '#F7EDF5',     // Lighter pink-violet tint
+  lookingText: '#944A87',   // Softer pink-violet text
   greenBg: '#F0FDF4',       // Green tint
   greenText: '#047857',     // Dark green
   

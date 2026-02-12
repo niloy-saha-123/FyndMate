@@ -260,4 +260,81 @@ describe('Profile Routes', () => {
 
         expect(response.statusCode).toBe(200);
     });
+
+    it('PATCH updates projects and experiences', async () => {
+        const token = await getAuthToken('test-user', 'test@example.com');
+
+        const response = await app.inject({
+            method: 'PATCH',
+            url: '/api/profile/me',
+            headers: {
+                authorization: `Bearer ${token}`,
+            },
+            payload: {
+                projects: [
+                    { name: 'Fyndmate', description: 'A mini portfolio + collaborator app' },
+                ],
+                experiences: [
+                    {
+                        company: 'Acme Labs',
+                        position: 'Software Intern',
+                        description: 'Built mobile features',
+                        startDate: '2024-01',
+                        endDate: '2024-05',
+                    },
+                ],
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(Array.isArray(body.projects)).toBe(true);
+        expect(body.projects[0].name).toBe('Fyndmate');
+        expect(Array.isArray(body.experiences)).toBe(true);
+        expect(body.experiences[0].company).toBe('Acme Labs');
+    });
+
+    it('PATCH accepts optional empty experience timeline', async () => {
+        const token = await getAuthToken('test-user', 'test@example.com');
+
+        const response = await app.inject({
+            method: 'PATCH',
+            url: '/api/profile/me',
+            headers: {
+                authorization: `Bearer ${token}`,
+            },
+            payload: {
+                experiences: [
+                    {
+                        company: 'Acme Labs',
+                        position: 'Intern',
+                        startDate: '',
+                        endDate: '',
+                    },
+                ],
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+    });
+
+    it('PATCH rejects > 5 projects', async () => {
+        const token = await getAuthToken('test-user', 'test@example.com');
+
+        const response = await app.inject({
+            method: 'PATCH',
+            url: '/api/profile/me',
+            headers: {
+                authorization: `Bearer ${token}`,
+            },
+            payload: {
+                projects: Array(6).fill({
+                    name: 'Project',
+                    description: 'Description',
+                }),
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+    });
 });

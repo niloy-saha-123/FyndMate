@@ -12,6 +12,7 @@ import {
     matchIdParamSchema,
     feedQuerySchema,
     blockUserSchema,
+    reportUserSchema,
 } from '../../../src/schemas/matching.schema.js';
 
 describe('createLikeSchema', () => {
@@ -296,6 +297,32 @@ describe('blockUserSchema', () => {
     it('rejects non-UUID', () => {
         const result = blockUserSchema.safeParse({
             userId: 'not-a-uuid',
+        });
+        expect(result.success).toBe(false);
+    });
+});
+
+describe('reportUserSchema', () => {
+    it('accepts valid payload', () => {
+        const result = reportUserSchema.safeParse({
+            userId: crypto.randomUUID(),
+            reason: 'Spam and harassment in messages',
+        });
+        expect(result.success).toBe(true);
+    });
+
+    it('rejects short reason', () => {
+        const result = reportUserSchema.safeParse({
+            userId: crypto.randomUUID(),
+            reason: 'Too bad',
+        });
+        expect(result.success).toBe(false);
+    });
+
+    it('rejects oversized reason', () => {
+        const result = reportUserSchema.safeParse({
+            userId: crypto.randomUUID(),
+            reason: 'a'.repeat(501),
         });
         expect(result.success).toBe(false);
     });

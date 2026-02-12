@@ -15,7 +15,6 @@ model User {
   name                        String
   profilePicture              String?
   bio                         String?
-  experience                  String?
   skills                      String[]
   interests                   String[]
   commitment                  String?
@@ -46,6 +45,7 @@ model User {
   auditLogs                   AuditLog[]                    @relation("UserAuditLogs")
   blocksReceived              Block[]                       @relation("BlocksReceived")
   blocksMade                  Block[]                       @relation("BlocksMade")
+  experiences                 Experience[]
   likesReceived               Like[]                        @relation("LikesReceived")
   likesMade                   Like[]                        @relation("LikesMade")
   matchesAsUser1              Match[]                       @relation("User1Matches")
@@ -53,6 +53,8 @@ model User {
   MatchNotificationPreference MatchNotificationPreference[]
   sentMessages                Message[]                     @relation("SentMessages")
   projects                    Project[]
+  reportsReceived             Report[]                      @relation("ReportsReceived")
+  reportsMade                 Report[]                      @relation("ReportsMade")
   uploadSessions              UploadSession[]               @relation("UserUploadSessions")
 
   @@index([supabaseId])
@@ -74,6 +76,22 @@ model Project {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Experience {
+  id          String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId      String
+  company     String
+  position    String
+  description String?
+  startDate   DateTime? @db.Date
+  endDate     DateTime? @db.Date
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Like {
@@ -123,6 +141,19 @@ model Block {
   @@unique([blockerId, blockedId])
   @@index([blockerId])
   @@index([blockedId])
+}
+
+model Report {
+  id         String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  reporterId String
+  reportedId String
+  reason     String
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  reported   User     @relation("ReportsReceived", fields: [reportedId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  reporter   User     @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([reporterId, createdAt])
+  @@index([reportedId, createdAt])
 }
 
 model Message {
@@ -197,4 +228,14 @@ model MatchNotificationPreference {
   @@unique([matchId, userId], map: "unique_match_user_notification")
   @@index([matchId], map: "idx_match_notification_pref_match")
   @@index([userId], map: "idx_match_notification_pref_user")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model User_experience_backup {
+  id           String?
+  experience   String?
+  backed_up_at DateTime? @db.Timestamptz(6)
+
+  @@map("_User_experience_backup")
+  @@ignore
 }

@@ -21,7 +21,7 @@ export async function getMyMatches(userId: string) {
 
 export async function getMatchStatus(
   matchId: string
-): Promise<{ status: string; blockedBy: string | null }> {
+): Promise<{ status: string; blockedBy: string | null; otherUserId: string }> {
   return apiClient.get(`/api/matches/${matchId}`);
 }
 
@@ -60,4 +60,12 @@ export async function hideMatch(matchId: string) {
 
 export async function blockMatch(matchId: string) {
   return apiClient.post(`/api/matches/${matchId}/block`);
+}
+
+export async function unmatchMatch(matchId: string) {
+  return apiClient.post(`/api/matches/${matchId}/unmatch`);
+}
+
+export async function reportUser(userId: string, reason: string) {
+  return apiClient.post('/api/users/report', { userId, reason });
 }

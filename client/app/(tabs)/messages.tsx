@@ -12,7 +12,9 @@ import {
   Image,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +30,32 @@ import { COLORS, SHADOWS, BORDERS, RADIUS } from '../../src/theme/colors';
 import { NeoCard } from '../../src/components/NeoCard';
 import { formatRelativeTime, convertToLocalTime } from '../../src/utils/timeFormatting';
 
+const MESSAGES_CACHE_PREFIX = 'fyndmate_messages_cache:';
+
+type MessagesCache = {
+  matches: any[];
+  timestamp: number;
+};
+
+async function loadMessagesCache(userId: string): Promise<any[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(`${MESSAGES_CACHE_PREFIX}${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as MessagesCache;
+    return Array.isArray(parsed.matches) ? parsed.matches : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistMessagesCache(userId: string, matches: any[]) {
+  const payload: MessagesCache = {
+    matches,
+    timestamp: Date.now(),
+  };
+  AsyncStorage.setItem(`${MESSAGES_CACHE_PREFIX}${userId}`, JSON.stringify(payload)).catch(() => {});
+}
+
 export default function MessagesTab() {
   const { top, bottom } = useSafeAreaInsets();
   const { user, loading } = useAuth();
@@ -37,11 +65,34 @@ export default function MessagesTab() {
   useEffect(() => {
     if (!user || loading) return;
 
-    setLoadingMessages(true);
-    getMyMatches(user.id)
-      .then(setMatches)
-      .catch(console.error)
-      .finally(() => setLoadingMessages(false));
+    let mounted = true;
+
+    (async () => {
+      const cached = await loadMessagesCache(user.id);
+      if (mounted && cached && cached.length > 0) {
+        setMatches(cached);
+        setLoadingMessages(false);
+      } else if (mounted) {
+        setLoadingMessages(true);
+      }
+
+      try {
+        const fresh = await getMyMatches(user.id);
+        if (!mounted) return;
+        setMatches(fresh);
+        persistMessagesCache(user.id, fresh);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (mounted) {
+          setLoadingMessages(false);
+        }
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
   }, [user, loading]);
 
   useEffect(() => {
@@ -61,6 +112,7 @@ export default function MessagesTab() {
           if (match.user1Id !== user.id && match.user2Id !== user.id) return;
           const fresh = await getMyMatches(user.id);
           setMatches(fresh);
+          persistMessagesCache(user.id, fresh);
         }
       )
       .on(
@@ -71,7 +123,11 @@ export default function MessagesTab() {
           table: 'Match',
         },
         (payload) => {
-          setMatches((prev) => prev.filter((m) => m.id !== payload.old.id));
+          setMatches((prev) => {
+            const next = prev.filter((m) => m.id !== payload.old.id);
+            persistMessagesCache(user.id, next);
+            return next;
+          });
         }
       )
       .on(
@@ -84,10 +140,15 @@ export default function MessagesTab() {
         async (payload) => {
           const updated = payload.new;
           if (updated.status === 'hidden') {
-            setMatches((prev) => prev.filter((m) => m.id !== updated.id));
+            setMatches((prev) => {
+              const next = prev.filter((m) => m.id !== updated.id);
+              persistMessagesCache(user.id, next);
+              return next;
+            });
           } else {
             const fresh = await getMyMatches(user.id);
             setMatches(fresh);
+            persistMessagesCache(user.id, fresh);
           }
         }
       )
@@ -100,8 +161,8 @@ export default function MessagesTab() {
         },
         (payload) => {
           const msg = payload.new;
-          setMatches((prev) =>
-            prev.map((match) => {
+          setMatches((prev) => {
+            const next = prev.map((match) => {
               if (match.id !== msg.matchId) return match;
               if (match.status === 'blocked') return match;
 
@@ -112,8 +173,10 @@ export default function MessagesTab() {
                 lastMessage: msg,
                 unreadCount: match.unreadCount + unreadIncrement,
               };
-            })
-          );
+            });
+            persistMessagesCache(user.id, next);
+            return next;
+          });
         }
       )
       .subscribe();
@@ -213,9 +276,6 @@ export default function MessagesTab() {
                   <Ionicons name="person" size={24} color={COLORS.border} />
                 </View>
               )}
-              {!isBlocked && item.unreadCount === 0 && (
-                <View style={styles.onlineIndicator} />
-              )}
             </View>
 
             {/* Message Info */}
@@ -265,21 +325,33 @@ export default function MessagesTab() {
         <Text style={styles.headerTitle}>Messages</Text>
       </View>
 
-      {/* Message List */}
-      <FlatList
-        data={matches}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMessageItem}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: bottom + 80 },
-        ]}
-        ListEmptyComponent={
-          loadingMessages ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.loadingText}>Loading messages...</Text>
-            </View>
-          ) : (
+      {loadingMessages && matches.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading messages...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={matches}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessageItem}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: bottom + 80 },
+          ]}
+          refreshing={loadingMessages}
+          onRefresh={async () => {
+            if (!user) return;
+            setLoadingMessages(true);
+            try {
+              const fresh = await getMyMatches(user.id);
+              setMatches(fresh);
+              persistMessagesCache(user.id, fresh);
+            } finally {
+              setLoadingMessages(false);
+            }
+          }}
+          ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <NeoCard style={styles.emptyCard}>
                 <View style={styles.emptyIconContainer}>
@@ -295,9 +367,9 @@ export default function MessagesTab() {
                 </Text>
               </NeoCard>
             </View>
-          )
-        }
-      />
+          }
+        />
+      )}
     </View>
   );
 }
@@ -329,6 +401,12 @@ const styles = StyleSheet.create({
   // List
   listContent: {
     padding: 16,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
 
   // Message Card
@@ -362,18 +440,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.gray200,
   },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: COLORS.success,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-  },
-
   // Message Info
   messageInfo: {
     flex: 1,

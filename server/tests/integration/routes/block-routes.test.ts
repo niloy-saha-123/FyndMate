@@ -155,4 +155,79 @@ describe('Block Routes', () => {
 
         expect(response.statusCode).toBe(200);
     });
+
+    it('POST /api/users/report creates report, blocks user, and archives likes', async () => {
+        const token = await getAuthToken('test-user', 'test@example.com');
+        const me = await prisma.user.findFirst({ orderBy: { createdAt: 'desc' } });
+        const other = await createDummyUser('Other');
+
+        const like = await likeService.createLike(other.id, me!.id, true, 'Hello there!') as any;
+
+        const response = await app.inject({
+            method: 'POST',
+            url: '/api/users/report',
+            headers: { authorization: `Bearer ${token}` },
+            payload: {
+                userId: other.id,
+                reason: 'Repeated harassment and spam messages',
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+
+        const report = await prisma.report.findFirst({
+            where: { reporterId: me!.id, reportedId: other.id },
+        });
+        expect(report).not.toBeNull();
+
+        const block = await prisma.block.findUnique({
+            where: {
+                blockerId_blockedId: {
+                    blockerId: me!.id,
+                    blockedId: other.id,
+                },
+            },
+        });
+        expect(block).not.toBeNull();
+
+        const likeAfter = await prisma.like.findUnique({ where: { id: like.id } });
+        expect(likeAfter?.status).toBe('archived');
+    });
+
+    it('POST /api/users/report rejects short reason', async () => {
+        const token = await getAuthToken('test-user', 'test@example.com');
+        const me = await prisma.user.findFirst({ orderBy: { createdAt: 'desc' } });
+        const other = await createDummyUser('Other');
+
+        await likeService.createLike(other.id, me!.id, true, 'Hello there!');
+
+        const response = await app.inject({
+            method: 'POST',
+            url: '/api/users/report',
+            headers: { authorization: `Bearer ${token}` },
+            payload: {
+                userId: other.id,
+                reason: 'Too short',
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+    });
+
+    it('POST /api/users/report rejects without interaction', async () => {
+        const token = await getAuthToken('test-user', 'test@example.com');
+        const stranger = await createDummyUser('Stranger');
+
+        const response = await app.inject({
+            method: 'POST',
+            url: '/api/users/report',
+            headers: { authorization: `Bearer ${token}` },
+            payload: {
+                userId: stranger.id,
+                reason: 'Inappropriate behavior in prior interaction',
+            },
+        });
+
+        expect(response.statusCode).toBe(400);
+    });
 });

@@ -23,7 +23,10 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 const SENSITIVE_LOCATION_FIELDS = [
     'latitude',
     'longitude',
+    'lat',
+    'lng',
     'locationSecret',
+    'ipAddress',
     // TODO [PREMIUM]: Uncomment when fields are added to schema:
     // 'searchLatitude',
     // 'searchLongitude',

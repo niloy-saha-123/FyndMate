@@ -33,8 +33,8 @@ const TAB_CONFIG: Record<string, {
   profilePage: { icon: 'person-outline', label: 'Profile' },
 };
 
-const ICON_SIZE = 24;
-const PILL_SIZE = 42;
+const ICON_SIZE = 26;
+const PILL_SIZE = 46;
 
 const SPRING_CONFIG = {
   stiffness: 400,
@@ -47,7 +47,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { bottom } = useSafeAreaInsets();
   const { profile } = useAuth();
 
-  const bottomInset = Math.max(bottom, 12);
+  const bottomInset = Math.max(bottom, 10);
 
   // Store the center-X of each icon wrapper (relative to navbar)
   const iconCentersX = useRef<number[]>([]);
@@ -92,7 +92,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   };
 
   // The icon wrapper top position inside the navbar (paddingTop)
-  const PILL_TOP = 10; // matches paddingTop of navbar
+  const PILL_TOP = 8; // matches paddingTop of navbar
 
   return (
     <View style={[styles.navbar, { paddingBottom: bottomInset }]}>
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.navBackground,
     borderTopWidth: BORDERS.medium,
     borderTopColor: COLORS.border,
-    paddingTop: 10,
+    paddingTop: 8,
   },
 
   // Sliding pill — absolute in navbar, slides along X axis with spring
@@ -265,15 +265,15 @@ const styles = StyleSheet.create({
   },
 
   profileAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 2,
     overflow: 'hidden',
   },
   profileAvatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 13,
+    borderRadius: 14,
   },
 });

@@ -101,6 +101,13 @@ export class LikeService {
             }
 
             if (existing.liked && liked) {
+                // Allow re-like after archived interactions (e.g. unmatch/report cleanup)
+                if (existing.status !== 'active') {
+                    return await prisma.like.update({
+                        where: { id: existing.id },
+                        data: { message, status: 'active', createdAt: new Date() },
+                    });
+                }
                 throw new Error("You have already liked this user.");
             }
 

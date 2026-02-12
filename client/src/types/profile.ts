@@ -6,6 +6,21 @@
  * onboardingCompleted is only for "me" (current user) - used for auth/routing.
  */
 
+export interface ProjectItem {
+  id?: string;
+  name: string;
+  description: string;
+}
+
+export interface ExperienceItem {
+  id?: string;
+  company: string;
+  position: string;
+  description?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -13,8 +28,8 @@ export interface UserProfile {
   bio: string | null;
   skills: string[];
   interests: string[];
-  experience: string | null;
-  commitment: string | null;
+  projects: ProjectItem[];
+  experiences: ExperienceItem[];
   age: number | null;
   birthDate: string | null;
   city: string | null;
@@ -23,6 +38,7 @@ export interface UserProfile {
   githubUsername: string | null;
   lookingFor: string[];
   locationSharing: string | null;
+  locationPermission?: string | null;
   /** Display string e.g. "City, Country" */
   location?: string | null;
   /** Only for current user - used for onboarding/auth routing. Never expose to others. */

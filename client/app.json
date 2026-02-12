@@ -15,7 +15,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fyndMate.app"
+      "bundleIdentifier": "com.fyndMate.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "FyndMate uses your location to show your city and country on your profile.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "FyndMate uses your location in the background to keep your city and country up to date."
+      },
+      "uiBackgroundModes": [
+        "location"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +32,14 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.fyndMate.app",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -36,7 +50,16 @@
       }
     },
     "plugins": [
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow FyndMate to access your location in the background to keep your city and country updated.",
+          "locationWhenInUsePermission": "Allow FyndMate to access your location while using the app to show your city and country.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ]
     ]
   }
 }

@@ -8,6 +8,7 @@ import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { withCircuitBreaker } from '../utils/circuit-breaker.js';
 
 export const BUCKET_NAME = 'profile-pictures';
+const DELETED_ACCOUNTS_PREFIX = 'deleted-accounts';
 const SIGNED_URL_EXPIRES_IN = 120; // 2 minutes
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -209,6 +210,104 @@ export async function deleteUserFiles(userId: string): Promise<void> {
   if (error) {
     console.error(`Failed to delete user files for ${userId}:`, error.message);
   }
+}
+
+type QuarantineMove = {
+  sourcePath: string;
+  quarantinePath: string;
+};
+
+type QuarantineFailure = {
+  sourcePath: string;
+  reason: string;
+};
+
+export type QuarantineMoveResult = {
+  moved: QuarantineMove[];
+  failed: QuarantineFailure[];
+};
+
+function buildQuarantinePath(deletionReference: string, sourcePath: string): string {
+  const timestamp = Date.now();
+  const safeSource = sourcePath.replace(/\//g, '__');
+  return `${DELETED_ACCOUNTS_PREFIX}/${deletionReference}/${timestamp}-${safeSource}`;
+}
+
+/**
+ * Convert profile-picture URL or relative path into a storage path.
+ */
+export function toStoragePath(pathOrUrl: string): string {
+  return extractPathFromUrl(pathOrUrl);
+}
+
+/**
+ * Move a single file path (or URL) into quarantine for delayed deletion.
+ */
+export async function moveStoragePathToQuarantine(
+  pathOrUrl: string,
+  deletionReference: string
+): Promise<QuarantineMoveResult> {
+  const sourcePath = toStoragePath(pathOrUrl);
+  if (!sourcePath) {
+    return { moved: [], failed: [] };
+  }
+
+  const quarantinePath = buildQuarantinePath(deletionReference, sourcePath);
+  const { error } = await supabaseAdmin.storage
+    .from(BUCKET_NAME)
+    .move(sourcePath, quarantinePath);
+
+  if (error) {
+    return {
+      moved: [],
+      failed: [{ sourcePath, reason: error.message }],
+    };
+  }
+
+  return {
+    moved: [{ sourcePath, quarantinePath }],
+    failed: [],
+  };
+}
+
+/**
+ * Move all files in a user's profile-picture folder to quarantine.
+ */
+export async function moveUserFilesToQuarantine(
+  userId: string,
+  deletionReference: string
+): Promise<QuarantineMoveResult> {
+  const { data: files, error: listError } = await supabaseAdmin.storage
+    .from(BUCKET_NAME)
+    .list(userId);
+
+  if (listError || !files?.length) {
+    return {
+      moved: [],
+      failed: listError ? [{ sourcePath: `${userId}/*`, reason: listError.message }] : [],
+    };
+  }
+
+  const moved: QuarantineMove[] = [];
+  const failed: QuarantineFailure[] = [];
+
+  for (const file of files) {
+    const sourcePath = `${userId}/${file.name}`;
+    const quarantinePath = buildQuarantinePath(deletionReference, sourcePath);
+
+    const { error } = await supabaseAdmin.storage
+      .from(BUCKET_NAME)
+      .move(sourcePath, quarantinePath);
+
+    if (error) {
+      failed.push({ sourcePath, reason: error.message });
+      continue;
+    }
+
+    moved.push({ sourcePath, quarantinePath });
+  }
+
+  return { moved, failed };
 }
 
 /**

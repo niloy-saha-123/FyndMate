@@ -111,10 +111,10 @@ export function initApiClient(
  * Build headers with Authorization if token exists.
  * Throws if token is missing (dev guard).
  */
-function buildHeaders(requireAuth = true): HeadersInit {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
+function buildHeaders(requireAuth = true, includeJsonContentType = false): HeadersInit {
+  const headers: HeadersInit = includeJsonContentType
+    ? { 'Content-Type': 'application/json' }
+    : {};
 
   const token = getAccessToken();
 
@@ -185,7 +185,7 @@ export const apiClient = {
     const url = `${API_BASE_URL}${endpoint}`;
     const response = await fetch(url, {
       method: 'GET',
-      headers: buildHeaders(requireAuth),
+      headers: buildHeaders(requireAuth, false),
     });
     return handleResponse<T>(response);
   },
@@ -198,10 +198,11 @@ export const apiClient = {
    */
   async post<T = any>(endpoint: string, body?: any, requireAuth = true): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
+    const hasBody = body !== undefined;
     const response = await fetch(url, {
       method: 'POST',
-      headers: buildHeaders(requireAuth),
-      body: body ? JSON.stringify(body) : undefined,
+      headers: buildHeaders(requireAuth, hasBody),
+      body: hasBody ? JSON.stringify(body) : undefined,
     });
     return handleResponse<T>(response);
   },
@@ -214,10 +215,11 @@ export const apiClient = {
    */
   async patch<T = any>(endpoint: string, body?: any, requireAuth = true): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
+    const hasBody = body !== undefined;
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: buildHeaders(requireAuth),
-      body: body ? JSON.stringify(body) : undefined,
+      headers: buildHeaders(requireAuth, hasBody),
+      body: hasBody ? JSON.stringify(body) : undefined,
     });
     return handleResponse<T>(response);
   },
@@ -231,7 +233,7 @@ export const apiClient = {
     const url = `${API_BASE_URL}${endpoint}`;
     const response = await fetch(url, {
       method: 'DELETE',
-      headers: buildHeaders(requireAuth),
+      headers: buildHeaders(requireAuth, false),
     });
     return handleResponse<T>(response);
   },

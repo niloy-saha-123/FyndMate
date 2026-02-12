@@ -16,6 +16,7 @@
  * - POST /api/likes/:id/accept
  * - POST /api/matches
  * - POST /api/users/block
+ * - POST /api/users/report
  * 
  * NOTE: All functions use the centralized apiClient which automatically
  * attaches the Authorization header from the auth context.
@@ -150,4 +151,13 @@ export async function unmatchUser(matchId: string) {
  */
 export async function blockUser(userId: string) {
     return apiClient.post('/api/users/block', { userId });
+}
+
+/**
+ * REPORT A USER (auto-block + hide forever)
+ * @param userId ID of user to report
+ * @param reason Human-readable report reason
+ */
+export async function reportUser(userId: string, reason: string) {
+    return apiClient.post('/api/users/report', { userId, reason });
 }

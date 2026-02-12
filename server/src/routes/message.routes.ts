@@ -8,6 +8,7 @@ import { authMiddleware } from '../middleware/auth.middleware.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { messageService } from '../services/message.service.js';
 import { matchService } from '../services/match.service.js';
+import { blockService } from '../services/block.service.js';
 import {
     sendMessageSchema,
     editMessageSchema,
@@ -210,10 +211,11 @@ export default async function messageRoutes(app: FastifyInstance) {
             const { matchId } = paramsResult.data;
 
             try {
-                await matchService.blockMatch(matchId, user.id);
+                const matchStatus = await matchService.getMatchStatus(matchId, user.id);
+                await blockService.blockUser(user.id, matchStatus.otherUserId);
                 return reply.send({ success: true });
             } catch (err: any) {
-                if (err.message === 'Not authorized') {
+                if (err.message === 'Not authorized' || err.message === 'Match not found') {
                     return reply.status(403).send({ error: err.message });
                 }
                 request.log.error(err);

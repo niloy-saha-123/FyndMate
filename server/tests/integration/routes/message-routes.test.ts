@@ -50,6 +50,7 @@ describe('Message Routes', () => {
             const body = JSON.parse(response.body);
             expect(body).toHaveProperty('status', 'active');
             expect(body).toHaveProperty('blockedBy');
+            expect(body).toHaveProperty('otherUserId');
         });
 
         it('rejects non-participant', async () => {
@@ -230,7 +231,7 @@ describe('Message Routes', () => {
 
     describe('POST /api/matches/:matchId/block', () => {
         it('blocks match successfully', async () => {
-            const { token, match } = await setupMatch();
+            const { token, me, other, match } = await setupMatch();
 
             const response = await app.inject({
                 method: 'POST',
@@ -242,14 +243,25 @@ describe('Message Routes', () => {
             const body = JSON.parse(response.body);
             expect(body.success).toBe(true);
 
-            const statusRes = await app.inject({
-                method: 'GET',
-                url: `/api/matches/${match.id}`,
-                headers: { authorization: `Bearer ${token}` },
+            const deletedMatch = await prisma.match.findUnique({
+                where: { id: match.id },
             });
-            const status = JSON.parse(statusRes.body);
-            expect(status.status).toBe('blocked');
-            expect(status.blockedBy).toBeDefined();
+            expect(deletedMatch).toBeNull();
+
+            const deletedMessages = await prisma.message.count({
+                where: { matchId: match.id },
+            });
+            expect(deletedMessages).toBe(0);
+
+            const block = await prisma.block.findUnique({
+                where: {
+                    blockerId_blockedId: {
+                        blockerId: me.id,
+                        blockedId: other.id,
+                    },
+                },
+            });
+            expect(block).not.toBeNull();
         });
 
         it('rejects non-participant', async () => {

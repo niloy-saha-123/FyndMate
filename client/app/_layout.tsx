@@ -5,6 +5,7 @@ import { StyleSheet } from 'react-native';
 import { AuthProvider } from "../src/auth/AuthProvider";
 import { ApiClientInitializer } from "../src/components/ApiClientInitializer";
 import { NotificationProvider } from '@/src/notifications/NotificationProvider';
+import { LocationProvider } from '@/src/location/LocationProvider';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { OfflineBanner } from '../src/components/OfflineBanner';
 
@@ -32,21 +33,24 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <NotificationProvider>
-          <ApiClientInitializer>
-            <SafeAreaView style={styles.statusbar}>
-              <OfflineBanner />
-              <Stack>
-                <Stack.Screen name="index" options={{ headerShown: false }} />
-                <Stack.Screen name="login" options={{ headerShown: false }} />
-                <Stack.Screen name="auth" options={{ headerShown: false }} />
-                <Stack.Screen name="app-gate" options={{ headerShown: false }} />
-                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              </Stack>
-            </SafeAreaView>
-          </ApiClientInitializer>
-        </NotificationProvider>
+        <LocationProvider>
+          <NotificationProvider>
+            <ApiClientInitializer>
+              <SafeAreaView style={styles.statusbar}>
+                <OfflineBanner />
+                <Stack>
+                  <Stack.Screen name="index" options={{ headerShown: false }} />
+                  <Stack.Screen name="login" options={{ headerShown: false }} />
+                  <Stack.Screen name="auth" options={{ headerShown: false }} />
+                  <Stack.Screen name="app-gate" options={{ headerShown: false }} />
+                  <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="messages/profile/[userId]" options={{ headerShown: false }} />
+                </Stack>
+              </SafeAreaView>
+            </ApiClientInitializer>
+          </NotificationProvider>
+        </LocationProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

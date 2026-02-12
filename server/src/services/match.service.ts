@@ -44,8 +44,6 @@ export class MatchService {
                 }
             });
 
-            console.log('DEBUG: Like record fetched:', JSON.stringify(like, null, 2));
-
             if (!like) {
                 console.warn('Accept attempt on non-existent like', {
                     likeId,
@@ -85,8 +83,6 @@ export class MatchService {
             outerLikerId = likerId;
             outerLikedId = likedId;
 
-            console.log('DEBUG: Extracted IDs - likerId:', likerId, 'likedId:', likedId);
-
             const [u1, u2] = [likerId, likedId].sort();
 
             const existingMatch = await tx.match.findUnique({
@@ -95,7 +91,10 @@ export class MatchService {
 
             if (existingMatch) {
                 if (existingMatch.status === 'unmatched') {
-                    throw new Error("Cannot re-match with this user.");
+                    return await tx.match.update({
+                        where: { id: existingMatch.id },
+                        data: { status: 'active', blockedBy: null },
+                    });
                 }
                 return existingMatch;
             }
@@ -131,7 +130,6 @@ export class MatchService {
 
             // Create Intro Message (from Liker)
             if (introContent && likerId) {
-                console.log('Creating intro message with senderId:', likerId);
                 await tx.message.create({
                     data: {
                         match: { connect: { id: newMatch.id } },
@@ -146,7 +144,6 @@ export class MatchService {
             if (replyMessage && replyMessage.trim().length > 0 && likedId) {
                 const sanitizedReply = sanitizeText(replyMessage);
                 if (sanitizedReply.length > 0) {
-                    console.log('Creating reply message with senderId:', likedId);
                     await tx.message.create({
                         data: {
                             match: { connect: { id: newMatch.id } },
@@ -182,7 +179,7 @@ export class MatchService {
 
     /**
      * Unmatch a user.
-     * Soft-deletes the match by setting status to 'unmatched'.
+     * Soft-updates match status so chat history remains in DB for moderation/audit.
      */
     async unmatch(matchId: string, requestingUserId: string) {
         const match = await prisma.match.findUnique({ where: { id: matchId } });
@@ -202,10 +199,38 @@ export class MatchService {
             throw new Error("Not authorized.");
         }
 
-        return await prisma.match.update({
-            where: { id: matchId },
-            data: { status: 'unmatched' }
+        const user1Id = match.user1Id;
+        const user2Id = match.user2Id;
+
+        const updatedMatch = await prisma.$transaction(async (tx) => {
+            await tx.like.updateMany({
+                where: {
+                    OR: [
+                        { likerId: match.user1Id, likedId: match.user2Id },
+                        { likerId: match.user2Id, likedId: match.user1Id },
+                    ],
+                },
+                data: { status: 'archived' },
+            });
+
+            return await tx.match.update({
+                where: { id: matchId },
+                data: {
+                    status: 'unmatched',
+                    blockedBy: null,
+                },
+            });
         });
+
+        // Ensure both users can rediscover each other immediately after unmatch.
+        await Promise.all([
+            redis.del(`feed:${user1Id}`),
+            redis.del(`feed:${user2Id}`),
+        ]).catch((err) => {
+            console.warn('Cache invalidation failed after unmatch (non-critical):', err.message);
+        });
+
+        return updatedMatch;
     }
 
     /**
@@ -265,7 +290,7 @@ export class MatchService {
     /**
      * Get match status (status, blockedBy) for a participant.
      */
-    async getMatchStatus(matchId: string, userId: string): Promise<{ status: string; blockedBy: string | null }> {
+    async getMatchStatus(matchId: string, userId: string): Promise<{ status: string; blockedBy: string | null; otherUserId: string }> {
         const match = await prisma.match.findUnique({
             where: { id: matchId },
             select: { status: true, blockedBy: true, user1Id: true, user2Id: true },
@@ -278,7 +303,8 @@ export class MatchService {
             throw new Error('Not authorized');
         }
 
-        return { status: match.status, blockedBy: match.blockedBy };
+        const otherUserId = match.user1Id === userId ? match.user2Id : match.user1Id;
+        return { status: match.status, blockedBy: match.blockedBy, otherUserId };
     }
 
     /**
@@ -296,10 +322,45 @@ export class MatchService {
             throw new Error('Not authorized');
         }
 
-        return prisma.match.update({
-            where: { id: matchId },
-            data: { status: 'blocked', blockedBy: userId },
+        const blockedId = match.user1Id === userId ? match.user2Id : match.user1Id;
+
+        const result = await prisma.$transaction(async (tx) => {
+            await tx.block.upsert({
+                where: {
+                    blockerId_blockedId: {
+                        blockerId: userId,
+                        blockedId,
+                    },
+                },
+                create: {
+                    blockerId: userId,
+                    blockedId,
+                },
+                update: {},
+            });
+
+            await tx.like.updateMany({
+                where: {
+                    OR: [
+                        { likerId: userId, likedId: blockedId },
+                        { likerId: blockedId, likedId: userId },
+                    ],
+                },
+                data: { status: 'archived' },
+            });
+
+            return tx.match.update({
+                where: { id: matchId },
+                data: { status: 'blocked', blockedBy: userId },
+            });
         });
+
+        await Promise.all([
+            redis.del(`feed:${userId}`),
+            redis.del(`feed:${blockedId}`),
+        ]).catch(() => {});
+
+        return result;
     }
 
     /**
@@ -315,10 +376,28 @@ export class MatchService {
             throw new Error('Not authorized');
         }
 
-        return prisma.match.update({
-            where: { id: matchId },
-            data: { status: 'active', blockedBy: null },
+        const otherUserId = match.user1Id === userId ? match.user2Id : match.user1Id;
+
+        const result = await prisma.$transaction(async (tx) => {
+            await tx.block.deleteMany({
+                where: {
+                    blockerId: userId,
+                    blockedId: otherUserId,
+                },
+            });
+
+            return tx.match.update({
+                where: { id: matchId },
+                data: { status: 'active', blockedBy: null },
+            });
         });
+
+        await Promise.all([
+            redis.del(`feed:${userId}`),
+            redis.del(`feed:${otherUserId}`),
+        ]).catch(() => {});
+
+        return result;
     }
 
     /**

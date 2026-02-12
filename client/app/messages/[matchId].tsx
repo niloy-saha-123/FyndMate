@@ -10,7 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  Image
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, router, useNavigation } from "expo-router";
 import { useAuth } from "../../src/auth/AuthProvider";
@@ -19,6 +20,9 @@ import {
   sendMessage,
   editMessage,
   getMatchStatus,
+  unmatchMatch,
+  blockMatch,
+  reportUser,
 } from "../../src/messages/message.service";
 import { subscribeToMessages } from "../../src/messages/message.realtime";
 import { useMessageNotificationGuard } from "../../src/notifications/useMessageNotificationGuard";
@@ -26,6 +30,8 @@ import {
   MESSAGE_MAX_LENGTH,
   isMessageValid,
   getMessageError,
+  REPORT_REASON_MIN_LENGTH,
+  REPORT_REASON_MAX_LENGTH,
 } from "../../src/constants/validation";
 import {
   convertToLocalTime,
@@ -66,9 +72,11 @@ interface MatchUserInfo {
 }
 
 type RealtimeEvent = "upsert" | "delete" | "match_inactive";
+type ConfirmAction = "unmatch" | "block" | null;
 
 export default function MessageScreen() {
-  const { matchId } = useLocalSearchParams<{ matchId?: string }>();
+  const { matchId } = useLocalSearchParams<{ matchId?: string | string[] }>();
+  const normalizedMatchId = Array.isArray(matchId) ? matchId[0] : matchId;
   const { user } = useAuth();
   const navigation = useNavigation();
 
@@ -79,8 +87,8 @@ export default function MessageScreen() {
     });
   }, [navigation]);
 
-  if (matchId) {
-    useMessageNotificationGuard(matchId);
+  if (normalizedMatchId) {
+    useMessageNotificationGuard(normalizedMatchId);
   }
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -91,6 +99,7 @@ export default function MessageScreen() {
   const [matchStatus, setMatchStatus] = useState<{
     status: string;
     blockedBy: string | null;
+    otherUserId?: string;
   } | null>(null);
   const [otherUser, setOtherUser] = useState<MatchUserInfo | null>(null);
 
@@ -98,6 +107,12 @@ export default function MessageScreen() {
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [confirmingAction, setConfirmingAction] = useState(false);
+  const [loadingThread, setLoadingThread] = useState(true);
 
   const flatListRef = useRef<FlatList<MessageWithMetadata>>(null);
 
@@ -147,18 +162,14 @@ export default function MessageScreen() {
   }, [messages.length]);
 
   useEffect(() => {
-    if (!matchId || !user) return;
+    if (!normalizedMatchId || !user) return;
 
-    getMatchStatus(matchId)
-      .then(setMatchStatus)
-      .catch(console.error);
-
-    getMessages(matchId).then(setMessages).catch(console.error);
-
-    // Get the other user's info from the first message
-    getMessages(matchId).then(msgs => {
-      setMessages(msgs);
-      if (msgs.length > 0) {
+    setLoadingThread(true);
+    Promise.all([getMatchStatus(normalizedMatchId), getMessages(normalizedMatchId)])
+      .then(([status, msgs]) => {
+        setMatchStatus(status);
+        setMessages(msgs);
+        if (msgs.length > 0) {
         // Find the other user (not the current user)
         const firstMessage = msgs[0];
         const otherUserInfo = firstMessage.senderId === user.id
@@ -178,7 +189,12 @@ export default function MessageScreen() {
             title: otherUserInfo.name,
             headerTitle: () => (
               <Pressable
-                onPress={() => router.push(`/profile/${otherUserInfo.id}`)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/messages/profile/[userId]',
+                    params: { userId: otherUserInfo.id, matchId: normalizedMatchId },
+                  })
+                }
                 style={styles.headerTitleContainer}
               >
                 {otherUserInfo.profilePicture ? (
@@ -205,11 +221,13 @@ export default function MessageScreen() {
             headerBackTitleVisible: false,
           });
         }
-      }
-    }).catch(console.error);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoadingThread(false));
 
     const unsubscribe = subscribeToMessages(
-      matchId,
+      normalizedMatchId,
       (event: RealtimeEvent, payload: any) => {
         if (event === "match_inactive") {
           if (payload.status === "blocked") {
@@ -243,7 +261,7 @@ export default function MessageScreen() {
     );
 
     return unsubscribe;
-  }, [matchId, user]);
+  }, [normalizedMatchId, user]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -264,65 +282,72 @@ export default function MessageScreen() {
 
   const handleUnmatch = async () => {
     setMenuVisible(false);
-    Alert.alert(
-      "Unmatch",
-      "Are you sure you want to unmatch this person?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Unmatch",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // TODO: Implement unmatch functionality
-              // await unmatchUser(matchId);
-              router.replace('/matches');
-            } catch (error) {
-              console.error("Failed to unmatch:", error);
-              Alert.alert("Error", "Failed to unmatch. Please try again.");
-            }
-          }
-        }
-      ]
-    );
+    if (!normalizedMatchId) return;
+    setConfirmAction("unmatch");
   };
 
   const handleBlock = async () => {
     setMenuVisible(false);
-    Alert.alert(
-      "Block User",
-      "Are you sure you want to block this user?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Block",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // TODO: Implement block functionality
-              // await blockUser(otherUserInfo.id);
-              router.replace('/matches');
-            } catch (error) {
-              console.error("Failed to block user:", error);
-              Alert.alert("Error", "Failed to block user. Please try again.");
-            }
-          }
-        }
-      ]
-    );
+    if (!normalizedMatchId) return;
+    setConfirmAction("block");
   };
 
   const handleReport = () => {
     setMenuVisible(false);
-    Alert.alert(
-      "Report User",
-      "Reporting functionality is not yet implemented.",
-      [{ text: "OK", style: "default" }]
-    );
+    setReportReason("");
+    setReportModalVisible(true);
+  };
+
+  const runConfirmAction = async () => {
+    if (!normalizedMatchId || !confirmAction || confirmingAction) return;
+    setConfirmingAction(true);
+    try {
+      if (confirmAction === "unmatch") {
+        await unmatchMatch(normalizedMatchId);
+      } else {
+        await blockMatch(normalizedMatchId);
+      }
+      setConfirmAction(null);
+      router.replace('/(tabs)/messages');
+    } catch (error) {
+      const fallback = confirmAction === "unmatch"
+        ? "Failed to unmatch. Please try again."
+        : "Failed to block user. Please try again.";
+      Alert.alert("Error", fallback);
+    } finally {
+      setConfirmingAction(false);
+    }
+  };
+
+  const submitReport = async () => {
+    const reason = reportReason.trim();
+    const targetUserId = otherUser?.id ?? matchStatus?.otherUserId;
+
+    if (!targetUserId) {
+      Alert.alert("Error", "Could not determine who to report.");
+      return;
+    }
+    if (reason.length < REPORT_REASON_MIN_LENGTH) {
+      Alert.alert("Reason too short", `Please provide at least ${REPORT_REASON_MIN_LENGTH} characters.`);
+      return;
+    }
+
+    try {
+      setSubmittingReport(true);
+      await reportUser(targetUserId, reason);
+      setReportModalVisible(false);
+      setReportReason("");
+      Alert.alert("Report sent", "Thank you. This user has been blocked for your safety.");
+      router.replace('/(tabs)/messages');
+    } catch (error: any) {
+      Alert.alert("Failed to report", error?.message || "Please try again.");
+    } finally {
+      setSubmittingReport(false);
+    }
   };
 
   async function handleSend() {
-    if (!user || !matchId) return;
+    if (!user || !normalizedMatchId) return;
 
     // Validate message
     if (!isMessageValid(text)) return;
@@ -333,11 +358,11 @@ export default function MessageScreen() {
     try {
       if (editingMessage) {
         setSavingEdit(true);
-        await editMessage(editingMessage.id, content, matchId);
+        await editMessage(editingMessage.id, content, normalizedMatchId);
         setEditingMessage(null);
         setSavingEdit(false);
       } else {
-        await sendMessage(matchId, content);
+        await sendMessage(normalizedMatchId, content);
       }
     } catch (err: any) {
       if (err.message?.toLowerCase().includes("permission")) {
@@ -370,6 +395,13 @@ export default function MessageScreen() {
       keyboardVerticalOffset={80}
     >
       <View style={styles.container}>
+        {loadingThread ? (
+          <View style={styles.threadLoadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.threadLoadingText}>Loading messages...</Text>
+          </View>
+        ) : (
+          <>
         {isBlocked && (
           <View style={styles.blockedBanner}>
             <Text style={styles.blockedText}>
@@ -405,7 +437,12 @@ export default function MessageScreen() {
                 ]}>
                   {showAvatarAndName && (
                     <Pressable
-                      onPress={() => router.push(`/profile/${item.sender.id}`)}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/messages/profile/[userId]',
+                          params: { userId: item.sender.id, matchId: normalizedMatchId },
+                        })
+                      }
                       style={styles.avatarContainer}
                     >
                       {item.sender.profilePicture ? (
@@ -533,6 +570,96 @@ export default function MessageScreen() {
             </View>
           </Pressable>
         </Modal>
+
+        {/* Report Modal */}
+        <Modal transparent animationType="fade" visible={reportModalVisible}>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              if (submittingReport) return;
+              setReportModalVisible(false);
+            }}
+          >
+            <View style={styles.modalBox}>
+              <Text style={styles.modalTitle}>Report user</Text>
+              <Text style={styles.modalSubtitle}>
+                Tell us what happened
+              </Text>
+              <TextInput
+                value={reportReason}
+                onChangeText={setReportReason}
+                placeholder="Describe the issue..."
+                maxLength={REPORT_REASON_MAX_LENGTH}
+                multiline
+                style={styles.reportInput}
+              />
+              <View style={styles.reportActions}>
+                <Pressable
+                  style={[styles.reportButton, styles.reportCancelButton]}
+                  onPress={() => setReportModalVisible(false)}
+                  disabled={submittingReport}
+                >
+                  <Text style={styles.reportCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.reportButton, styles.reportSubmitButton, submittingReport && styles.sendButtonDisabled]}
+                  onPress={submitReport}
+                  disabled={submittingReport}
+                >
+                  <Text style={styles.reportSubmitText}>{submittingReport ? "Sending..." : "Send report"}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+        <Modal transparent animationType="fade" visible={!!confirmAction}>
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => {
+              if (confirmingAction) return;
+              setConfirmAction(null);
+            }}
+          >
+            <View style={styles.confirmBox}>
+              <Text style={styles.confirmTitle}>
+                {confirmAction === "unmatch" ? "Unmatch" : "Block user"}
+              </Text>
+              <Text style={styles.confirmBody}>
+                {confirmAction === "unmatch"
+                  ? "Are you sure you want to unmatch this person?"
+                  : "Are you sure you want to block this user?"}
+              </Text>
+              <View style={styles.confirmActions}>
+                <Pressable
+                  style={[styles.reportButton, styles.reportCancelButton]}
+                  disabled={confirmingAction}
+                  onPress={() => setConfirmAction(null)}
+                >
+                  <Text style={styles.reportCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.reportButton,
+                    styles.reportSubmitButton,
+                    confirmingAction && styles.sendButtonDisabled,
+                  ]}
+                  disabled={confirmingAction}
+                  onPress={runConfirmAction}
+                >
+                  <Text style={styles.reportSubmitText}>
+                    {confirmingAction
+                      ? "Please wait..."
+                      : confirmAction === "unmatch"
+                        ? "Unmatch"
+                        : "Block"}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+          </>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -540,6 +667,18 @@ export default function MessageScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  threadLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  threadLoadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
   messageList: { padding: 16 },
 
   // Header Title
@@ -747,16 +886,54 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     padding: 20,
     borderRadius: RADIUS.medium,
-    width: 200,
+    width: 220,
     borderWidth: BORDERS.thin,
     borderColor: COLORS.border,
     ...SHADOWS.medium,
+  },
+  confirmBox: {
+    backgroundColor: COLORS.surface,
+    padding: 20,
+    borderRadius: RADIUS.medium,
+    width: '88%',
+    maxWidth: 360,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    ...SHADOWS.medium,
+  },
+  confirmTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: COLORS.textPrimary,
+    marginBottom: 10,
+  },
+  confirmBody: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
+    marginBottom: 16,
+    lineHeight: 26,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 10,
   },
   modalAction: {
     fontSize: 16,
     paddingVertical: 12,
     textAlign: "center",
     fontWeight: '600',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginBottom: 12,
   },
 
   // Input Validation
@@ -768,5 +945,44 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: COLORS.danger,
     borderWidth: 2
-  }
+  },
+
+  reportInput: {
+    minHeight: 180,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.small,
+    padding: 10,
+    fontSize: 16,
+    textAlignVertical: 'top',
+    backgroundColor: COLORS.gray100,
+  },
+  reportActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
+  },
+  reportButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: RADIUS.small,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+  },
+  reportCancelButton: {
+    backgroundColor: COLORS.surface,
+  },
+  reportSubmitButton: {
+    backgroundColor: COLORS.danger,
+  },
+  reportCancelText: {
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  reportSubmitText: {
+    fontWeight: '700',
+    color: COLORS.surface,
+  },
 });

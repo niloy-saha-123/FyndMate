@@ -9,12 +9,14 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { likeService } from '../services/like.service.js';
 import { matchService } from '../services/match.service.js';
 import { blockService } from '../services/block.service.js';
+import { reportService } from '../services/report.service.js';
 import {
     createLikeSchema,
     acceptLikeSchema,
     likeIdParamSchema,
     matchIdParamSchema,
     blockUserSchema,
+    reportUserSchema,
 } from '../schemas/matching.schema.js';
 import {
     LIKES_RATE_LIMIT,
@@ -198,6 +200,31 @@ export default async function matchingRoutes(app: FastifyInstance) {
 
         try {
             await blockService.blockUser(user.id, blockedId);
+            return reply.send({ success: true });
+        } catch (error: any) {
+            request.log.error(error);
+            return reply.status(400).send({ error: error.message });
+        }
+    });
+
+    // Reporting (auto-block + remove visibility)
+    app.post('/users/report', async (request, reply) => {
+        const user = request.user!;
+
+        const parseResult = reportUserSchema.safeParse(request.body);
+        if (!parseResult.success) {
+            const firstIssue = parseResult.error.issues[0];
+            return reply.status(400).send({
+                error: 'Validation failed',
+                message: firstIssue?.message || 'Invalid request',
+                field: firstIssue?.path.join('.') || 'unknown',
+            });
+        }
+
+        const { userId: reportedId, reason } = parseResult.data;
+
+        try {
+            await reportService.reportUser(user.id, reportedId, reason);
             return reply.send({ success: true });
         } catch (error: any) {
             request.log.error(error);

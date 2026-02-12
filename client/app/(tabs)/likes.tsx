@@ -34,7 +34,7 @@ export default function LikesScreen() {
     const MAX_REPLY_LENGTH = 500;
 
     useEffect(() => {
-        fetchLikes();
+        fetchLikes({ silent: true });
     }, [fetchLikes]);
 
     const handleAccept = async () => {
@@ -53,8 +53,6 @@ export default function LikesScreen() {
     };
 
     const renderItem = ({ item }: { item: Like }) => {
-        const isOnline = Math.random() > 0.5; // Mock online status
-
         return (
             <NeoCard style={styles.requestCard}>
                 {/* Star Badge */}
@@ -76,7 +74,6 @@ export default function LikesScreen() {
                                 <Ionicons name="person" size={30} color={COLORS.border} />
                             </View>
                         )}
-                        {isOnline && <View style={styles.onlineIndicator} />}
                     </View>
                     <View style={styles.requestHeaderInfo}>
                         <Text style={styles.requestName}>{item.likerUser.name}</Text>
@@ -310,17 +307,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: COLORS.gray200,
-    },
-    onlineIndicator: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: COLORS.success,
-        borderWidth: 2,
-        borderColor: COLORS.border,
     },
     requestHeaderInfo: {
         flex: 1,

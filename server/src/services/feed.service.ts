@@ -123,19 +123,20 @@ export class FeedService {
             // Outgoing LIKES only (not passes) - users I liked should not reappear
             // Passed users (liked=false) CAN reappear in the feed for second chances
             prisma.like.findMany({
-                where: { likerId: userId, liked: true },
+                where: { likerId: userId, liked: true, status: 'active' },
                 select: { likedId: true },
             }),
 
             // Incoming likes (they liked me) should appear in "Likes You", not Feed.
             prisma.like.findMany({
-                where: { likedId: userId, liked: true },
+                where: { likedId: userId, liked: true, status: 'active' },
                 select: { likerId: true },
             }),
 
             prisma.match.findMany({
                 where: {
                     OR: [{ user1Id: userId }, { user2Id: userId }],
+                    status: 'active',
                 },
                 select: { user1Id: true, user2Id: true },
             }),
@@ -204,6 +205,19 @@ export class FeedService {
             priv.map(async (u: any) => ({
                 ...u,
                 profilePicture: await signProfilePicture(u.profilePicture),
+                projects: (u.projects ?? []).map((p: any) => ({
+                    id: p.id,
+                    name: p.title,
+                    description: p.description,
+                })),
+                experiences: (u.experiences ?? []).map((e: any) => ({
+                    id: e.id,
+                    company: e.company,
+                    position: e.position,
+                    description: e.description,
+                    startDate: e.startDate,
+                    endDate: e.endDate,
+                })),
             }))
         );
 

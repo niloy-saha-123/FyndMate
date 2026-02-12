@@ -12,6 +12,8 @@ import {
     INTRO_MESSAGE_MAX_LENGTH,
     REPLY_MESSAGE_MIN_LENGTH,
     REPLY_MESSAGE_MAX_LENGTH,
+    REPORT_REASON_MIN_LENGTH,
+    REPORT_REASON_MAX_LENGTH,
 } from './validation-constants.js';
 
 // ============================================
@@ -103,6 +105,17 @@ export const blockUserSchema = z.object({
     userId: z.string().uuid('Invalid user ID format'),
 });
 
+/**
+ * Schema for reporting a user.
+ * Used in: POST /api/users/report
+ */
+export const reportUserSchema = z.object({
+    userId: z.string().uuid('Invalid user ID format'),
+    reason: z.string()
+        .min(REPORT_REASON_MIN_LENGTH, `Report reason must be at least ${REPORT_REASON_MIN_LENGTH} characters`)
+        .max(REPORT_REASON_MAX_LENGTH, `Report reason cannot exceed ${REPORT_REASON_MAX_LENGTH} characters`),
+});
+
 // ============================================
 // TYPE EXPORTS
 // ============================================
@@ -111,3 +124,4 @@ export type CreateLikeInput = z.infer<typeof createLikeSchema>;
 export type AcceptLikeInput = z.infer<typeof acceptLikeSchema>;
 export type FeedQueryInput = z.infer<typeof feedQuerySchema>;
 export type BlockUserInput = z.infer<typeof blockUserSchema>;
+export type ReportUserInput = z.infer<typeof reportUserSchema>;

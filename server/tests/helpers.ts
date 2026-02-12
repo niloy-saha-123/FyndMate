@@ -52,8 +52,8 @@ export async function createDummyUser(name: string, overrides: any = {}) {
  * MUST be called in `beforeEach` to guarantee a clean slate for every test.
  *
  * Deletion order respects Foreign Key constraints:
- *   Message → MatchNotificationPreference → Match → Like → Block →
- *   UploadSession → AuditLog → Project → User
+ *   Message → MatchNotificationPreference → Match → Like → Block → Report →
+ *   UploadSession → AuditLog → Experience → Project → User
  */
 export async function clearDatabase() {
     // SAFETY: Prevent production database wipe
@@ -82,8 +82,10 @@ export async function clearDatabase() {
     await prisma.match.deleteMany();
     await prisma.like.deleteMany();
     await prisma.block.deleteMany();
+    await prisma.report.deleteMany();
     await prisma.uploadSession.deleteMany();
     await prisma.auditLog.deleteMany();
+    await prisma.experience.deleteMany();
     await prisma.project.deleteMany();
     await prisma.user.deleteMany();
 }

@@ -8,7 +8,7 @@
  * - Skip, Request, and Save actions
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -49,6 +49,7 @@ export default function FeedScreen() {
   const [message, setMessage] = useState('');
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const autoRefreshInFlight = useRef(false);
 
   // Computed validation state
   const introMessageError = getIntroMessageError(message);
@@ -57,6 +58,15 @@ export default function FeedScreen() {
   // useFeed loads cache + fetches 5 on mount. No explicit fetch needed.
 
   const currentProfile = profiles[currentIndex];
+  const formatMonth = (value?: string | null) => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      const monthMatch = /^(\d{4}-\d{2})/.exec(value);
+      return monthMatch ? monthMatch[1] : value;
+    }
+    return parsed.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  };
 
   const handleSkip = async () => {
     if (!currentProfile) return;
@@ -107,6 +117,23 @@ export default function FeedScreen() {
     setMessage(templates[type]);
   };
 
+  // Auto-refresh when feed is empty so newly joined users appear without manual action.
+  useEffect(() => {
+    if (currentProfile || loading) return;
+
+    const interval = setInterval(async () => {
+      if (autoRefreshInFlight.current) return;
+      autoRefreshInFlight.current = true;
+      try {
+        await fetchFeed(true);
+      } finally {
+        autoRefreshInFlight.current = false;
+      }
+    }, 90 * 1000);
+
+    return () => clearInterval(interval);
+  }, [currentProfile, loading, fetchFeed]);
+
   // Loading state
   if (loading && profiles.length === 0) {
     return (
@@ -141,7 +168,9 @@ export default function FeedScreen() {
             <Ionicons name="search" size={48} color={COLORS.primary} />
           </View>
           <Text style={styles.emptyTitle}>No more profiles</Text>
-          <Text style={styles.emptySubtitle}>Check back later for more collaborators!</Text>
+          <Text style={styles.emptySubtitle}>
+            Check back later for more collaborators, or refresh to fetch passed, unmatched, and new people.
+          </Text>
           <NeoButton
             title="Refresh"
             onPress={() => {
@@ -229,16 +258,6 @@ export default function FeedScreen() {
                 {currentProfile.bio || 'No bio available'}
               </Text>
 
-              {/* Meta tags */}
-              <ChipContainer style={{ marginTop: 12 }}>
-                {currentProfile.experience && (
-                  <NeoChip label={`${currentProfile.experience} experience`} variant="meta" />
-                )}
-                {currentProfile.commitment && (
-                  <NeoChip label={currentProfile.commitment} variant="meta" />
-                )}
-              </ChipContainer>
-
               {/* GitHub Link */}
               {currentProfile.githubUsername && (
                 <TouchableOpacity
@@ -252,26 +271,10 @@ export default function FeedScreen() {
               )}
             </View>
 
-            {/* Looking For (interests as fallback when lookingFor not in API) */}
-            {((currentProfile.lookingFor ?? currentProfile.interests ?? []).length > 0) && (
-              <View style={styles.sectionPadding}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.geoCircleSmall} />
-                  <Text style={styles.sectionTitle}>Looking for</Text>
-                </View>
-                <ChipContainer>
-                  {(currentProfile.lookingFor ?? currentProfile.interests ?? []).map((item: string, idx: number) => (
-                    <NeoChip key={idx} label={item} variant="looking" />
-                  ))}
-                </ChipContainer>
-              </View>
-            )}
-
             {/* Skills */}
             {currentProfile.skills && currentProfile.skills.length > 0 && (
               <View style={styles.sectionPadding}>
                 <View style={styles.sectionHeader}>
-                  <View style={styles.diamondIcon} />
                   <Text style={styles.sectionTitle}>Skills</Text>
                 </View>
                 <ChipContainer>
@@ -284,6 +287,61 @@ export default function FeedScreen() {
                     </Text>
                   )}
                 </ChipContainer>
+              </View>
+            )}
+
+            {/* Interests */}
+            {(currentProfile.interests ?? []).length > 0 && (
+              <View style={styles.sectionPadding}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Interests</Text>
+                </View>
+                <ChipContainer>
+                  {(currentProfile.interests ?? []).map((item: string, idx: number) => (
+                    <NeoChip key={idx} label={item} variant="looking" />
+                  ))}
+                </ChipContainer>
+              </View>
+            )}
+
+            {/* Experience */}
+            {currentProfile.experiences && currentProfile.experiences.length > 0 && (
+              <View style={styles.sectionPadding}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="briefcase-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                  <Text style={styles.sectionTitle}>Experience</Text>
+                </View>
+                {currentProfile.experiences.slice(0, 5).map((experience, index) => (
+                  <View key={experience.id ?? `experience-${index}`} style={styles.portfolioItem}>
+                    <Text style={styles.portfolioTitle}>
+                      {experience.position}{experience.company ? ` @ ${experience.company}` : ''}
+                    </Text>
+                    {experience.description ? (
+                      <Text style={styles.portfolioDescription}>{experience.description}</Text>
+                    ) : null}
+                    {(experience.startDate || experience.endDate) ? (
+                      <Text style={styles.portfolioTimeline}>
+                        {(formatMonth(experience.startDate) || 'Start')} - {(formatMonth(experience.endDate) || 'Present')}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Projects */}
+            {currentProfile.projects && currentProfile.projects.length > 0 && (
+              <View style={styles.sectionPadding}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="hammer-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                  <Text style={styles.sectionTitle}>Projects</Text>
+                </View>
+                {currentProfile.projects.slice(0, 5).map((project, index) => (
+                  <View key={project.id ?? `project-${index}`} style={styles.portfolioItem}>
+                    <Text style={styles.portfolioTitle}>{project.name}</Text>
+                    <Text style={styles.portfolioDescription}>{project.description}</Text>
+                  </View>
+                ))}
               </View>
             )}
 
@@ -674,6 +732,32 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: COLORS.textPrimary,
     lineHeight: 24,
+  },
+  portfolioItem: {
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.small,
+    padding: 12,
+    marginBottom: 10,
+  },
+  portfolioTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  portfolioDescription: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+    color: COLORS.textSecondary,
+  },
+  portfolioTimeline: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textMuted,
   },
   moreSkills: {
     fontSize: 12,
