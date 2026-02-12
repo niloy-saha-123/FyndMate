@@ -32,8 +32,8 @@ import {
   convertToLocalTime, 
   formatRelativeTime, 
   formatDateSection,
-  shouldShowTimestamp,
-  formatMessageTime
+  formatMessageTime,
+  isLastInBurst
 } from "../../src/utils/timeFormatting";
 import { COLORS, SHADOWS, BORDERS, RADIUS } from "../../src/theme/colors";
 import { NeoCard } from "../../src/components/NeoCard";
@@ -72,6 +72,7 @@ export default function ChatScreen() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [processedMessages, setProcessedMessages] = useState<MessageWithMetadata[]>([]);
+  const [visibleTimestamps, setVisibleTimestamps] = useState<Set<string>>(new Set()); // Track which timestamps should be visible
   const [text, setText] = useState("");
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [matchStatus, setMatchStatus] = useState<{
@@ -89,30 +90,46 @@ export default function ChatScreen() {
   useEffect(() => {
     if (messages.length === 0) {
       setProcessedMessages([]);
+      setVisibleTimestamps(new Set());
       return;
     }
 
     // Convert to local time and add metadata
     const withMetadata: MessageWithMetadata[] = messages.map((msg, index) => {
       const localCreatedAt = convertToLocalTime(msg.createdAt);
-      const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
-      const nextLocalCreatedAt = nextMessage ? convertToLocalTime(nextMessage.createdAt) : null;
+      
+      const shouldShowTs = isLastInBurst(messages, index);
       
       return {
         ...msg,
         localCreatedAt,
-        showTimestamp: shouldShowTimestamp(
-          localCreatedAt,
-          nextLocalCreatedAt,
-          msg.senderId,
-          nextMessage?.senderId || null
-        ),
+        showTimestamp: shouldShowTs,
         dateString: formatDateSection(localCreatedAt)
       };
     });
 
     setProcessedMessages(withMetadata);
+    
+    // Set up delayed timestamps for messages that should show timestamps
+    const newVisibleTimestamps = new Set(visibleTimestamps);
+    const messagesToShowTimestamp = withMetadata.filter(msg => msg.showTimestamp);
+    
+    messagesToShowTimestamp.forEach(msg => {
+      if (!newVisibleTimestamps.has(msg.id)) {
+        // Schedule timestamp to appear after 1 second delay
+        setTimeout(() => {
+          setVisibleTimestamps(prev => new Set(prev).add(msg.id));
+        }, 1000);
+      }
+    });
   }, [messages]);
+
+  // Clear visible timestamps when messages change significantly
+  useEffect(() => {
+    if (messages.length === 0) {
+      setVisibleTimestamps(new Set());
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     if (!matchId || !user) return;
@@ -300,7 +317,7 @@ export default function ChatScreen() {
                       {item.content}
                     </Text>
                     
-                    {item.showTimestamp && (
+                    {visibleTimestamps.has(item.id) && (
                       <View style={styles.timestampContainer}>
                         <Text style={styles.timestamp}>
                           {formatMessageTime(item.localCreatedAt)}

@@ -71,32 +71,33 @@ export function formatDateSection(date: Date): string {
 }
 
 /**
- * Check if two messages belong to the same burst
- * A burst is defined as messages from the same sender with <5 minutes gap
- * @param currentMessage Date of current message
- * @param nextMessage Date of next message (or null if last)
- * @param currentSenderId Sender ID of current message
- * @param nextSenderId Sender ID of next message (or null if last)
- * @returns True if timestamp should be shown (end of burst)
+ * Check if a message is the last in a burst from the same sender
+ * A burst is defined as consecutive messages from the same sender within 5 minutes
+ * @param messages Array of all messages
+ * @param currentIndex Index of current message
+ * @returns True if this message should show a timestamp
  */
-export function shouldShowTimestamp(
-  currentMessageDate: Date,
-  nextMessageDate: Date | null,
-  currentSenderId: string,
-  nextSenderId: string | null
-): boolean {
-  // Show timestamp if this is the last message
-  if (!nextMessageDate || !nextSenderId) {
+export function isLastInBurst(messages: Array<{id: string, senderId: string, createdAt: string}>, currentIndex: number): boolean {
+  const currentMessage = messages[currentIndex];
+  const currentSender = currentMessage.senderId;
+  const currentCreatedAt = new Date(currentMessage.createdAt);
+  
+  // If this is the last message overall, show timestamp
+  if (currentIndex === messages.length - 1) {
     return true;
   }
-
-  // Show timestamp if sender changes
-  if (currentSenderId !== nextSenderId) {
+  
+  const nextMessage = messages[currentIndex + 1];
+  const nextSender = nextMessage.senderId;
+  const nextCreatedAt = new Date(nextMessage.createdAt);
+  
+  // If sender changes, this is the last in burst
+  if (currentSender !== nextSender) {
     return true;
   }
-
-  // Show timestamp if gap is > 5 minutes
-  const gapMs = nextMessageDate.getTime() - currentMessageDate.getTime();
+  
+  // If gap to next message is > 5 minutes, this is the last in burst
+  const gapMs = nextCreatedAt.getTime() - currentCreatedAt.getTime();
   const gapMinutes = gapMs / (1000 * 60);
   
   return gapMinutes > 5;
