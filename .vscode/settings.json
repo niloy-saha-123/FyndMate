@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
         "supabase"
-    ]
+    ],
+    "prisma.pinToPrisma6": true
 }

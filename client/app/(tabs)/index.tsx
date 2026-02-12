@@ -24,7 +24,6 @@ import {
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeOutLeft, SlideInRight } from 'react-native-reanimated';
 
 import { useFeed } from '@/src/hooks/useFeed';
@@ -334,11 +333,8 @@ export default function FeedScreen() {
       </ScrollView>
 
       {/* Bottom Action Bar */}
-      <LinearGradient
-        colors={['#F9A8D4', '#F472B6']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.actionBar, { paddingBottom: bottom + 16 }]}
+      <View
+        style={[styles.actionBar, { paddingBottom: bottom + 16, backgroundColor: COLORS.surface }]}
       >
         <View style={styles.actionBarInner}>
           <NeoButton title="Skip" onPress={handleSkip} variant="secondary" />
@@ -349,7 +345,7 @@ export default function FeedScreen() {
           />
           {/* Bookmark button removed as per user request */}
         </View>
-      </LinearGradient>
+      </View>
 
       {/* Request Modal */}
       <Modal

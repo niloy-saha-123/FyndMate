@@ -32,13 +32,16 @@ export default function ChatTab() {
   const { top, bottom } = useSafeAreaInsets();
   const { user, loading } = useAuth();
   const [matches, setMatches] = useState<any[]>([]);
+  const [loadingChats, setLoadingChats] = useState(true);
 
   useEffect(() => {
     if (!user || loading) return;
 
+    setLoadingChats(true);
     getMyMatches(user.id)
       .then(setMatches)
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setLoadingChats(false));
   }, [user, loading]);
 
   useEffect(() => {
@@ -280,21 +283,27 @@ export default function ChatTab() {
           { paddingBottom: bottom + 80 },
         ]}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <NeoCard style={styles.emptyCard}>
-              <View style={styles.emptyIconContainer}>
-                <Ionicons
-                  name="chatbubbles-outline"
-                  size={48}
-                  color={COLORS.primary}
-                />
-              </View>
-              <Text style={styles.emptyTitle}>No chats yet</Text>
-              <Text style={styles.emptySubtitle}>
-                When you match with someone, your conversations will appear here.
-              </Text>
-            </NeoCard>
-          </View>
+          loadingChats ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.loadingText}>Loading chats...</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <NeoCard style={styles.emptyCard}>
+                <View style={styles.emptyIconContainer}>
+                  <Ionicons
+                    name="chatbubbles-outline"
+                    size={48}
+                    color={COLORS.primary}
+                  />
+                </View>
+                <Text style={styles.emptyTitle}>No chats yet</Text>
+                <Text style={styles.emptySubtitle}>
+                  When you match with someone, your conversations will appear here.
+                </Text>
+              </NeoCard>
+            </View>
+          )
         }
       />
     </View>

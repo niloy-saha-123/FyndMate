@@ -244,18 +244,17 @@ export class MatchService {
             const sanitizedUser2 = filterLocationByPrivacy(m.user2);
             const { birthDate: _b1, city: _c1, country: _ct1, ...u1 } = sanitizedUser1 as any;
             const { birthDate: _b2, city: _c2, country: _ct2, ...u2 } = sanitizedUser2 as any;
+
+            // Sign both profile pictures in parallel instead of sequentially
+            const [pic1, pic2] = await Promise.all([
+                signProfilePicture(u1.profilePicture),
+                signProfilePicture(u2.profilePicture),
+            ]);
+
             return {
                 ...m,
-                user1: {
-                    ...u1,
-                    profilePicture: await signProfilePicture(u1.profilePicture),
-                    age: age1
-                },
-                user2: {
-                    ...u2,
-                    profilePicture: await signProfilePicture(u2.profilePicture),
-                    age: age2
-                }
+                user1: { ...u1, profilePicture: pic1, age: age1 },
+                user2: { ...u2, profilePicture: pic2, age: age2 },
             };
         }));
 

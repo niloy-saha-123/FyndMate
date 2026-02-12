@@ -12,7 +12,7 @@ import {
   Alert,
   Image
 } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, router, useNavigation } from "expo-router";
 import { useAuth } from "../../src/auth/AuthProvider";
 import {
   getMessages,
@@ -60,11 +60,25 @@ interface MessageWithMetadata extends Message {
   dateString: string;
 }
 
+interface MatchUserInfo {
+  id: string;
+  name: string;
+  profilePicture: string | null;
+}
+
 type RealtimeEvent = "upsert" | "delete" | "match_inactive";
 
 export default function ChatScreen() {
   const { matchId } = useLocalSearchParams<{ matchId?: string }>();
   const { user } = useAuth();
+  const navigation = useNavigation();
+
+  // Hide default header initially to prevent flash of "chat/[matchId]"
+  useEffect(() => {
+    navigation.setOptions({
+      headerShown: false
+    });
+  }, [navigation]);
 
   if (matchId) {
     useChatNotificationGuard(matchId);
@@ -79,10 +93,12 @@ export default function ChatScreen() {
     status: string;
     blockedBy: string | null;
   } | null>(null);
+  const [otherUser, setOtherUser] = useState<MatchUserInfo | null>(null);
 
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [actionModalVisible, setActionModalVisible] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const flatListRef = useRef<FlatList<MessageWithMetadata>>(null);
 
@@ -140,6 +156,59 @@ export default function ChatScreen() {
 
     getMessages(matchId).then(setMessages).catch(console.error);
 
+    // Get the other user's info from the first message
+    getMessages(matchId).then(msgs => {
+      setMessages(msgs);
+      if (msgs.length > 0) {
+        // Find the other user (not the current user)
+        const firstMessage = msgs[0];
+        const otherUserInfo = firstMessage.senderId === user.id 
+          ? msgs.find(m => m.senderId !== user.id)?.sender 
+          : firstMessage.sender;
+        
+        if (otherUserInfo) {
+          setOtherUser({
+            id: otherUserInfo.id,
+            name: otherUserInfo.name,
+            profilePicture: otherUserInfo.profilePicture
+          });
+          
+          // Set the navigation header title
+          navigation.setOptions({
+            headerShown: true,
+            title: otherUserInfo.name,
+            headerTitle: () => (
+              <Pressable 
+                onPress={() => router.push(`/profile/${otherUserInfo.id}`)}
+                style={styles.headerTitleContainer}
+              >
+                {otherUserInfo.profilePicture ? (
+                  <Image
+                    source={{ uri: otherUserInfo.profilePicture }}
+                    style={styles.headerAvatar}
+                  />
+                ) : (
+                  <View style={[styles.headerAvatar, styles.noHeaderAvatar]}>
+                    <Ionicons name="person" size={20} color={COLORS.border} />
+                  </View>
+                )}
+                <Text style={styles.headerTitleText}>{otherUserInfo.name}</Text>
+              </Pressable>
+            ),
+            headerRight: () => (
+              <Pressable 
+                onPress={() => setMenuVisible(true)}
+                style={styles.headerMenuButton}
+              >
+                <Ionicons name="ellipsis-vertical" size={24} color={COLORS.textPrimary} />
+              </Pressable>
+            ),
+            headerBackTitleVisible: false,
+          });
+        }
+      }
+    }).catch(console.error);
+
     const unsubscribe = subscribeToMessages(
       matchId,
       (event: RealtimeEvent, payload: any) => {
@@ -193,6 +262,65 @@ export default function ChatScreen() {
       Date.now() - new Date(message.createdAt).getTime() < EDIT_WINDOW_MS
     );
   }
+
+  const handleUnmatch = async () => {
+    setMenuVisible(false);
+    Alert.alert(
+      "Unmatch",
+      "Are you sure you want to unmatch this person?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Unmatch",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // TODO: Implement unmatch functionality
+              // await unmatchUser(matchId);
+              router.replace('/matches');
+            } catch (error) {
+              console.error("Failed to unmatch:", error);
+              Alert.alert("Error", "Failed to unmatch. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleBlock = async () => {
+    setMenuVisible(false);
+    Alert.alert(
+      "Block User",
+      "Are you sure you want to block this user?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // TODO: Implement block functionality
+              // await blockUser(otherUserInfo.id);
+              router.replace('/matches');
+            } catch (error) {
+              console.error("Failed to block user:", error);
+              Alert.alert("Error", "Failed to block user. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleReport = () => {
+    setMenuVisible(false);
+    Alert.alert(
+      "Report User",
+      "Reporting functionality is not yet implemented.",
+      [{ text: "OK", style: "default" }]
+    );
+  };
 
   async function handleSend() {
     if (!user || !matchId) return;
@@ -291,7 +419,6 @@ export default function ChatScreen() {
                           <Ionicons name="person" size={20} color={COLORS.border} />
                         </View>
                       )}
-                      <Text style={styles.senderName}>{item.sender.name}</Text>
                     </Pressable>
                   )}
                   
@@ -316,17 +443,6 @@ export default function ChatScreen() {
                     >
                       {item.content}
                     </Text>
-                    
-                    {visibleTimestamps.has(item.id) && (
-                      <View style={styles.timestampContainer}>
-                        <Text style={styles.timestamp}>
-                          {formatMessageTime(item.localCreatedAt)}
-                        </Text>
-                        {item.editedAt && (
-                          <Text style={styles.edited}>edited</Text>
-                        )}
-                      </View>
-                    )}
                   </Pressable>
                 </View>
               </>
@@ -336,20 +452,6 @@ export default function ChatScreen() {
 
         {!isBlocked && (
           <View style={styles.inputWrapper}>
-            {/* Character counter and error */}
-            {text.length > 0 && (
-              <View style={styles.charCountContainer}>
-                <Text style={[
-                  styles.charCount,
-                  isMessageTooLong && styles.charCountError
-                ]}>
-                  {text.trim().length}/{CHAT_MESSAGE_MAX_LENGTH}
-                </Text>
-                {isMessageTooLong && (
-                  <Text style={styles.errorText}>Message too long</Text>
-                )}
-              </View>
-            )}
             <View style={styles.inputContainer}>
               <TextInput
                 value={text}
@@ -401,6 +503,37 @@ export default function ChatScreen() {
             </View>
           </Pressable>
         </Modal>
+
+        {/* Three-dot Menu Modal */}
+        <Modal transparent animationType="fade" visible={menuVisible}>
+          <Pressable
+            style={styles.menuOverlay}
+            onPress={() => setMenuVisible(false)}
+          >
+            <View style={styles.menuContainer}>
+              <Pressable
+                style={styles.menuItem}
+                onPress={handleUnmatch}
+              >
+                <Text style={[styles.menuText, styles.menuTextDestructive]}>Unmatch</Text>
+              </Pressable>
+              
+              <Pressable
+                style={styles.menuItem}
+                onPress={handleBlock}
+              >
+                <Text style={[styles.menuText, styles.menuTextDestructive]}>Block</Text>
+              </Pressable>
+              
+              <Pressable
+                style={[styles.menuItem, styles.menuItemLast]}
+                onPress={handleReport}
+              >
+                <Text style={styles.menuText}>Report</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -409,6 +542,68 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   messageList: { padding: 16 },
+
+  // Header Title
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: -20,
+  },
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+  },
+  noHeaderAvatar: {
+    backgroundColor: COLORS.gray200,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitleText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  headerMenuButton: {
+    padding: 12,
+    marginRight: -8,
+  },
+
+  // Menu Modal
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  menuContainer: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.medium,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    ...SHADOWS.medium,
+    minWidth: 180,
+  },
+  menuItem: {
+    padding: 16,
+    borderBottomWidth: BORDERS.thin,
+    borderBottomColor: COLORS.border,
+  },
+  menuItemLast: {
+    borderBottomWidth: 0,
+  },
+  menuText: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+  },
+  menuTextDestructive: {
+    color: COLORS.danger,
+    fontWeight: '600',
+  },
 
   // Date Headers
   dateHeader: {
@@ -461,13 +656,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  senderName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    maxWidth: 60,
-  },
 
   // Message Bubbles
   messageBubble: {
@@ -497,24 +685,6 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary 
   },
 
-  // Timestamps
-  timestampContainer: {
-    flexDirection: "row",
-    gap: 6,
-    marginTop: 6,
-    alignItems: 'center',
-  },
-  timestamp: { 
-    fontSize: 11, 
-    color: COLORS.textLight,
-    fontWeight: '500',
-  },
-  edited: { 
-    fontSize: 11, 
-    color: COLORS.textLight, 
-    fontStyle: "italic" 
-  },
-
   // Blocked Banner
   blockedBanner: {
     backgroundColor: COLORS.danger,
@@ -533,24 +703,28 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border
+    borderTopColor: COLORS.border,
+    alignItems: "center", // Keep send button vertically centered
   },
   input: {
     flex: 1,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: RADIUS.full,
+    borderRadius: RADIUS.large, // More rectangular with rounded edges instead of fully oval
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12, // Increased vertical padding for better text containment
     fontSize: 16,
-    backgroundColor: COLORS.gray100
+    backgroundColor: COLORS.gray100,
+    minHeight: 44, // Ensure minimum height for touch targets
   },
   sendButton: {
     backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24, // Increased from 20 to make button wider
+    paddingVertical: 12, // Added vertical padding for better proportion
     justifyContent: "center",
     borderRadius: RADIUS.full,
     marginLeft: 8,
+    minWidth: 80, // Minimum width to prevent it from becoming too thin
     ...SHADOWS.small,
   },
   sendButtonDisabled: { 
@@ -591,26 +765,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border
-  },
-  charCountContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 4
-  },
-  charCount: {
-    fontSize: 12,
-    color: COLORS.textLight
-  },
-  charCountError: {
-    color: COLORS.danger,
-    fontWeight: "600"
-  },
-  errorText: {
-    fontSize: 12,
-    color: COLORS.danger,
-    fontWeight: "500"
   },
   inputError: {
     borderColor: COLORS.danger,
