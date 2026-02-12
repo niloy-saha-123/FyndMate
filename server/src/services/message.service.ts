@@ -34,13 +34,14 @@ export class MessageService {
 
   /**
    * Get messages for a match. User must be a participant.
+   * Includes sender profile data for UI display.
    */
   async getMessages(matchId: string, userId: string) {
     await this.ensureMatchParticipant(matchId, userId);
 
-    return prisma.message.findMany({
+    const messages = await prisma.message.findMany({
       where: { matchId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'asc' }, // Oldest first - UI will reverse for display
       select: {
         id: true,
         matchId: true,
@@ -49,8 +50,17 @@ export class MessageService {
         createdAt: true,
         readAt: true,
         editedAt: true,
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            profilePicture: true,
+          }
+        }
       },
     });
+
+    return messages;
   }
 
   /**

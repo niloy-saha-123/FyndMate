@@ -26,6 +26,7 @@ import {
 import { supabase } from '../../src/auth/supabaseClient';
 import { COLORS, SHADOWS, BORDERS, RADIUS } from '../../src/theme/colors';
 import { NeoCard } from '../../src/components/NeoCard';
+import { formatRelativeTime, convertToLocalTime } from '../../src/utils/timeFormatting';
 
 export default function ChatTab() {
   const { top, bottom } = useSafeAreaInsets();
@@ -137,6 +138,11 @@ export default function ChatTab() {
     const isBlocked = item.status === 'blocked';
     const iBlockedThem = isBlocked && item.blockedBy === user.id;
     const theyBlockedMe = isBlocked && item.blockedBy !== user.id;
+    
+    // Format last message time
+    const lastMessageTime = item.lastMessage?.createdAt 
+      ? formatRelativeTime(convertToLocalTime(item.lastMessage.createdAt))
+      : '';
 
     return (
       <Pressable
@@ -230,8 +236,11 @@ export default function ChatTab() {
               </Text>
             </View>
 
-            {/* Right Side */}
+            {/* Right Side - Time and Unread */}
             <View style={styles.chatRight}>
+              {item.lastMessage && (
+                <Text style={styles.lastMessageTime}>{lastMessageTime}</Text>
+              )}
               {item.unreadCount > 0 && !isBlocked && (
                 <View style={styles.unreadBadge}>
                   <Text style={styles.unreadText}>
@@ -396,6 +405,12 @@ const styles = StyleSheet.create({
   chatRight: {
     alignItems: 'flex-end',
     justifyContent: 'center',
+  },
+  lastMessageTime: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    marginBottom: 4,
+    fontWeight: '500',
   },
   unreadBadge: {
     minWidth: 24,
