@@ -169,7 +169,7 @@ export default function FeedScreen() {
           </View>
           <Text style={styles.emptyTitle}>No more profiles</Text>
           <Text style={styles.emptySubtitle}>
-            Check back later for more collaborators, or refresh to fetch passed, unmatched, and new people.
+            Check back later for more profiles or refresh to see people you have passed.
           </Text>
           <NeoButton
             title="Refresh"
