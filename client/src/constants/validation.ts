@@ -34,6 +34,7 @@ export const PROFILE_BIO_MAX_LENGTH = 300;
 export const PROFILE_MAX_SKILLS = 15;
 export const PROFILE_MAX_INTERESTS = 15;
 export const PROFILE_TAG_MAX_LENGTH = 30;
+export const PROFILE_TAG_REGEX = /^[\p{L}\p{N}][\p{L}\p{N} +#./&-]*$/u;
 export const PROFILE_NAME_MAX_LENGTH = 100;
 export const PROFILE_GITHUB_MAX_LENGTH = 39;
 export const PROFILE_MIN_AGE = 13;

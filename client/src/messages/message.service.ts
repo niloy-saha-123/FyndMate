@@ -54,6 +54,12 @@ export async function editMessage(messageId: string, content: string, matchId: s
   return message;
 }
 
+export async function deleteMessage(matchId: string, messageId: string) {
+  return apiClient.patch(
+    `/api/matches/${matchId}/messages/${messageId}/delete`
+  );
+}
+
 export async function hideMatch(matchId: string) {
   return apiClient.post(`/api/matches/${matchId}/hide`);
 }

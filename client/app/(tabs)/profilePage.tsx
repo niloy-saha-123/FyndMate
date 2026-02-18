@@ -40,6 +40,7 @@ import {
   PROFILE_MAX_SKILLS,
   PROFILE_MAX_INTERESTS,
   PROFILE_TAG_MAX_LENGTH,
+  PROFILE_TAG_REGEX,
   PROFILE_GITHUB_MAX_LENGTH,
   PROFILE_MAX_PROJECTS,
   PROFILE_MAX_EXPERIENCES,
@@ -93,6 +94,21 @@ const AVAILABLE_INTERESTS = [
   'Hackathons',
   'Side Projects',
 ];
+
+function normalizeTagInput(value: string) {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function validateTagInput(value: string, label: 'Skill' | 'Interest') {
+  if (!value) return `${label} is required`;
+  if (value.length > PROFILE_TAG_MAX_LENGTH) {
+    return `${label} must be ${PROFILE_TAG_MAX_LENGTH} characters or less`;
+  }
+  if (!PROFILE_TAG_REGEX.test(value)) {
+    return `${label} contains invalid characters`;
+  }
+  return null;
+}
 
 function toMonthValue(value?: string | null): string {
   if (!value) return '';
@@ -248,15 +264,14 @@ export default function ProfilePage() {
   }, []);
 
   const addCustomSkill = useCallback(() => {
-    const trimmed = customSkill.trim();
-    if (!trimmed) return;
-
-    if (trimmed.length > PROFILE_TAG_MAX_LENGTH) {
-      setSkillError(`Skill must be ${PROFILE_TAG_MAX_LENGTH} characters or less`);
+    const normalized = normalizeTagInput(customSkill);
+    const validation = validateTagInput(normalized, 'Skill');
+    if (validation) {
+      setSkillError(validation);
       return;
     }
 
-    if (formData.skills.includes(trimmed)) {
+    if (formData.skills.includes(normalized)) {
       setSkillError('This skill is already added');
       return;
     }
@@ -266,21 +281,20 @@ export default function ProfilePage() {
       return;
     }
 
-    setFormData((prev) => ({ ...prev, skills: [...prev.skills, trimmed] }));
+    setFormData((prev) => ({ ...prev, skills: [...prev.skills, normalized] }));
     setCustomSkill('');
     setSkillError(null);
   }, [customSkill, formData.skills]);
 
   const addCustomInterest = useCallback(() => {
-    const trimmed = customInterest.trim();
-    if (!trimmed) return;
-
-    if (trimmed.length > PROFILE_TAG_MAX_LENGTH) {
-      setInterestError(`Interest must be ${PROFILE_TAG_MAX_LENGTH} characters or less`);
+    const normalized = normalizeTagInput(customInterest);
+    const validation = validateTagInput(normalized, 'Interest');
+    if (validation) {
+      setInterestError(validation);
       return;
     }
 
-    if (formData.interests.includes(trimmed)) {
+    if (formData.interests.includes(normalized)) {
       setInterestError('This interest is already added');
       return;
     }
@@ -290,7 +304,7 @@ export default function ProfilePage() {
       return;
     }
 
-    setFormData((prev) => ({ ...prev, interests: [...prev.interests, trimmed] }));
+    setFormData((prev) => ({ ...prev, interests: [...prev.interests, normalized] }));
     setCustomInterest('');
     setInterestError(null);
   }, [customInterest, formData.interests]);

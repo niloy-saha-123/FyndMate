@@ -33,6 +33,7 @@ import {
 
 const GITHUB_USERNAME_REGEX = /^(?!-)[A-Za-z0-9-]{1,39}(?<!-)$/;
 const EXPERIENCE_DATE_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
+const TAG_REGEX = /^[\p{L}\p{N}][\p{L}\p{N} +#./&-]*$/u;
 const ACCOUNT_DELETION_RETENTION_DAYS = Math.max(
   1,
   Number(process.env.ACCOUNT_DELETION_RETENTION_DAYS ?? 14)
@@ -311,16 +312,28 @@ export default async function profileRoutes(app: FastifyInstance) {
           ? sanitizeText(rest.githubUsername)
           : undefined;
         const sanitizedSkills = rest.skills?.map((skill, idx) => {
-          const sanitized = sanitizeText(skill);
+          const sanitized = sanitizeText(skill).replace(/\s+/g, ' ').trim();
           if (!sanitized) {
             throw new Error(`skills.${idx}: value is required`);
+          }
+          if (sanitized.length > PROFILE_TAG_MAX_LENGTH) {
+            throw new Error(`skills.${idx}: must be ${PROFILE_TAG_MAX_LENGTH} characters or less`);
+          }
+          if (!TAG_REGEX.test(sanitized)) {
+            throw new Error(`skills.${idx}: contains invalid characters`);
           }
           return sanitized;
         });
         const sanitizedInterests = rest.interests?.map((interest, idx) => {
-          const sanitized = sanitizeText(interest);
+          const sanitized = sanitizeText(interest).replace(/\s+/g, ' ').trim();
           if (!sanitized) {
             throw new Error(`interests.${idx}: value is required`);
+          }
+          if (sanitized.length > PROFILE_TAG_MAX_LENGTH) {
+            throw new Error(`interests.${idx}: must be ${PROFILE_TAG_MAX_LENGTH} characters or less`);
+          }
+          if (!TAG_REGEX.test(sanitized)) {
+            throw new Error(`interests.${idx}: contains invalid characters`);
           }
           return sanitized;
         });

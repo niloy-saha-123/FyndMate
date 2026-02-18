@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLikes } from '@/src/hooks/useLikes';
 import { Like } from '@/src/services/matchingService';
 import { useAuth } from '@/src/auth/AuthProvider';
+import { router } from 'expo-router';
 import { COLORS, SHADOWS, BORDERS, RADIUS } from '@/src/theme/colors';
 import { NeoCard } from '@/src/components/NeoCard';
 import { NeoButton } from '@/src/components/NeoButton';
@@ -31,6 +32,8 @@ export default function LikesScreen() {
 
     const [selectedLike, setSelectedLike] = useState<Like | null>(null);
     const [replyText, setReplyText] = useState('');
+    const [declineTarget, setDeclineTarget] = useState<Like | null>(null);
+    const [declineSubmitting, setDeclineSubmitting] = useState(false);
     const MAX_REPLY_LENGTH = 500;
 
     useEffect(() => {
@@ -44,12 +47,19 @@ export default function LikesScreen() {
         setReplyText('');
     };
 
-    const handleQuickAccept = async (item: Like) => {
-        await onAccept(item.id);
-    };
-
     const handleDecline = async (likeId: string) => {
         await onDecline(likeId);
+    };
+
+    const confirmDecline = async () => {
+        if (!declineTarget) return;
+        setDeclineSubmitting(true);
+        try {
+            await onDecline(declineTarget.id);
+        } finally {
+            setDeclineSubmitting(false);
+            setDeclineTarget(null);
+        }
     };
 
     const renderItem = ({ item }: { item: Like }) => {
@@ -63,7 +73,15 @@ export default function LikesScreen() {
 
                 {/* Header */}
                 <View style={styles.requestHeader}>
-                    <View style={styles.avatarContainer}>
+                    <TouchableOpacity
+                        style={styles.avatarContainer}
+                        onPress={() =>
+                            router.push({
+                                pathname: '/messages/profile/[userId]',
+                                params: { userId: item.likerUser.id },
+                            })
+                        }
+                    >
                         {item.likerUser.profilePicture ? (
                             <Image
                                 source={{ uri: item.likerUser.profilePicture }}
@@ -74,7 +92,7 @@ export default function LikesScreen() {
                                 <Ionicons name="person" size={30} color={COLORS.border} />
                             </View>
                         )}
-                    </View>
+                    </TouchableOpacity>
                     <View style={styles.requestHeaderInfo}>
                         <Text style={styles.requestName}>{item.likerUser.name}</Text>
                         <Text style={styles.requestMeta}>
@@ -91,19 +109,25 @@ export default function LikesScreen() {
 
                 {/* Actions */}
                 <View style={styles.requestActions}>
-                    <NeoButton
-                        title="Reply"
-                        onPress={() => setSelectedLike(item)}
-                        variant="secondary"
-                        size="small"
-                        style={{ flex: 1 }}
-                    />
-                    <NeoButton
-                        title="Accept"
-                        onPress={() => handleQuickAccept(item)}
-                        size="small"
-                        style={{ flex: 1, marginLeft: 8 }}
-                    />
+                    <View style={styles.requestActionSlot}>
+                        <NeoButton
+                            title="Decline"
+                            onPress={() => setDeclineTarget(item)}
+                            variant="secondary"
+                            size="small"
+                            fullWidth
+                            style={styles.requestActionButton}
+                        />
+                    </View>
+                    <View style={styles.requestActionSlot}>
+                        <NeoButton
+                            title="Accept"
+                            onPress={() => setSelectedLike(item)}
+                            size="small"
+                            fullWidth
+                            style={styles.requestActionButton}
+                        />
+                    </View>
                 </View>
             </NeoCard>
         );
@@ -177,7 +201,7 @@ export default function LikesScreen() {
                         <Text style={styles.modalTitle}>
                             Match with {selectedLike?.likerUser.name}
                         </Text>
-                        <Text style={styles.modalSubtitle}>Respond to their message:</Text>
+                        <Text style={styles.modalSubtitle}>Send a message or match instantly</Text>
 
                         {/* Quote */}
                         <View style={styles.quoteBox}>
@@ -208,10 +232,57 @@ export default function LikesScreen() {
                                 variant="secondary"
                             />
                             <NeoButton
-                                title="Send & Match"
+                                title="Accept"
                                 onPress={handleAccept}
-                                disabled={replyText.length < 1 || replyText.length > MAX_REPLY_LENGTH}
+                                disabled={replyText.length > MAX_REPLY_LENGTH}
                                 style={{ flex: 1, marginLeft: 12 }}
+                            />
+                        </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* Decline Confirmation Modal */}
+            <Modal
+                visible={!!declineTarget}
+                animationType="fade"
+                transparent
+                onRequestClose={() => {
+                    if (!declineSubmitting) setDeclineTarget(null);
+                }}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => {
+                        if (!declineSubmitting) setDeclineTarget(null);
+                    }}
+                >
+                    <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+                        <View style={styles.modalHandle} />
+                        <Text style={styles.modalTitle}>
+                            Decline {declineTarget?.likerUser.name}?
+                        </Text>
+                        <Text style={styles.modalSubtitle}>
+                            This will remove their request.
+                        </Text>
+
+                        <View style={styles.modalActionsRow}>
+                            <NeoButton
+                                title="Cancel"
+                                onPress={() => setDeclineTarget(null)}
+                                variant="secondary"
+                                size="small"
+                                style={{ flex: 1 }}
+                                disabled={declineSubmitting}
+                            />
+                            <NeoButton
+                                title={declineSubmitting ? "Declining..." : "Decline"}
+                                onPress={confirmDecline}
+                                variant="danger"
+                                size="small"
+                                style={{ flex: 1, marginLeft: 8 }}
+                                disabled={declineSubmitting}
                             />
                         </View>
                     </TouchableOpacity>
@@ -352,6 +423,14 @@ const styles = StyleSheet.create({
     // Actions
     requestActions: {
         flexDirection: 'row',
+        gap: 8,
+    },
+    requestActionSlot: {
+        flex: 1,
+        minWidth: 0,
+    },
+    requestActionButton: {
+        width: '100%',
     },
 
     // Loading/Error/Empty
@@ -439,6 +518,11 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: COLORS.textMuted,
         marginBottom: 16,
+    },
+    modalActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
     },
     quoteBox: {
         borderLeftWidth: 4,

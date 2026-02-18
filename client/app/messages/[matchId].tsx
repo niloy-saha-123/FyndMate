@@ -19,6 +19,7 @@ import {
   getMessages,
   sendMessage,
   editMessage,
+  deleteMessage,
   getMatchStatus,
   unmatchMatch,
   blockMatch,
@@ -52,6 +53,11 @@ interface Message {
   content: string;
   createdAt: string;
   editedAt?: string | null;
+  isDeleted?: boolean;
+  deletedBy?: string | null;
+  deletedAt?: string | null;
+  status?: "pending" | "failed" | "sent";
+  clientError?: string | null;
   sender: {
     id: string;
     name: string;
@@ -115,6 +121,8 @@ export default function MessageScreen() {
   const [loadingThread, setLoadingThread] = useState(true);
 
   const flatListRef = useRef<FlatList<MessageWithMetadata>>(null);
+  const FAILED_MESSAGE_TEXT = "Cannot send message";
+  const MESSAGE_SEND_WINDOW_MS = 5 * 60 * 1000;
 
   // Process messages with metadata for UI rendering
   useEffect(() => {
@@ -246,13 +254,9 @@ export default function MessageScreen() {
         }
 
         setMessages(prev => {
-          if (event === "delete") {
-            return prev.filter(m => m.id !== payload.id);
-          }
-
           const exists = prev.some(m => m.id === payload.id);
           if (exists) {
-            return prev.map(m => (m.id === payload.id ? payload : m));
+            return prev.map(m => (m.id === payload.id ? { ...m, ...payload } : m));
           }
 
           return [...prev, payload];
@@ -273,10 +277,94 @@ export default function MessageScreen() {
 
   function canEditMessage(message: Message): boolean {
     if (!user) return false;
-    const EDIT_WINDOW_MS = 3 * 60 * 1000;
     return (
+      !message.isDeleted &&
+      message.status !== "pending" &&
+      message.status !== "failed" &&
       message.senderId === user.id &&
-      Date.now() - new Date(message.createdAt).getTime() < EDIT_WINDOW_MS
+      Date.now() - new Date(message.createdAt).getTime() < MESSAGE_SEND_WINDOW_MS
+    );
+  }
+
+  function canDeleteMessage(message: Message): boolean {
+    if (!user) return false;
+    return (
+      !message.isDeleted &&
+      message.status !== "pending" &&
+      message.status !== "failed" &&
+      message.senderId === user.id &&
+      Date.now() - new Date(message.createdAt).getTime() < MESSAGE_SEND_WINDOW_MS
+    );
+  }
+
+  function canRetryMessage(message: Message): boolean {
+    if (!user) return false;
+    return (
+      message.status === "failed" &&
+      message.senderId === user.id
+    );
+  }
+
+  function isSuspiciousContent(content: string): boolean {
+    const lower = content.toLowerCase();
+    if (lower.includes("<script")) return true;
+    if (content.includes("\u0000")) return true;
+
+    const sqlPattern = /\b(drop|alter|delete|insert|update|union|select)\b/i;
+    const injectionMarkers = /(--|\/\*|\*\/|;)/;
+    if (sqlPattern.test(content) && injectionMarkers.test(content)) return true;
+
+    return false;
+  }
+
+  function getDeletedLabel(message: Message): string {
+    if (!user) return "Deleted a message";
+    if (message.senderId === user.id) return "You deleted a message";
+    const fallbackName = otherUser?.name || "User";
+    const senderName = message.sender?.name || fallbackName;
+    return `${senderName} deleted a message`;
+  }
+
+  function getDisplayContent(message: Message): string {
+    if (message.isDeleted) {
+      return getDeletedLabel(message);
+    }
+    return message.content;
+  }
+
+  function createLocalMessage(content: string, status: "pending" | "failed"): Message {
+    const now = new Date().toISOString();
+    return {
+      id: `local-${Date.now()}`,
+      matchId: normalizedMatchId || "local",
+      senderId: user?.id || "local",
+      content,
+      createdAt: now,
+      editedAt: null,
+      isDeleted: false,
+      deletedBy: null,
+      deletedAt: null,
+      status,
+      clientError: status === "failed" ? FAILED_MESSAGE_TEXT : null,
+      sender: {
+        id: user?.id || "local",
+        name: "You",
+        profilePicture: null,
+      },
+    };
+  }
+
+  function replaceLocalMessage(localId: string, next: Message) {
+    setMessages(prev => prev.map(m => (m.id === localId ? next : m)));
+  }
+
+  function markLocalFailed(localId: string) {
+    setMessages(prev =>
+      prev.map(m =>
+        m.id === localId
+          ? { ...m, status: "failed", clientError: FAILED_MESSAGE_TEXT }
+          : m
+      )
     );
   }
 
@@ -357,12 +445,32 @@ export default function MessageScreen() {
 
     try {
       if (editingMessage) {
+        if (editingMessage.isDeleted) {
+          Alert.alert("Can't edit", "This message was deleted.");
+          setEditingMessage(null);
+          return;
+        }
         setSavingEdit(true);
         await editMessage(editingMessage.id, content, normalizedMatchId);
         setEditingMessage(null);
         setSavingEdit(false);
       } else {
-        await sendMessage(normalizedMatchId, content);
+        if (isSuspiciousContent(content)) {
+          const failed = createLocalMessage(content, "failed");
+          setMessages(prev => [...prev, failed]);
+          return;
+        }
+
+        const localPending = createLocalMessage(content, "pending");
+        setMessages(prev => [...prev, localPending]);
+
+        try {
+          const created = await sendMessage(normalizedMatchId, content);
+          replaceLocalMessage(localPending.id, { ...created, status: "sent" });
+        } catch (err) {
+          markLocalFailed(localPending.id);
+          throw err;
+        }
       }
     } catch (err: any) {
       if (err.message?.toLowerCase().includes("permission")) {
@@ -375,7 +483,7 @@ export default function MessageScreen() {
       }
 
       console.error(err);
-      Alert.alert("Error", "Failed to send message");
+      Alert.alert("Error", FAILED_MESSAGE_TEXT);
       setText(content);
       setSavingEdit(false);
     }
@@ -387,6 +495,8 @@ export default function MessageScreen() {
   const messageError = getMessageError(text);
   const isMessageTooLong = text.trim().length > MESSAGE_MAX_LENGTH;
   const canSend = isMessageValid(text) && !savingEdit;
+  const canEditSelected = selectedMessage ? canEditMessage(selectedMessage) : false;
+  const canDeleteSelected = selectedMessage ? canDeleteMessage(selectedMessage) : false;
 
   return (
     <KeyboardAvoidingView
@@ -458,28 +568,48 @@ export default function MessageScreen() {
                     </Pressable>
                   )}
 
-                  <Pressable
-                    onLongPress={() => {
-                      if (!canEditMessage(item) || isBlocked) return;
-                      setSelectedMessage(item);
-                      setActionModalVisible(true);
-                    }}
-                    style={[
-                      styles.messageBubble,
-                      isMyMessage ? styles.myMessage : styles.theirMessage
-                    ]}
-                  >
-                    <Text
+                  <View style={styles.messageContentStack}>
+                    <Pressable
+                      onPress={() => {
+                        if (!canRetryMessage(item)) return;
+                        setText(item.content);
+                      }}
+                      onLongPress={() => {
+                        if (isBlocked || item.senderId !== user.id) return;
+                        setSelectedMessage(item);
+                        setActionModalVisible(true);
+                      }}
                       style={[
-                        styles.messageText,
-                        isMyMessage
-                          ? styles.myMessageText
-                          : styles.theirMessageText
+                        styles.messageBubble,
+                        isMyMessage ? styles.myMessage : styles.theirMessage,
+                        item.isDeleted && styles.deletedMessageBubble,
+                        item.status === "failed" && styles.failedMessageBubble
                       ]}
                     >
-                      {item.content}
-                    </Text>
-                  </Pressable>
+                      <Text
+                        style={[
+                          styles.messageText,
+                          isMyMessage
+                            ? styles.myMessageText
+                            : styles.theirMessageText,
+                          item.isDeleted && styles.deletedMessageText
+                        ]}
+                      >
+                        {getDisplayContent(item)}
+                      </Text>
+                    </Pressable>
+                    {!item.isDeleted && item.editedAt ? (
+                      <Text style={[
+                        styles.editedLabel,
+                        isMyMessage ? styles.editedLabelMy : styles.editedLabelTheir
+                      ]}>
+                        edited
+                      </Text>
+                    ) : null}
+                    {item.status === "failed" ? (
+                      <Text style={styles.failedLabel}>{FAILED_MESSAGE_TEXT}</Text>
+                    ) : null}
+                  </View>
                 </View>
               </>
             );
@@ -524,13 +654,44 @@ export default function MessageScreen() {
             <View style={styles.modalBox}>
               <Pressable
                 onPress={() => {
-                  if (!selectedMessage) return;
+                  if (!selectedMessage || !canEditSelected) return;
                   setEditingMessage(selectedMessage);
                   setText(selectedMessage.content);
                   setActionModalVisible(false);
                 }}
+                disabled={!canEditSelected}
               >
-                <Text style={styles.modalAction}>Edit</Text>
+                <Text style={[styles.modalAction, !canEditSelected && styles.modalActionDisabled]}>
+                  Edit
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={async () => {
+                  if (!selectedMessage) return;
+                  if (selectedMessage.status === "failed") {
+                    setMessages(prev => prev.filter(m => m.id !== selectedMessage.id));
+                    setActionModalVisible(false);
+                    return;
+                  }
+                  if (!canDeleteSelected || !normalizedMatchId) return;
+                  try {
+                    await deleteMessage(normalizedMatchId, selectedMessage.id);
+                  } catch (err: any) {
+                    Alert.alert("Error", err?.message || "Failed to delete message");
+                  } finally {
+                    setActionModalVisible(false);
+                  }
+                }}
+                disabled={!selectedMessage || (selectedMessage.status !== "failed" && !canDeleteSelected)}
+              >
+                <Text style={[
+                  styles.modalAction,
+                  styles.modalActionDelete,
+                  (!selectedMessage || (selectedMessage.status !== "failed" && !canDeleteSelected)) && styles.modalActionDisabled
+                ]}>
+                  Delete
+                </Text>
               </Pressable>
 
               <Pressable onPress={() => setActionModalVisible(false)}>
@@ -767,6 +928,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     alignItems: 'flex-end',
   },
+  messageContentStack: {
+    maxWidth: "70%",
+  },
   myMessageContainer: {
     justifyContent: 'flex-end',
     flexDirection: 'row',
@@ -797,7 +961,6 @@ const styles = StyleSheet.create({
 
   // Message Bubbles
   messageBubble: {
-    maxWidth: "70%",
     padding: 12,
     borderRadius: RADIUS.large,
     borderWidth: BORDERS.thin,
@@ -821,6 +984,36 @@ const styles = StyleSheet.create({
   },
   theirMessageText: {
     color: COLORS.textPrimary
+  },
+  deletedMessageBubble: {
+    backgroundColor: COLORS.gray100,
+    borderStyle: 'dashed',
+  },
+  deletedMessageText: {
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+  },
+  failedMessageBubble: {
+    borderColor: COLORS.danger,
+  },
+  editedLabel: {
+    marginTop: 4,
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  editedLabelMy: {
+    color: COLORS.textMuted,
+    alignSelf: 'flex-end',
+  },
+  editedLabelTheir: {
+    color: COLORS.textMuted,
+    alignSelf: 'flex-start',
+  },
+  failedLabel: {
+    marginTop: 6,
+    fontSize: 12,
+    color: COLORS.danger,
+    fontWeight: "600",
   },
 
   // Blocked Banner
@@ -923,6 +1116,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     textAlign: "center",
     fontWeight: '600',
+  },
+  modalActionDelete: {
+    color: COLORS.danger,
+  },
+  modalActionDisabled: {
+    color: COLORS.textLight,
   },
   modalTitle: {
     fontSize: 18,

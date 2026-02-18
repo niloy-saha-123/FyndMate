@@ -1,6 +1,6 @@
 /**
  * @file client/src/theme/colors.ts
- * @description Neo-brutalist color palette for Collab/FyndMate
+ * @description Neo-brutalist color palette for Troupe/FyndMate
  */
 
 export const COLORS = {
