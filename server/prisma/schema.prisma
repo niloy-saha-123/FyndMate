@@ -164,6 +164,9 @@ model Message {
   createdAt DateTime  @default(now())
   readAt    DateTime?
   editedAt  DateTime? @db.Timestamp(6)
+  isDeleted Boolean   @default(false)
+  deletedBy String?
+  deletedAt DateTime? @db.Timestamp(6)
   match     Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
   sender    User      @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
@@ -238,4 +241,18 @@ model User_experience_backup {
 
   @@map("_User_experience_backup")
   @@ignore
+}
+
+model deleted_account_retention {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                String
+  supabase_id            String
+  email                  String?
+  deleted_at             DateTime  @default(now()) @db.Timestamptz(6)
+  retention_ends_at      DateTime  @db.Timestamptz(6)
+  quarantined_file_paths String[]  @default([])
+  metadata               Json      @default("{}")
+  purged_at              DateTime? @db.Timestamptz(6)
+
+  @@index([deleted_at(sort: Desc)], map: "idx_deleted_account_retention_deleted_at")
 }

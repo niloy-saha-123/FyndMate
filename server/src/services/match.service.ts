@@ -254,7 +254,17 @@ export class MatchService {
                 messages: {
                     take: 1,
                     orderBy: { createdAt: 'desc' },
-                    select: { id: true, content: true, senderId: true, createdAt: true, readAt: true }, // TODO [POST-MVP]: Implement proper read receipts and unread counts server-side.
+                    select: {
+                        id: true,
+                        content: true,
+                        senderId: true,
+                        createdAt: true,
+                        readAt: true,
+                        editedAt: true,
+                        isDeleted: true,
+                        deletedBy: true,
+                        deletedAt: true,
+                    }, // TODO [POST-MVP]: Implement proper read receipts and unread counts server-side.
                 }
             },
             orderBy: {
@@ -276,10 +286,22 @@ export class MatchService {
                 signProfilePicture(u2.profilePicture),
             ]);
 
+            const normalizedMessages = (m.messages ?? []).map((msg: any) => {
+                if (!msg?.isDeleted) return msg;
+                const senderName = msg.senderId === userId
+                    ? 'You'
+                    : (msg.senderId === m.user1Id ? u1.name : u2.name);
+                const content = senderName === 'You'
+                    ? 'You deleted a message'
+                    : `${senderName} deleted a message`;
+                return { ...msg, content };
+            });
+
             return {
                 ...m,
                 user1: { ...u1, profilePicture: pic1, age: age1 },
                 user2: { ...u2, profilePicture: pic2, age: age2 },
+                messages: normalizedMessages,
             };
         }));
 
