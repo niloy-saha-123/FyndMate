@@ -90,13 +90,26 @@ export class MatchService {
             });
 
             if (existingMatch) {
+                let resolvedMatch: Match;
                 if (existingMatch.status === 'unmatched') {
-                    return await tx.match.update({
+                    resolvedMatch = await tx.match.update({
                         where: { id: existingMatch.id },
-                        data: { status: 'active', blockedBy: null },
+                        data: {
+                            status: 'active',
+                            blockedBy: null,
+                            conversationStartAt: new Date(),
+                        },
                     });
+                } else {
+                    resolvedMatch = existingMatch;
                 }
-                return existingMatch;
+
+                await tx.like.update({
+                    where: { id: likeId },
+                    data: { status: 'archived' },
+                });
+
+                return resolvedMatch;
             }
 
             const newMatch = await tx.match.create({
@@ -218,6 +231,7 @@ export class MatchService {
                 data: {
                     status: 'unmatched',
                     blockedBy: null,
+                    conversationStartAt: new Date(),
                 },
             });
         });
@@ -286,7 +300,12 @@ export class MatchService {
                 signProfilePicture(u2.profilePicture),
             ]);
 
-            const normalizedMessages = (m.messages ?? []).map((msg: any) => {
+            const conversationStartMs = new Date(m.conversationStartAt).getTime();
+            const visibleMessages = (m.messages ?? []).filter((msg: any) => {
+                return new Date(msg.createdAt).getTime() >= conversationStartMs;
+            });
+
+            const normalizedMessages = visibleMessages.map((msg: any) => {
                 if (!msg?.isDeleted) return msg;
                 const senderName = msg.senderId === userId
                     ? 'You'

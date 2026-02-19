@@ -36,14 +36,18 @@ describe('Data Integrity', () => {
     });
 
     /**
-     * Should delete match from database when blocking
+     * Should preserve match and mark it blocked when blocking
      */
-    it('blocking deletes match from database', async () => {
+    it('blocking preserves match and marks it blocked', async () => {
         const user1 = await createDummyUser('User1');
         const user2 = await createDummyUser('User2');
 
         const like = await likeService.createLike(user1.id, user2.id, true, 'Hello there!');
         const match = await matchService.acceptLike(like.id);
+
+        const messageCountBefore = await prisma.message.count({
+            where: { matchId: match.id },
+        });
 
         await blockService.blockUser(user1.id, user2.id);
 
@@ -51,6 +55,13 @@ describe('Data Integrity', () => {
             where: { id: match.id },
         });
 
-        expect(matchAfterBlock).toBeNull();
+        expect(matchAfterBlock).not.toBeNull();
+        expect(matchAfterBlock?.status).toBe('blocked');
+        expect(matchAfterBlock?.blockedBy).toBe(user1.id);
+
+        const messageCountAfter = await prisma.message.count({
+            where: { matchId: match.id },
+        });
+        expect(messageCountAfter).toBe(messageCountBefore);
     });
 });

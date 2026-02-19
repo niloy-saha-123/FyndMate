@@ -180,6 +180,7 @@ export default async function messageRoutes(app: FastifyInstance) {
                     err.message === 'Message not found' ||
                     err.message === 'Not authorized' ||
                     err.message.includes('not active') ||
+                    err.message.includes('previous conversation') ||
                     err.message.includes('5 minutes')
                 ) {
                     return reply.status(403).send({ error: err.message });
@@ -226,6 +227,7 @@ export default async function messageRoutes(app: FastifyInstance) {
                     err.message === 'Message not found' ||
                     err.message === 'Not authorized' ||
                     err.message.includes('not active') ||
+                    err.message.includes('previous conversation') ||
                     err.message.includes('5 minutes') ||
                     err.message.includes('already deleted')
                 ) {

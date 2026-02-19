@@ -180,9 +180,9 @@ describe('MatchService', () => {
     });
 
     /**
-     * Should fail to re-match after unmatch
+     * Should allow re-match after unmatch and hide old-cycle messages
      */
-    it('fails to re-match after unmatch', async () => {
+    it('allows re-match after unmatch and resets conversation boundary', async () => {
         const me = await createDummyUser('Me');
         const other = await createDummyUser('Other');
 
@@ -193,19 +193,41 @@ describe('MatchService', () => {
             'Hello there!'
         );
         const match = await matchService.acceptLike(like.id);
-        await matchService.unmatch(match.id, me.id);
 
-        // Try to like again
-        const newLike = await likeService.createLike(
-            me.id,
+        const oldMessage = await prisma.message.create({
+            data: {
+                matchId: match.id,
+                senderId: me.id,
+                content: 'Message from old cycle',
+            },
+        });
+
+        const unmatched = await matchService.unmatch(match.id, me.id);
+        expect(unmatched.status).toBe('unmatched');
+
+        const relike = await likeService.createLike(
             other.id,
+            me.id,
             true,
             'Want to try again!'
         );
 
-        await expect(matchService.acceptLike(newLike.id)).rejects.toThrow(
-            'Cannot re-match'
+        const rematch = await matchService.acceptLike(relike.id);
+        expect(rematch.id).toBe(match.id);
+        expect(rematch.status).toBe('active');
+        expect(new Date(rematch.conversationStartAt).getTime()).toBeGreaterThanOrEqual(
+            new Date(unmatched.conversationStartAt).getTime()
         );
+
+        const relikeAfterAccept = await prisma.like.findUnique({ where: { id: relike.id } });
+        expect(relikeAfterAccept?.status).toBe('archived');
+
+        const { data } = await matchService.getMatches(me.id);
+        const rematched = data.find((m) => m.id === match.id);
+        expect(rematched).toBeTruthy();
+
+        const visibleMessageIds = rematched?.messages.map((msg) => msg.id) ?? [];
+        expect(visibleMessageIds).not.toContain(oldMessage.id);
     });
 
     /**

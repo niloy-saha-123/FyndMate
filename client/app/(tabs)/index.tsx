@@ -404,7 +404,7 @@ export default function FeedScreen() {
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <Ionicons name="star" size={20} color={COLORS.accent} />
-              <Text style={styles.modalTitle}>Send Troupe Request</Text>
+              <Text style={styles.modalTitle}>Send Request</Text>
             </View>
             <Text style={styles.modalSubtitle}>
               Include a short message so they know why you reached out.
