@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   Dimensions,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { signIn, signUp } from "../src/auth/emailAuth";
