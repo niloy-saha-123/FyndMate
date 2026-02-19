@@ -204,9 +204,19 @@ export default function MessagesTab() {
     const isBlocked = item.status === 'blocked';
     const iBlockedThem = isBlocked && item.blockedBy === user.id;
     const theyBlockedMe = isBlocked && item.blockedBy !== user.id;
+    const lastMessage = item.lastMessage;
+
+    const deletedLabel = () => {
+      if (!lastMessage) return 'Start a conversation';
+      if (lastMessage.senderId === user?.id) {
+        return 'You deleted a message';
+      }
+      const name = otherUser?.name ?? 'User';
+      return `${name} deleted a message`;
+    };
 
     // Format last message time
-    const lastMessageTime = item.lastMessage?.createdAt
+    const lastMessageTime = lastMessage?.createdAt
       ? formatRelativeTime(convertToLocalTime(item.lastMessage.createdAt))
       : '';
 
@@ -293,8 +303,10 @@ export default function MessagesTab() {
                   ? 'You have been blocked'
                   : iBlockedThem
                     ? 'You blocked this user'
-                    : item.lastMessage
-                      ? item.lastMessage.content
+                    : lastMessage
+                      ? lastMessage.isDeleted
+                        ? deletedLabel()
+                        : lastMessage.content
                       : 'Start a conversation'}
               </Text>
             </View>

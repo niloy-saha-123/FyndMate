@@ -8,7 +8,7 @@ import { prisma } from '../lib/prisma.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
 
 const MAX_MESSAGE_LENGTH = 2000;
-const EDIT_WINDOW_MS = 3 * 60 * 1000; // 3 minutes (matches RLS policy)
+const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes (matches RLS policy)
 
 export class MessageService {
   /**
@@ -50,6 +50,9 @@ export class MessageService {
         createdAt: true,
         readAt: true,
         editedAt: true,
+        isDeleted: true,
+        deletedBy: true,
+        deletedAt: true,
         sender: {
           select: {
             id: true,
@@ -60,7 +63,19 @@ export class MessageService {
       },
     });
 
-    return messages;
+    return messages.map((message) => {
+      if (!message.isDeleted) return message;
+
+      const deletedLabel =
+        message.senderId === userId
+          ? 'You deleted a message'
+          : `${message.sender.name} deleted a message`;
+
+      return {
+        ...message,
+        content: deletedLabel,
+      };
+    });
   }
 
   /**
@@ -103,6 +118,10 @@ export class MessageService {
       throw new Error('Message not found');
     }
 
+    if (message.isDeleted) {
+      throw new Error('Cannot edit deleted message');
+    }
+
     if (message.senderId !== senderId) {
       throw new Error('Not authorized');
     }
@@ -119,7 +138,7 @@ export class MessageService {
 
     const elapsed = Date.now() - new Date(message.createdAt).getTime();
     if (elapsed > EDIT_WINDOW_MS) {
-      throw new Error('Message can only be edited within 3 minutes');
+      throw new Error('Message can only be edited within 5 minutes');
     }
 
     const sanitized = sanitizeText(content);
@@ -137,6 +156,81 @@ export class MessageService {
         editedAt: new Date(),
       },
     });
+  }
+
+  /**
+   * Soft delete a message. Only sender, within edit/delete window.
+   */
+  async deleteMessage(messageId: string, senderId: string) {
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: { match: true, sender: { select: { name: true } } },
+    });
+
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    if (message.isDeleted) {
+      throw new Error('Message already deleted');
+    }
+
+    if (message.senderId !== senderId) {
+      throw new Error('Not authorized');
+    }
+
+    const isParticipant =
+      message.match.user1Id === senderId || message.match.user2Id === senderId;
+    if (!isParticipant) {
+      throw new Error('Not authorized');
+    }
+
+    if (message.match.status !== 'active') {
+      throw new Error('Cannot delete message - match is not active');
+    }
+
+    const elapsed = Date.now() - new Date(message.createdAt).getTime();
+    if (elapsed > EDIT_WINDOW_MS) {
+      throw new Error('Message can only be deleted within 5 minutes');
+    }
+
+    const updated = await prisma.message.update({
+      where: { id: messageId },
+      data: {
+        isDeleted: true,
+        deletedBy: senderId,
+        deletedAt: new Date(),
+      },
+      select: {
+        id: true,
+        matchId: true,
+        senderId: true,
+        content: true,
+        createdAt: true,
+        readAt: true,
+        editedAt: true,
+        isDeleted: true,
+        deletedBy: true,
+        deletedAt: true,
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            profilePicture: true,
+          }
+        }
+      },
+    });
+
+    const deletedLabel =
+      updated.senderId === senderId
+        ? 'You deleted a message'
+        : `${updated.sender.name} deleted a message`;
+
+    return {
+      ...updated,
+      content: deletedLabel,
+    };
   }
 }
 

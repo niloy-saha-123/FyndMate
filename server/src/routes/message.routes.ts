@@ -180,7 +180,7 @@ export default async function messageRoutes(app: FastifyInstance) {
                     err.message === 'Message not found' ||
                     err.message === 'Not authorized' ||
                     err.message.includes('not active') ||
-                    err.message.includes('3 minutes')
+                    err.message.includes('5 minutes')
                 ) {
                     return reply.status(403).send({ error: err.message });
                 }
@@ -189,6 +189,50 @@ export default async function messageRoutes(app: FastifyInstance) {
                 }
                 request.log.error(err);
                 return reply.status(500).send({ error: 'Failed to edit message' });
+            }
+        }
+    );
+
+    // PATCH /api/matches/:matchId/messages/:messageId/delete
+    app.patch(
+        '/matches/:matchId/messages/:messageId/delete',
+        {
+            preHandler: [
+                rateLimit({ limit: 30, windowSec: 60, keyPrefix: 'message_delete' }),
+            ],
+        },
+        async (request, reply) => {
+            const user = request.user!;
+            const paramsResult = matchIdParamSchema
+                .merge(messageIdParamSchema)
+                .safeParse(request.params);
+            if (!paramsResult.success) {
+                const first = paramsResult.error.issues[0];
+                return reply.status(400).send({
+                    error: 'Validation failed',
+                    message: first?.message || 'Invalid parameters',
+                });
+            }
+            const { messageId } = paramsResult.data;
+
+            try {
+                const message = await messageService.deleteMessage(
+                    messageId,
+                    user.id
+                );
+                return reply.send(message);
+            } catch (err: any) {
+                if (
+                    err.message === 'Message not found' ||
+                    err.message === 'Not authorized' ||
+                    err.message.includes('not active') ||
+                    err.message.includes('5 minutes') ||
+                    err.message.includes('already deleted')
+                ) {
+                    return reply.status(403).send({ error: err.message });
+                }
+                request.log.error(err);
+                return reply.status(500).send({ error: 'Failed to delete message' });
             }
         }
     );

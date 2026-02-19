@@ -169,7 +169,7 @@ export default function FeedScreen() {
           </View>
           <Text style={styles.emptyTitle}>No more profiles</Text>
           <Text style={styles.emptySubtitle}>
-            Check back later for more collaborators, or refresh to fetch passed, unmatched, and new people.
+            Check back later for more profiles or refresh to see people you have passed.
           </Text>
           <NeoButton
             title="Refresh"
@@ -189,7 +189,7 @@ export default function FeedScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Collab</Text>
+          <Text style={styles.headerTitle}>Troupe</Text>
         </View>
       </View>
 
@@ -404,7 +404,7 @@ export default function FeedScreen() {
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <Ionicons name="star" size={20} color={COLORS.accent} />
-              <Text style={styles.modalTitle}>Send Collaboration Request</Text>
+              <Text style={styles.modalTitle}>Send Troupe Request</Text>
             </View>
             <Text style={styles.modalSubtitle}>
               Include a short message so they know why you reached out.

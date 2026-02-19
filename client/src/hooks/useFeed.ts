@@ -184,7 +184,7 @@ export function useFeed() {
 
         if (err instanceof LikesRateLimitError) {
           Alert.alert(
-            "Can't Send Collaboration Request",
+            "Can't Send Troupe Request",
             `You've reached your daily limit of ${LIKES_RATE_LIMIT} collaboration requests.\n\nPlease try again in ${err.retryAfterHours} hour${err.retryAfterHours !== 1 ? 's' : ''}.`,
             [{ text: 'OK', style: 'default' }]
           );

@@ -5,6 +5,7 @@ import {
   PROFILE_MAX_SKILLS,
   PROFILE_MAX_INTERESTS,
   PROFILE_TAG_MAX_LENGTH,
+  PROFILE_TAG_REGEX,
   PROFILE_NAME_MAX_LENGTH,
   PROFILE_GITHUB_MAX_LENGTH,
   PROFILE_MAX_PROJECTS,
@@ -157,6 +158,9 @@ function validateProfilePayload(payload: Partial<UserProfile>): void {
       if (trimmed.length > PROFILE_TAG_MAX_LENGTH) {
         throw new Error(`Each skill must be ${PROFILE_TAG_MAX_LENGTH} characters or less`);
       }
+      if (!PROFILE_TAG_REGEX.test(trimmed)) {
+        throw new Error('Skill contains invalid characters');
+      }
     }
   }
   if (payload.interests !== undefined) {
@@ -170,6 +174,9 @@ function validateProfilePayload(payload: Partial<UserProfile>): void {
       }
       if (trimmed.length > PROFILE_TAG_MAX_LENGTH) {
         throw new Error(`Each interest must be ${PROFILE_TAG_MAX_LENGTH} characters or less`);
+      }
+      if (!PROFILE_TAG_REGEX.test(trimmed)) {
+        throw new Error('Interest contains invalid characters');
       }
     }
   }
