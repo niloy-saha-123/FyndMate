@@ -100,56 +100,61 @@ export default function Login() {
   // Main sign up options screen
   if (!showEmailForm) {
     return (
-      <View style={styles.container}>
-        <View style={styles.logoContainer}>
-          <LottieView
-            source={require("../assets/animation.json")}
-            autoPlay
-            loop
-            style={styles.logoAnimation}
-          />
-        </View>
+      <View style={styles.bgWrapper}>
+        <View style={styles.mobileFrame}>
+          {/* Decorative Triangles */}
+          <View style={[styles.triangle, styles.trianglePurple]} />
+          <View style={[styles.triangle, styles.trianglePink]} />
+          <View style={[styles.geoCircle, styles.geoCircle1]} />
+          <View style={[styles.geoCircle, styles.geoCircle2]} />
 
-        <Text style={styles.title}>Sign up to continue</Text>
+          {/* Header with Back Button (hidden on first login) */}
+          <View style={styles.headerRow} />
 
-        <View style={styles.buttonsContainer}>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => setShowEmailForm(true)}
-          >
-            <LinearGradient
-              colors={["#8B85C2", "#6058AE"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientButton}
-            >
-              <Text style={styles.primaryButtonText}>Continue with email</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          {/* Main Content */}
+          <View style={styles.flex1Center}>
+            {/* Logo Small */}
+            <View style={styles.logoRow}>
+              <Image source={require("../assets/icons/icon.png")} style={styles.logoSmall} />
+              <Image source={require("../assets/icons/wordmark.png")} style={styles.wordmarkSmall} />
+            </View>
+            {/* Welcome Text */}
+            <Text style={styles.loginTitle}>Welcome Back!</Text>
+            <Text style={styles.loginSubtitle}>Sign in to find your collaborators</Text>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or continue with</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <View style={styles.socialButtonsRow}>
-            <TouchableOpacity
-              style={styles.socialButton}
-              onPress={signInWithGoogle}
-            >
-              <Ionicons name="logo-google" size={28} color="#DB4437" />
+            {/* Social Login Buttons */}
+            <TouchableOpacity style={styles.socialBtn} onPress={signInWithGoogle}>
+              {/* Google SVG icon replacement */}
+              <Text style={styles.socialBtnText}>Continue with Google</Text>
             </TouchableOpacity>
-          </View>
-        </View>
+            <TouchableOpacity style={styles.socialBtn}>
+              {/* GitHub SVG icon replacement */}
+              <Text style={styles.socialBtnText}>Continue with GitHub</Text>
+            </TouchableOpacity>
 
-        <View style={styles.footer}>
-          <TouchableOpacity>
-            <Text style={styles.footerLink}>Terms of use</Text>
-          </TouchableOpacity>
-          <TouchableOpacity>
-            <Text style={styles.footerLink}>Privacy Policy</Text>
-          </TouchableOpacity>
+            {/* Divider */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>Or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Email Login Form Button */}
+            <TouchableOpacity style={styles.neoBtnPrimary} onPress={() => setShowEmailForm(true)}>
+              <Text style={styles.neoBtnText}>Continue with Email</Text>
+            </TouchableOpacity>
+
+            {/* Sign Up Link */}
+            <View style={styles.signupRow}>
+              <Text style={styles.signupText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => setIsSignUp(true) || setShowEmailForm(true)}>
+                <Text style={styles.signupLink}>Sign up</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Bottom Pattern */}
+          <View style={styles.hatchedBg} />
         </View>
       </View>
     );
@@ -157,30 +162,27 @@ export default function Login() {
 
   // Email form screen
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => setShowEmailForm(false)}
-        >
-          <Ionicons name="arrow-back" size={24} color="#374151" />
-        </TouchableOpacity>
+    <View style={styles.bgWrapper}>
+      <View style={styles.mobileFrame}>
+        {/* Decorative Triangles */}
+        <View style={[styles.triangle, styles.trianglePurple]} />
+        <View style={[styles.triangle, styles.trianglePink]} />
+        <View style={[styles.geoCircle, styles.geoCircle1]} />
+        <View style={[styles.geoCircle, styles.geoCircle2]} />
 
-        <View style={styles.formContainer}>
-          <View style={styles.header}>
-            <Text style={styles.formTitle}>
-              {isSignUp ? "Create Account" : "Welcome Back"}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isSignUp
-                ? "Create your account to get started"
-                : "Sign in to continue"}
-            </Text>
-          </View>
+        {/* Header with Back Button */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backButton} onPress={() => setShowEmailForm(false)}>
+            <Text style={styles.backIcon}>{'<'}</Text>
+          </TouchableOpacity>
+        </View>
 
+        {/* Main Content */}
+        <View style={styles.flex1Center}>
+          <Text style={styles.formTitle}>{isSignUp ? 'Create Account' : 'Welcome Back'}</Text>
+          <Text style={styles.loginSubtitle}>{isSignUp ? 'Create your account to get started' : 'Sign in to continue'}</Text>
+
+          {/* Email Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email</Text>
             <TextInput
@@ -195,11 +197,10 @@ export default function Login() {
               autoCapitalize="none"
               style={styles.input}
             />
-            {errors.email && (
-              <Text style={styles.errorText}>{errors.email}</Text>
-            )}
+            {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
           </View>
 
+          {/* Name Input (Sign Up) */}
           {isSignUp && (
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Full Name</Text>
@@ -214,12 +215,11 @@ export default function Login() {
                 autoCapitalize="words"
                 style={styles.input}
               />
-              {errors.name && (
-                <Text style={styles.errorText}>{errors.name}</Text>
-              )}
+              {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
             </View>
           )}
 
+          {/* Password Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Password</Text>
             <TextInput
@@ -234,232 +234,294 @@ export default function Login() {
               autoCapitalize="none"
               style={styles.input}
             />
-            {errors.password && (
-              <Text style={styles.errorText}>{errors.password}</Text>
-            )}
+            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
           </View>
 
+          {/* Forgot Password */}
           {!isSignUp && (
             <TouchableOpacity style={styles.forgotPassword}>
               <Text style={styles.forgotPasswordText}>Forgot password?</Text>
             </TouchableOpacity>
           )}
 
+          {/* Login/Signup Button */}
           <TouchableOpacity
-            style={[
-              styles.submitButton,
-              (!email || !password || (isSignUp && !name)) && {
-                opacity: 0.6,
-              },
-            ]}
+            style={styles.neoBtnPrimary}
             onPress={handleAuth}
+            disabled={!email || !password || (isSignUp && !name)}
           >
-            <LinearGradient
-              colors={["#8B85C2", "#6058AE"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientButton}
-            >
-              <Text style={styles.primaryButtonText}>
-                {isSignUp ? "Create Account" : "Sign In"}
-              </Text>
-            </LinearGradient>
+            <Text style={styles.neoBtnText}>{isSignUp ? 'Create Account' : 'Sign In'}</Text>
           </TouchableOpacity>
 
-          <View style={styles.toggleContainer}>
-            <Text style={styles.toggleText}>
-              {isSignUp
-                ? "Already have an account? "
-                : "Don't have an account? "}
-            </Text>
+          {/* Toggle Sign In/Up */}
+          <View style={styles.signupRow}>
+            <Text style={styles.signupText}>{isSignUp ? 'Already have an account? ' : "Don't have an account? "}</Text>
             <TouchableOpacity onPress={() => setIsSignUp(!isSignUp)}>
-              <Text style={styles.toggleLink}>
-                {isSignUp ? "Sign In" : "Sign Up"}
-              </Text>
+              <Text style={styles.signupLink}>{isSignUp ? 'Sign In' : 'Sign Up'}</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+        {/* Bottom Pattern */}
+        <View style={styles.hatchedBg} />
+      </View>
+    </View>
   );
 }
 
+const { width, height } = Dimensions.get("window");
 const styles = StyleSheet.create({
-  container: {
+  bgWrapper: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  scrollContent: {
-    flexGrow: 1,
+  mobileFrame: {
+    width: 390,
+    height: 844,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#000',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 20, height: 20 },
+    shadowOpacity: 0.2,
+    shadowRadius: 0,
+    elevation: 10,
+    position: 'relative',
+  },
+  triangle: {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    borderStyle: 'solid',
+    zIndex: 10,
+  },
+  trianglePurple: {
+    top: 24,
+    right: 16,
+    borderLeftWidth: 25,
+    borderLeftColor: 'transparent',
+    borderRightWidth: 25,
+    borderRightColor: 'transparent',
+    borderBottomWidth: 45,
+    borderBottomColor: '#8B5CF6',
+    transform: [{ rotate: '12deg' }],
+  },
+  trianglePink: {
+    top: 96,
+    left: 16,
+    borderLeftWidth: 20,
+    borderLeftColor: 'transparent',
+    borderRightWidth: 20,
+    borderRightColor: 'transparent',
+    borderTopWidth: 35,
+    borderTopColor: '#EC4899',
+    transform: [{ rotate: '-12deg' }],
+  },
+  geoCircle: {
+    position: 'absolute',
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: '#000',
+    backgroundColor: '#8B5CF6',
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+  },
+  geoCircle1: { top: 64, right: 80, width: 12, height: 12, backgroundColor: '#6366F1' },
+  geoCircle2: { top: 128, right: 32, width: 16, height: 16, backgroundColor: '#F472B6' },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    minHeight: 60,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#000',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+  },
+  backIcon: {
+    fontSize: 22,
+    color: '#374151',
+    fontWeight: 'bold',
+  },
+  flex1Center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingTop: 0,
   },
-  logoContainer: {
-    alignItems: "center",
-    marginTop: 80,
-    marginBottom: 40,
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 24,
   },
-  logoAnimation: {
-    width: 220,
-    height: 220,
+  logoSmall: {
+    width: 48,
+    height: 48,
+    resizeMode: 'contain',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1F2937",
-    textAlign: "center",
-    marginBottom: 40,
+  wordmarkSmall: {
+    height: 40,
+    width: 120,
+    resizeMode: 'contain',
+    marginLeft: 8,
   },
-  buttonsContainer: {
-    paddingHorizontal: 24,
+  loginTitle: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#000',
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  primaryButton: {
-    borderRadius: 30,
-    overflow: "hidden",
-    marginBottom: 16,
-    shadowColor: "#6058AE",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+  loginSubtitle: {
+    color: '#6B7280',
+    fontWeight: '500',
+    fontSize: 15,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  socialBtn: {
+    backgroundColor: '#fff',
+    borderWidth: 3,
+    borderColor: '#000',
+    borderRadius: 999,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
     elevation: 4,
+    width: '100%',
   },
-  gradientButton: {
-    paddingVertical: 18,
-    alignItems: "center",
-    borderRadius: 30,
+  socialBtnText: {
+    fontWeight: 'bold',
+    fontSize: 15,
+    color: '#000',
   },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 32,
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 18,
+    width: '100%',
   },
   dividerLine: {
     flex: 1,
-    height: 1,
-    backgroundColor: "#E5E7EB",
+    height: 3,
+    backgroundColor: '#000',
   },
   dividerText: {
-    marginHorizontal: 16,
-    fontSize: 14,
-    color: "#9CA3AF",
-    fontWeight: "500",
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    marginHorizontal: 8,
   },
-  socialButtonsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 20,
+  neoBtnPrimary: {
+    backgroundColor: '#8B5CF6',
+    borderWidth: 3,
+    borderColor: '#000',
+    borderRadius: 999,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 4,
+    width: '100%',
   },
-  socialButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 40,
-    marginTop: "auto",
-    paddingBottom: 40,
-  },
-  footerLink: {
-    fontSize: 14,
-    color: "#6058AE",
-    fontWeight: "600",
-  },
-  backButton: {
-    marginTop: 20,
-    marginBottom: 20,
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  formContainer: {
-    flex: 1,
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  formTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#1F2937",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: "#6B7280",
-    textAlign: "center",
+  neoBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 18,
   },
   inputContainer: {
-    marginBottom: 20,
+    width: '100%',
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 8,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 6,
   },
   input: {
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
+    borderWidth: 3,
+    borderColor: '#000',
+    borderRadius: 16,
+    backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: "#111827",
+    color: '#111827',
+    fontWeight: '600',
   },
   errorText: {
-    marginTop: 6,
-    color: "#EF4444",
+    marginTop: 4,
+    color: '#EF4444',
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: '500',
   },
   forgotPassword: {
-    alignSelf: "flex-end",
-    marginBottom: 24,
+    alignSelf: 'flex-end',
+    marginBottom: 12,
     marginTop: -8,
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: "#6058AE",
-    fontWeight: "600",
+    color: '#6058AE',
+    fontWeight: '600',
   },
-  submitButton: {
-    borderRadius: 30,
-    overflow: "hidden",
-    marginBottom: 24,
-    shadowColor: "#6058AE",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  toggleContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
+  signupRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 8,
+    marginBottom: 8,
   },
-  toggleText: {
+  signupText: {
     fontSize: 14,
-    color: "#6B7280",
+    color: '#6B7280',
   },
-  toggleLink: {
+  signupLink: {
     fontSize: 14,
-    color: "#6058AE",
-    fontWeight: "700",
+    color: '#5B21B6',
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
+  },
+  hatchedBg: {
+    height: 16,
+    backgroundColor: '#F9A8D4',
+    borderTopWidth: 3,
+    borderColor: '#000',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 });
