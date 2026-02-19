@@ -5,7 +5,6 @@
 
 import { Prisma, Like, Match } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { redis } from '../lib/redis.js';
 import { blockService } from './block.service.js';
 import { matchService } from './match.service.js';
 import { publicUserLikeSelect } from '../utils/publicUser.js';
@@ -17,6 +16,7 @@ import {
     INTRO_MESSAGE_MIN_LENGTH,
     INTRO_MESSAGE_MAX_LENGTH,
 } from '../schemas/validation-constants.js';
+import { invalidateFeedCacheForUsers } from '../utils/cacheInvalidation.js';
 
 type ReceivedLike = Prisma.LikeGetPayload<{
     include: {
@@ -142,10 +142,7 @@ export class LikeService {
 
         // Invalidate Feed Cache for both users
         // Non-critical: If Redis is down, caches will just stay stale for 5 minutes
-        await Promise.all([
-            redis.del(`feed:${likerId}`),
-            redis.del(`feed:${likedId}`)
-        ]).catch(err => {
+        await invalidateFeedCacheForUsers([likerId, likedId]).catch(err => {
             console.warn('Cache invalidation failed (non-critical):', err.message);
             // Not throwing - like was created successfully, cache will expire naturally
         });

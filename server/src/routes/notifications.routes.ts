@@ -135,6 +135,34 @@ export default async function notificationRoutes(app: FastifyInstance) {
     }
   );
 
+  // DELETE /api/notifications/push-token - Disable push notifications for current user
+  app.delete(
+    '/notifications/push-token',
+    {
+      preHandler: [
+        authMiddleware,
+        rateLimit({ limit: 5, windowSec: 3600, keyPrefix: 'push_token' }),
+      ],
+    },
+    async (request, reply) => {
+      const userId = request.user!.id;
+
+      try {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            pushToken: null,
+            pushTokenUpdatedAt: new Date(),
+          },
+        });
+        return reply.send({ success: true });
+      } catch (err: any) {
+        request.log.error(err, 'Failed to clear push token');
+        return reply.status(500).send({ error: 'Failed to clear push token' });
+      }
+    }
+  );
+
   // GET /api/notifications/preferences/:matchId - Get notification preference for a match
   app.get(
     '/notifications/preferences/:matchId',

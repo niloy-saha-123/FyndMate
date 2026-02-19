@@ -1,8 +1,10 @@
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
+import { redis } from '../lib/redis.js';
 import { BUCKET_NAME } from '../services/storage.service.js';
 
 // Cache signed URLs for 25 minutes (URLs are valid for 30 min).
 const CACHE_TTL_MS = 25 * 60 * 1000;
+const SIGNED_URL_TTL_SECONDS = 30 * 60;
 const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 
 // Strip the public URL prefix to get a clean storage path.
@@ -17,11 +19,25 @@ export async function signProfilePicture(profilePicture?: string | null): Promis
   if (!profilePicture) return null;
 
   const path = toStoragePath(profilePicture);
+  const redisKey = `image:signed:${path}`;
 
   // Return cached URL if still valid
   const cached = signedUrlCache.get(path);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.url;
+  }
+
+  try {
+    const redisCached = await redis.get(redisKey);
+    if (redisCached) {
+      signedUrlCache.set(path, {
+        url: redisCached,
+        expiresAt: Date.now() + CACHE_TTL_MS,
+      });
+      return redisCached;
+    }
+  } catch {
+    // Redis is best-effort for this optimization.
   }
 
   const { data, error } = await supabaseAdmin.storage
@@ -37,11 +53,19 @@ export async function signProfilePicture(profilePicture?: string | null): Promis
     expiresAt: Date.now() + CACHE_TTL_MS,
   });
 
+  try {
+    await redis.setex(redisKey, SIGNED_URL_TTL_SECONDS, data.signedUrl);
+  } catch {
+    // Redis is best-effort for this optimization.
+  }
+
   return data.signedUrl;
 }
 
 // Invalidate cached signed URL when a user changes their profile picture.
 export function invalidateSignedUrl(profilePicture?: string | null): void {
   if (!profilePicture) return;
-  signedUrlCache.delete(toStoragePath(profilePicture));
+  const path = toStoragePath(profilePicture);
+  signedUrlCache.delete(path);
+  redis.del(`image:signed:${path}`).catch(() => {});
 }

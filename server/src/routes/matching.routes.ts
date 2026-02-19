@@ -23,6 +23,9 @@ import {
     LIKES_RATE_LIMIT_WINDOW_SECONDS,
 } from '../schemas/validation-constants.js';
 
+const SWIPE_DEBUG_ENABLED = process.env.DEBUG_SWIPE_LOGS === '1';
+const lastSwipeAtByUser = new Map<string, number>();
+
 export default async function matchingRoutes(app: FastifyInstance) {
     app.addHook('preHandler', authMiddleware);
 
@@ -45,6 +48,23 @@ export default async function matchingRoutes(app: FastifyInstance) {
         }
 
         const { likedId, liked, message } = parseResult.data;
+
+        if (SWIPE_DEBUG_ENABLED) {
+            const now = Date.now();
+            const lastAt = lastSwipeAtByUser.get(user.id);
+            const deltaMs = typeof lastAt === 'number' ? now - lastAt : null;
+            lastSwipeAtByUser.set(user.id, now);
+            request.log.info(
+                {
+                    userId: user.id,
+                    likedId,
+                    liked,
+                    messageLength: message?.length ?? 0,
+                    deltaMs,
+                },
+                'Swipe request trace'
+            );
+        }
 
         try {
             const result = await likeService.createLike(user.id, likedId, liked, message);

@@ -20,6 +20,7 @@ import { NeoCard } from '../../../src/components/NeoCard';
 import { NeoChip, ChipContainer } from '../../../src/components/NeoChip';
 import { getUserProfileById } from '../../../src/services/profileService';
 import { blockMatch, reportUser, unmatchMatch } from '../../../src/messages/message.service';
+import { acceptLike, blockUser, declineLike } from '../../../src/services/matchingService';
 import {
   REPORT_REASON_MAX_LENGTH,
   REPORT_REASON_MIN_LENGTH,
@@ -40,12 +41,23 @@ function formatMonth(value?: string | null) {
 
 export default function MessageProfileScreen() {
   const { top, bottom } = useSafeAreaInsets();
-  const { userId, matchId, self } = useLocalSearchParams<{ userId?: string | string[]; matchId?: string | string[]; self?: string | string[] }>();
+  const { userId, matchId, self, mode, likeId, introMessage } = useLocalSearchParams<{
+    userId?: string | string[];
+    matchId?: string | string[];
+    self?: string | string[];
+    mode?: string | string[];
+    likeId?: string | string[];
+    introMessage?: string | string[];
+  }>();
   const normalizedUserId = Array.isArray(userId) ? userId[0] : userId;
   const normalizedMatchId = Array.isArray(matchId) ? matchId[0] : matchId;
   const selfParam = Array.isArray(self) ? self[0] : self;
+  const modeParam = Array.isArray(mode) ? mode[0] : mode;
+  const normalizedLikeId = Array.isArray(likeId) ? likeId[0] : likeId;
+  const introMessageParam = Array.isArray(introMessage) ? introMessage[0] : introMessage;
   const isSelfPreview = selfParam === '1';
-  const showManageMenu = Boolean(normalizedMatchId) && !isSelfPreview;
+  const isRequestMode = modeParam === 'request' && Boolean(normalizedLikeId);
+  const showManageMenu = !isSelfPreview && (Boolean(normalizedMatchId) || isRequestMode);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -54,8 +66,19 @@ export default function MessageProfileScreen() {
   const [submittingReport, setSubmittingReport] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [confirmingAction, setConfirmingAction] = useState(false);
+  const [requestActionSubmitting, setRequestActionSubmitting] = useState<'accept' | 'decline' | null>(null);
+  const [declineConfirmVisible, setDeclineConfirmVisible] = useState(false);
 
   const displayName = useMemo(() => profile?.name ?? 'Profile', [profile?.name]);
+  const requestIntroMessage = (introMessageParam ?? '').trim();
+  const requestBottomPadding = isRequestMode ? bottom + 210 : bottom + 24;
+
+  const routeToRequests = () => {
+    router.replace({
+      pathname: '/(tabs)/likes',
+      params: { refreshAt: Date.now().toString() },
+    });
+  };
 
   useEffect(() => {
     if (!normalizedUserId) return;
@@ -77,21 +100,33 @@ export default function MessageProfileScreen() {
 
   const handleBlock = () => {
     setMenuVisible(false);
-    if (!normalizedMatchId) return;
     setConfirmAction('block');
   };
 
   const runConfirmAction = async () => {
-    if (!normalizedMatchId || !confirmAction || confirmingAction) return;
+    if (!confirmAction || confirmingAction) return;
     setConfirmingAction(true);
     try {
       if (confirmAction === 'unmatch') {
+        if (!normalizedMatchId) return;
         await unmatchMatch(normalizedMatchId);
+        setConfirmAction(null);
+        router.replace('/(tabs)/messages');
       } else {
-        await blockMatch(normalizedMatchId);
+        if (normalizedMatchId) {
+          await blockMatch(normalizedMatchId);
+          setConfirmAction(null);
+          if (isRequestMode) {
+            routeToRequests();
+          } else {
+            router.replace('/(tabs)/messages');
+          }
+        } else if (normalizedUserId) {
+          await blockUser(normalizedUserId);
+          setConfirmAction(null);
+          routeToRequests();
+        }
       }
-      setConfirmAction(null);
-      router.replace('/(tabs)/messages');
     } catch (error) {
       const fallback = confirmAction === 'unmatch'
         ? 'Failed to unmatch. Please try again.'
@@ -115,11 +150,42 @@ export default function MessageProfileScreen() {
       setReportModalVisible(false);
       setReportReason('');
       Alert.alert('Report sent', 'Thank you. This user has been blocked for your safety.');
-      router.replace('/(tabs)/messages');
+      if (isRequestMode) {
+        routeToRequests();
+      } else {
+        router.replace('/(tabs)/messages');
+      }
     } catch (error: any) {
       Alert.alert('Failed to report', error?.message || 'Please try again.');
     } finally {
       setSubmittingReport(false);
+    }
+  };
+
+  const handleAcceptRequest = async () => {
+    if (!normalizedLikeId || requestActionSubmitting) return;
+    setRequestActionSubmitting('accept');
+    try {
+      await acceptLike(normalizedLikeId);
+      routeToRequests();
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to accept request.');
+    } finally {
+      setRequestActionSubmitting(null);
+    }
+  };
+
+  const handleDeclineRequest = async () => {
+    if (!normalizedLikeId || requestActionSubmitting) return;
+    setRequestActionSubmitting('decline');
+    try {
+      await declineLike(normalizedLikeId);
+      setDeclineConfirmVisible(false);
+      routeToRequests();
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to decline request.');
+    } finally {
+      setRequestActionSubmitting(null);
     }
   };
 
@@ -152,7 +218,7 @@ export default function MessageProfileScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: bottom + 24 }]}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: requestBottomPadding }]}>
         <NeoCard style={styles.profileCard}>
           <View style={styles.imageSection}>
             <View style={styles.imageContainer}>
@@ -253,9 +319,11 @@ export default function MessageProfileScreen() {
       <Modal visible={menuVisible && showManageMenu} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
         <Pressable style={styles.overlay} onPress={() => setMenuVisible(false)}>
           <View style={styles.menuSheet}>
-            <Pressable style={styles.menuItem} onPress={handleUnmatch}>
-              <Text style={styles.menuDangerText}>Unmatch</Text>
-            </Pressable>
+            {normalizedMatchId ? (
+              <Pressable style={styles.menuItem} onPress={handleUnmatch}>
+                <Text style={styles.menuDangerText}>Unmatch</Text>
+              </Pressable>
+            ) : null}
             <Pressable style={styles.menuItem} onPress={handleBlock}>
               <Text style={styles.menuDangerText}>Block</Text>
             </Pressable>
@@ -301,6 +369,34 @@ export default function MessageProfileScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+      {isRequestMode ? (
+        <View style={[styles.requestActionContainer, { paddingBottom: bottom + 12 }]}>
+          <View style={styles.requestMessageBox}>
+            <Text style={styles.requestMessageLabel}>They said:</Text>
+            <Text numberOfLines={3} style={styles.requestMessageText}>
+              {requestIntroMessage ? `"${requestIntroMessage}"` : 'No intro message'}
+            </Text>
+          </View>
+          <View style={styles.requestActions}>
+            <Pressable
+              style={[styles.requestActionButton, styles.requestDeclineButton]}
+              onPress={() => setDeclineConfirmVisible(true)}
+              disabled={Boolean(requestActionSubmitting)}
+            >
+              <Text style={styles.requestDeclineText}>Decline</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.requestActionButton, styles.requestAcceptButton, requestActionSubmitting && styles.requestActionButtonDisabled]}
+              onPress={handleAcceptRequest}
+              disabled={Boolean(requestActionSubmitting)}
+            >
+              <Text style={styles.requestAcceptText}>
+                {requestActionSubmitting === 'accept' ? 'Accepting...' : 'Accept'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
       <Modal visible={!!confirmAction} transparent animationType="fade" onRequestClose={() => setConfirmAction(null)}>
         <Pressable style={styles.overlay} onPress={() => {
           if (confirmingAction) return;
@@ -334,6 +430,48 @@ export default function MessageProfileScreen() {
                     : confirmAction === 'unmatch'
                       ? 'Unmatch'
                       : 'Block'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+      <Modal
+        visible={declineConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!requestActionSubmitting) {
+            setDeclineConfirmVisible(false);
+          }
+        }}
+      >
+        <Pressable
+          style={styles.overlay}
+          onPress={() => {
+            if (!requestActionSubmitting) {
+              setDeclineConfirmVisible(false);
+            }
+          }}
+        >
+          <View style={styles.confirmSheet}>
+            <Text style={styles.confirmTitle}>Decline request</Text>
+            <Text style={styles.confirmBody}>This will remove their request.</Text>
+            <View style={styles.reportActions}>
+              <Pressable
+                style={[styles.reportButton, styles.reportCancel]}
+                onPress={() => setDeclineConfirmVisible(false)}
+                disabled={Boolean(requestActionSubmitting)}
+              >
+                <Text style={styles.reportCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.reportButton, styles.reportSubmit, requestActionSubmitting && styles.reportSubmitDisabled]}
+                onPress={handleDeclineRequest}
+                disabled={Boolean(requestActionSubmitting)}
+              >
+                <Text style={styles.reportSubmitText}>
+                  {requestActionSubmitting === 'decline' ? 'Declining...' : 'Decline'}
                 </Text>
               </Pressable>
             </View>
@@ -584,5 +722,74 @@ const styles = StyleSheet.create({
   reportSubmitText: {
     color: COLORS.surface,
     fontWeight: '700',
+  },
+  requestActionContainer: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 0,
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.medium,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    ...SHADOWS.medium,
+  },
+  requestMessageBox: {
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.small,
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  requestMessageLabel: {
+    textTransform: 'uppercase',
+    color: COLORS.textMuted,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 4,
+    fontSize: 12,
+  },
+  requestMessageText: {
+    color: COLORS.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+  requestActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  requestActionButton: {
+    flex: 1,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.large,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestDeclineButton: {
+    backgroundColor: COLORS.surface,
+  },
+  requestAcceptButton: {
+    backgroundColor: COLORS.primary,
+  },
+  requestActionButtonDisabled: {
+    opacity: 0.7,
+  },
+  requestDeclineText: {
+    color: COLORS.textPrimary,
+    fontWeight: '800',
+    fontSize: 18,
+  },
+  requestAcceptText: {
+    color: COLORS.surface,
+    fontWeight: '800',
+    fontSize: 18,
   },
 });

@@ -124,6 +124,11 @@ export async function savePushToken(token: string) {
   return result;
 }
 
+export async function clearPushToken() {
+  console.log('📱 Clearing push token');
+  return apiClient.delete<{ success: boolean }>('/api/notifications/push-token');
+}
+
 // Debug function - calls profile to check if token was persisted (server stores it on User)
 export async function verifyPushTokenSaved(_userId: string): Promise<boolean> {
   try {

@@ -18,6 +18,7 @@ import { prisma } from '../lib/prisma.js';
 import { reverseGeocode } from '../services/geocoding.service.js';
 import { verifySignature, isNonceUsed, markNonceUsed } from '../utils/locationSecurity.js';
 import { auditLog, AuditAction } from '../services/auditLog.service.js';
+import { invalidateAllFeedCache, invalidateProfileViewCacheForProfile } from '../utils/cacheInvalidation.js';
 
 /**
  * PATCH /users/me/location
@@ -131,6 +132,13 @@ export async function updateLocationHandler(req: FastifyRequest, reply: FastifyR
             ...(locationSharing ? { locationSharing } : {}),
             ...(locationPermission ? { locationPermission } : {}),
         },
+    });
+
+    await Promise.all([
+        invalidateAllFeedCache(),
+        invalidateProfileViewCacheForProfile(userId),
+    ]).catch((error) => {
+        req.log.warn({ error, userId }, 'Location cache invalidation failed');
     });
 
     // ---- Audit log (security tracking) ----

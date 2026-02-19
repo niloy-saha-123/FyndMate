@@ -5,12 +5,12 @@
 
 import { Prisma, Match } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { redis } from '../lib/redis.js';
 import { publicUserMatchSelect } from '../utils/publicUser.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
 import { filterLocationByPrivacy } from '../utils/locationPrivacy.js';
 import { signProfilePicture } from '../utils/profilePicture.js';
 import { computeAge } from '../utils/computeAge.js';
+import { invalidateFeedCacheForUsers } from '../utils/cacheInvalidation.js';
 
 type MatchWithUsers = Prisma.MatchGetPayload<{
     include: {
@@ -179,10 +179,7 @@ export class MatchService {
 
         // Cache invalidation AFTER transaction succeeds (prevents inconsistency on rollback)
         // Non-critical: If Redis is down, caches will just stay stale for 5 minutes
-        await Promise.all([
-            redis.del(`feed:${outerLikerId}`),
-            redis.del(`feed:${outerLikedId}`)
-        ]).catch(err => {
+        await invalidateFeedCacheForUsers([outerLikerId, outerLikedId]).catch(err => {
             console.warn('Cache invalidation failed (non-critical):', err.message);
             // Not throwing - match was created successfully, cache will expire naturally
         });
@@ -237,10 +234,7 @@ export class MatchService {
         });
 
         // Ensure both users can rediscover each other immediately after unmatch.
-        await Promise.all([
-            redis.del(`feed:${user1Id}`),
-            redis.del(`feed:${user2Id}`),
-        ]).catch((err) => {
+        await invalidateFeedCacheForUsers([user1Id, user2Id]).catch((err) => {
             console.warn('Cache invalidation failed after unmatch (non-critical):', err.message);
         });
 
@@ -396,10 +390,7 @@ export class MatchService {
             });
         });
 
-        await Promise.all([
-            redis.del(`feed:${userId}`),
-            redis.del(`feed:${blockedId}`),
-        ]).catch(() => {});
+        await invalidateFeedCacheForUsers([userId, blockedId]).catch(() => {});
 
         return result;
     }
@@ -433,10 +424,7 @@ export class MatchService {
             });
         });
 
-        await Promise.all([
-            redis.del(`feed:${userId}`),
-            redis.del(`feed:${otherUserId}`),
-        ]).catch(() => {});
+        await invalidateFeedCacheForUsers([userId, otherUserId]).catch(() => {});
 
         return result;
     }

@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../src/app.js';
-import { getAuthToken, clearDatabase } from '../../helpers.js';
+import { getAuthToken, clearDatabase, createDummyUser } from '../../helpers.js';
 import { prisma } from '../../../src/lib/prisma.js';
 
 describe('Profile Routes', () => {
@@ -349,6 +349,49 @@ describe('Profile Routes', () => {
         });
 
         expect(response.statusCode).toBe(400);
+    });
+
+    it('GET /api/profile/:userId allows viewing incoming requester profile', async () => {
+        const token = await getAuthToken('test-user', 'test@example.com');
+        const receiver = await prisma.user.findFirst({ orderBy: { createdAt: 'desc' } });
+        const requester = await createDummyUser('Requester');
+
+        await prisma.like.create({
+            data: {
+                likerId: requester.id,
+                likedId: receiver!.id,
+                liked: true,
+                message: 'Hello there!',
+                status: 'active',
+            },
+        });
+
+        const response = await app.inject({
+            method: 'GET',
+            url: `/api/profile/${requester.id}`,
+            headers: {
+                authorization: `Bearer ${token}`,
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = JSON.parse(response.body);
+        expect(body.id).toBe(requester.id);
+    });
+
+    it('GET /api/profile/:userId rejects when no match and no incoming request', async () => {
+        const token = await getAuthToken('test-user', 'test@example.com');
+        const stranger = await createDummyUser('Stranger');
+
+        const response = await app.inject({
+            method: 'GET',
+            url: `/api/profile/${stranger.id}`,
+            headers: {
+                authorization: `Bearer ${token}`,
+            },
+        });
+
+        expect(response.statusCode).toBe(403);
     });
 
     it('DELETE /api/profile/me deletes account', async () => {

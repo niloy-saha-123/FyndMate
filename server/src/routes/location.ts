@@ -9,6 +9,7 @@ import { authMiddleware } from '../middleware/auth.middleware.js';
 import { updateLocationHandler } from '../controllers/locationController.js';
 import { prisma } from '../lib/prisma.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { invalidateAllFeedCache, invalidateProfileViewCacheForProfile } from '../utils/cacheInvalidation.js';
 
 export async function locationRoutes(app: FastifyInstance) {
     /**
@@ -67,6 +68,13 @@ export async function locationRoutes(app: FastifyInstance) {
         await prisma.user.update({
             where: { id: userId },
             data: { locationSharing }
+        });
+
+        await Promise.all([
+            invalidateAllFeedCache(),
+            invalidateProfileViewCacheForProfile(userId),
+        ]).catch((err) => {
+            req.log.warn({ err, userId }, 'Location-settings cache invalidation failed');
         });
 
         return reply.send({ success: true, locationSharing });

@@ -19,6 +19,8 @@ import messageRoutes from './routes/message.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import notificationRoutes from './routes/notifications.routes.js';
 
+const PERF_DEBUG_ENABLED = process.env.DEBUG_PERF_LOGS === '1';
+
 export async function buildApp() {
   const app = Fastify({
     logger: true,
@@ -48,6 +50,28 @@ export async function buildApp() {
    * Strips sensitive location fields (lat, long, secret) from all responses.
    */
   app.addHook('onSend', sanitizeLocationResponse);
+
+  if (PERF_DEBUG_ENABLED) {
+    app.addHook('onRequest', async (request) => {
+      (request as any).__perfStartedAt = Date.now();
+    });
+
+    app.addHook('onResponse', async (request, reply) => {
+      const startedAt = (request as any).__perfStartedAt as number | undefined;
+      if (!startedAt) return;
+      const durationMs = Date.now() - startedAt;
+      app.log.info(
+        {
+          method: request.method,
+          url: request.url,
+          route: request.routeOptions?.url,
+          statusCode: reply.statusCode,
+          durationMs,
+        },
+        'Route timing'
+      );
+    });
+  }
 
   app.addHook('onClose', async () => {
     await prisma.$disconnect();

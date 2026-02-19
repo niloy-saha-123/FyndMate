@@ -27,6 +27,9 @@ const BATCH_SIZE = 5;
 const LOAD_MORE_THRESHOLD = 2;
 const MAX_ATTEMPTS = 2;
 const RETRY_DELAY_MS = 500;
+const SWIPE_MIN_INTERVAL_MS = 250;
+const SWIPE_DUPLICATE_WINDOW_MS = 1200;
+const SWIPE_DEBUG_ENABLED = process.env.EXPO_PUBLIC_DEBUG_SWIPE === '1';
 
 type FeedCache = {
   profiles: UserProfile[];
@@ -73,92 +76,161 @@ export function useFeed() {
   const [hasMore, setHasMore] = useState(true);
   const [swipeError, setSwipeError] = useState<SwipeError | null>(null);
   const initialLoadDone = useRef(false);
+  const fetchInFlightRef = useRef(false);
+  const lastSwipeAtRef = useRef<number>(0);
+  const lastSwipeProfileIdRef = useRef<string | null>(null);
+  const swipeInFlightIdsRef = useRef<Set<string>>(new Set());
+
+  const logSwipe = useCallback((meta: Record<string, unknown>) => {
+    if (!SWIPE_DEBUG_ENABLED) return;
+    const stack = new Error().stack;
+    console.log('[swipe-debug]', { ...meta, stack });
+  }, []);
 
   const fetchFeed = useCallback(
     async (reset = false) => {
+      if (fetchInFlightRef.current) return;
       if (loading) return;
       if (!reset && !hasMore) return;
+      fetchInFlightRef.current = true;
 
-      if (reset) {
-        setHasMore(true);
-        setCursor(undefined);
-      }
-      const currentCursor = reset ? undefined : cursor;
-
-      // Try cache first on initial load - show immediately, no loading spinner
-      if (reset && !currentCursor) {
-        const cached = await loadCache();
-        if (cached && cached.profiles.length > 0) {
-          setProfiles(cached.profiles);
-          setCursor(cached.cursor);
-          setHasMore(cached.hasMore);
-          setError(null);
-          // Fetch fresh in background (don't set loading - user sees cache)
-        } else {
-          setLoading(true);
-        }
-      } else {
-        setLoading(true);
-      }
-      setError(null);
-
-      let attempts = 0;
-      let data: UserProfile[] = [];
-      let lastError: unknown = null;
-
-      while (attempts < MAX_ATTEMPTS) {
-        try {
-          data = await getDiscoveryFeed(BATCH_SIZE, currentCursor);
-          lastError = null;
-          break;
-        } catch (err) {
-          lastError = err;
-          attempts += 1;
-          if (attempts >= MAX_ATTEMPTS) break;
-          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempts));
-        }
-      }
-
-      if (lastError) {
-        // On fetch failure: use cache if we have it (offline)
+      try {
         if (reset) {
+          setHasMore(true);
+          setCursor(undefined);
+        }
+        const currentCursor = reset ? undefined : cursor;
+
+        // Try cache first on initial load - show immediately, no loading spinner
+        if (reset && !currentCursor) {
           const cached = await loadCache();
           if (cached && cached.profiles.length > 0) {
             setProfiles(cached.profiles);
             setCursor(cached.cursor);
             setHasMore(cached.hasMore);
             setError(null);
-            setLoading(false);
-            return;
+            // Fetch fresh in background (don't set loading - user sees cache)
+          } else {
+            setLoading(true);
+          }
+        } else {
+          setLoading(true);
+        }
+        setError(null);
+
+        let attempts = 0;
+        let data: UserProfile[] = [];
+        let lastError: unknown = null;
+
+        while (attempts < MAX_ATTEMPTS) {
+          try {
+            data = await getDiscoveryFeed(BATCH_SIZE, currentCursor);
+            lastError = null;
+            break;
+          } catch (err) {
+            lastError = err;
+            attempts += 1;
+            if (attempts >= MAX_ATTEMPTS) break;
+            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempts));
           }
         }
-        setError(getUserFriendlyErrorMessage(lastError as Error));
+
+        if (lastError) {
+          // On fetch failure: use cache if we have it (offline)
+          if (reset) {
+            const cached = await loadCache();
+            if (cached && cached.profiles.length > 0) {
+              setProfiles(cached.profiles);
+              setCursor(cached.cursor);
+              setHasMore(cached.hasMore);
+              setError(null);
+              setLoading(false);
+              return;
+            }
+          }
+          setError(getUserFriendlyErrorMessage(lastError as Error));
+          setLoading(false);
+          return;
+        }
+
+        const newHasMore = data.length >= BATCH_SIZE;
+        setHasMore(newHasMore);
+
+        setProfiles((prev) => {
+          const newList = reset ? data : [...prev, ...data];
+          const newCursor = data.length > 0 ? data[data.length - 1].id : currentCursor;
+          setCursor(newCursor);
+          persistCache(newList, newCursor, newHasMore);
+          return newList;
+        });
+
         setLoading(false);
-        return;
+      } finally {
+        fetchInFlightRef.current = false;
       }
-
-      const newHasMore = data.length >= BATCH_SIZE;
-      setHasMore(newHasMore);
-
-      setProfiles((prev) => {
-        const newList = reset ? data : [...prev, ...data];
-        const newCursor = data.length > 0 ? data[data.length - 1].id : currentCursor;
-        setCursor(newCursor);
-        persistCache(newList, newCursor, newHasMore);
-        return newList;
-      });
-
-      setLoading(false);
     },
     [cursor, loading, hasMore]
   );
 
   // Load more when running low (called after swipe)
   const swipe = useCallback(
-    async (likedId: string, liked: boolean, message?: string) => {
+    async (
+      likedId: string,
+      liked: boolean,
+      message?: string,
+      source: 'skip_button' | 'request_modal' | 'retry' | 'unknown' = 'unknown'
+    ) => {
       setSwipeError(null);
+
+      const now = Date.now();
+      const sinceLastSwipe = lastSwipeAtRef.current > 0
+        ? now - lastSwipeAtRef.current
+        : null;
+      const topProfileId = profiles[0]?.id ?? null;
+
+      logSwipe({
+        event: 'swipe_invoked',
+        likedId,
+        liked,
+        source,
+        sinceLastSwipe,
+        topProfileId,
+      });
+
+      if (sinceLastSwipe !== null && sinceLastSwipe < SWIPE_MIN_INTERVAL_MS) {
+        logSwipe({ event: 'swipe_blocked_interval', likedId, source, sinceLastSwipe });
+        return { matched: false, ignored: true };
+      }
+
+      if (
+        lastSwipeProfileIdRef.current === likedId &&
+        sinceLastSwipe !== null &&
+        sinceLastSwipe < SWIPE_DUPLICATE_WINDOW_MS
+      ) {
+        logSwipe({ event: 'swipe_blocked_duplicate_profile', likedId, source, sinceLastSwipe });
+        return { matched: false, ignored: true };
+      }
+
+      if (topProfileId && topProfileId !== likedId) {
+        logSwipe({ event: 'swipe_blocked_stale_profile', likedId, source, topProfileId });
+        return { matched: false, ignored: true };
+      }
+
+      if (swipeInFlightIdsRef.current.has(likedId)) {
+        logSwipe({ event: 'swipe_blocked_inflight', likedId, source });
+        return { matched: false, ignored: true };
+      }
+
+      lastSwipeAtRef.current = now;
+      lastSwipeProfileIdRef.current = likedId;
+      swipeInFlightIdsRef.current.add(likedId);
+
       const swipedProfile = profiles.find((p) => p.id === likedId);
-      if (!swipedProfile) return;
+      if (!swipedProfile) {
+        swipeInFlightIdsRef.current.delete(likedId);
+        logSwipe({ event: 'swipe_blocked_profile_missing', likedId, source });
+        return { matched: false, ignored: true };
+      }
 
       setProfiles((prev) => prev.filter((p) => p.id !== likedId));
 
@@ -201,9 +273,11 @@ export function useFeed() {
           errorMessage: apiErr?.message ?? (err instanceof Error ? err.message : undefined),
         });
         return { matched: false, error: true };
+      } finally {
+        swipeInFlightIdsRef.current.delete(likedId);
       }
     },
-    [profiles, cursor, hasMore, loading, fetchFeed]
+    [profiles, cursor, hasMore, loading, fetchFeed, logSwipe]
   );
 
   const clearSwipeError = useCallback(() => setSwipeError(null), []);
