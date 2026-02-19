@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { signIn, signUp } from "../src/auth/emailAuth";
@@ -22,11 +23,12 @@ import LottieView from "lottie-react-native";
 
 export default function Login() {
   const router = useRouter();
+  // Restore old behavior: show social/email choice first, not email form directly
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(true);
+  const [isSignUp, setIsSignUp] = useState(false); // default to login, not sign up
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
