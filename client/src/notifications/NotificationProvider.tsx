@@ -21,6 +21,12 @@ const NotificationContext = createContext<NotificationContextType>({
 });
 
 const NOTIFICATIONS_ENABLED_KEY = 'fyndmate_notifications_enabled';
+/** Throttle push token save to avoid rate limit (15/hour). Only save to server at most every 30 min per user. */
+const PUSH_TOKEN_SAVE_THROTTLE_MS = 30 * 60 * 1000;
+
+function getPushTokenLastSaveKey(userId: string) {
+  return `fyndmate_push_token_last_save_${userId}`;
+}
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -37,10 +43,21 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!user || !notificationsEnabled) return;
 
     try {
+      const throttleKey = getPushTokenLastSaveKey(user.id);
+      const lastSaveStr = await AsyncStorage.getItem(throttleKey);
+      const now = Date.now();
+      if (lastSaveStr) {
+        const elapsed = now - parseInt(lastSaveStr, 10);
+        if (elapsed < PUSH_TOKEN_SAVE_THROTTLE_MS) {
+          return; // Avoid rate limit: server allows 15 saves/hour
+        }
+      }
+
       const token = await registerForPushNotifications();
       if (token) {
         console.log('📱 Push token refreshed:', token);
         await savePushToken(token);
+        await AsyncStorage.setItem(throttleKey, String(now));
         console.log('✅ Push token saved to database');
       }
     } catch (error) {
@@ -131,8 +148,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       .then(async token => {
         if (token) {
           console.log('📱 Push token:', token);
-          await savePushToken(token);
-          console.log('✅ Push token saved for user:', user.id);
+          try {
+            await savePushToken(token);
+            await AsyncStorage.setItem(getPushTokenLastSaveKey(user.id), String(Date.now()));
+            console.log('✅ Push token saved for user:', user.id);
+          } catch (err) {
+            console.error('❌ Failed to save push token (user may need to re-open app):', err);
+          }
         } else {
           console.log('⚠️ No push token received (emulator or permissions denied)');
         }

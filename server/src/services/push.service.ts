@@ -51,7 +51,10 @@ export async function sendMessagePush(params: SendMessagePushParams): Promise<vo
     ]);
 
     if (pref?.enabled === false) return;
-    if (!receiver?.pushToken) return;
+    if (!receiver?.pushToken) {
+      console.warn('[push] Skipping push: no push token for receiver', { matchId, receiverId });
+      return;
+    }
 
     const title = sender?.name ?? 'New message';
     const body = (content && content.trim()) ? content.trim().slice(0, 200) : 'New message';
@@ -79,6 +82,8 @@ export async function sendMessagePush(params: SendMessagePushParams): Promise<vo
 
     if (result.data?.status === 'error') {
       console.error('[push] Expo push error:', result.data.message);
+    } else {
+      console.log('[push] Push sent successfully', { matchId, receiverId });
     }
   } catch (err) {
     console.error('[push] sendMessagePush failed:', err);

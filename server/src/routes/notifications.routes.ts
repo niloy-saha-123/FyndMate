@@ -69,6 +69,7 @@ export default async function notificationRoutes(app: FastifyInstance) {
     });
 
     if (!receiver?.pushToken) {
+      request.log.warn({ receiverUserId }, 'Push not sent: receiver has no push token');
       return reply.send({ success: false, reason: 'no_push_token' });
     }
 

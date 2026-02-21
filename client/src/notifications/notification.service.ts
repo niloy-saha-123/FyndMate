@@ -116,12 +116,27 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
 export async function savePushToken(token: string) {
   console.log('📱 Saving push token');
-  const result = await apiClient.patch<{ success: boolean }>(
-    '/api/notifications/push-token',
-    { pushToken: token }
-  );
-  console.log('✅ Push token saved successfully');
-  return result;
+  const doSave = () =>
+    apiClient.patch<{ success: boolean }>(
+      '/api/notifications/push-token',
+      { pushToken: token }
+    );
+
+  try {
+    const result = await doSave();
+    console.log('✅ Push token saved successfully');
+    return result;
+  } catch (err: any) {
+    // Retry once after delay if rate-limited so push delivery can recover
+    const is429 = err?.statusCode === 429 || err?.message?.includes('Too many requests');
+    if (is429) {
+      await new Promise((r) => setTimeout(r, 60 * 1000)); // wait 1 min
+      const result = await doSave();
+      console.log('✅ Push token saved on retry');
+      return result;
+    }
+    throw err;
+  }
 }
 
 export async function clearPushToken() {
@@ -159,7 +174,7 @@ export async function setNotificationPreference(
   matchId: string,
   enabled: boolean
 ) {
-  return apiClient.patch(`/api/notifications/preferences/${matchId}`, { enabled });
+  return apiClient.put(`/api/notifications/preferences/${matchId}`, { enabled });
 }
 
 
