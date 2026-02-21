@@ -263,6 +263,30 @@ export const apiClient = {
   },
 
   /**
+   * PUT request
+   * @param endpoint API endpoint
+   * @param body Request body (will be JSON stringified)
+   * @param requireAuth Whether to require authentication (default: true)
+   */
+  async put<T = any>(endpoint: string, body?: any, requireAuth = true): Promise<T> {
+    const startedAt = Date.now();
+    const url = `${API_BASE_URL}${endpoint}`;
+    const hasBody = body !== undefined;
+    let status: string | number = 'ERR';
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: buildHeaders(requireAuth, hasBody),
+      body: hasBody ? JSON.stringify(body) : undefined,
+    });
+    status = response.status;
+    try {
+      return await handleResponse<T>(response);
+    } finally {
+      logApiMetric('PUT', endpoint, status, Date.now() - startedAt);
+    }
+  },
+
+  /**
    * DELETE request
    * @param endpoint API endpoint
    * @param requireAuth Whether to require authentication (default: true)
