@@ -1,62 +1,17 @@
-import { useState, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  FlatList,
-  Animated,
-} from "react-native";
+
 import { useRouter, Redirect } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../src/auth/AuthProvider";
 import { LoadingGate } from "../src/components/LoadingGate";
+import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions } from "react-native";
 
-const { width, height } = Dimensions.get("window");
-
-interface OnboardingSlide {
-  id: string;
-  title?: string;
-  description: string;
-  gradientColors: string[];
-}
-
-const onboardingData: OnboardingSlide[] = [
-  {
-    id: "1",
-    description: "Users going through a vetting process to ensure you never match with bots.",
-    gradientColors: ["#C4C1E0", "#8B85C2"],
-  },
-  {
-    id: "2",
-    title: "Matches",
-    description: "We match you with people that have a large array of similar interests.",
-    gradientColors: ["#FECACA", "#F472B6"],
-  },
-];
 
 export default function Welcome() {
   const router = useRouter();
   const { user, loading, profile, profileLoading } = useAuth();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const flatListRef = useRef<FlatList>(null);
-
-  // These refs MUST be declared before any early returns (Rules of Hooks)
-  const handleViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) {
-      setCurrentIndex(viewableItems[0].index || 0);
-    }
-  }).current;
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-  }).current;
-
   if (loading || profileLoading) {
     return <LoadingGate message="Checking your account" />;
   }
+
 
   if (user && profile) {
     const destination = profile.onboardingCompleted
@@ -69,260 +24,218 @@ export default function Welcome() {
     return <Redirect href={destination} />;
   }
 
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { useNativeDriver: false }
-  );
 
-  const renderSlide = ({ item, index }: { item: OnboardingSlide; index: number }) => {
-    return (
-      <View style={styles.slide}>
-        <View style={styles.carouselContainer}>
-          {/* Previous card peek */}
-          {index > 0 && (
-            <View style={[styles.peekCard, styles.leftPeek]}>
-              <LinearGradient
-                colors={onboardingData[index - 1].gradientColors as [string, string]}
-                style={styles.cardGradient}
-              />
-            </View>
-          )}
-
-          {/* Main card */}
-          <View style={styles.mainCard}>
-            <LinearGradient
-              colors={item.gradientColors as [string, string]}
-              style={styles.cardGradient}
-            />
-          </View>
-
-          {/* Next card peek */}
-          {index < onboardingData.length - 1 && (
-            <View style={[styles.peekCard, styles.rightPeek]}>
-              <LinearGradient
-                colors={onboardingData[index + 1].gradientColors as [string, string]}
-                style={styles.cardGradient}
-              />
-            </View>
-          )}
-        </View>
-
-        <View style={styles.textContainer}>
-          {item.title && (
-            <Text style={styles.title}>{item.title}</Text>
-          )}
-          <Text style={styles.description}>{item.description}</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderPagination = () => {
-    return (
-      <View style={styles.paginationContainer}>
-        {onboardingData.map((_, index) => {
-          const inputRange = [
-            (index - 1) * width,
-            index * width,
-            (index + 1) * width,
-          ];
-
-          const dotWidth = scrollX.interpolate({
-            inputRange,
-            outputRange: [8, 8, 8],
-            extrapolate: "clamp",
-          });
-
-          const opacity = scrollX.interpolate({
-            inputRange,
-            outputRange: [0.3, 1, 0.3],
-            extrapolate: "clamp",
-          });
-
-          const backgroundColor = scrollX.interpolate({
-            inputRange,
-            outputRange: ["#D1D5DB", "#6058AE", "#D1D5DB"],
-            extrapolate: "clamp",
-          });
-
-          return (
-            <Animated.View
-              key={index}
-              style={[
-                styles.dot,
-                {
-                  width: dotWidth,
-                  opacity,
-                  backgroundColor,
-                },
-              ]}
-            />
-          );
-        })}
-      </View>
-    );
-  };
-
+  // Neo-brutalist splash screen inspired by provided HTML
   return (
-    <View style={styles.container}>
-      <FlatList
-        ref={flatListRef}
-        data={onboardingData}
-        renderItem={renderSlide}
-        keyExtractor={(item) => item.id}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        onViewableItemsChanged={handleViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        scrollEventThrottle={16}
-      />
+    <View style={styles.bgWrapper}>
+      <View style={styles.mobileFrame}>
+        {/* Geometric Circles */}
+        <View style={[styles.geoCircle, styles.geoCircle1]} />
+        <View style={[styles.geoCircle, styles.geoCircle2]} />
+        <View style={[styles.geoCircle, styles.geoCircle3]} />
 
-      {renderPagination()}
-
-      <View style={styles.bottomContainer}>
-        <TouchableOpacity
-          style={styles.createAccountButton}
-          onPress={() => router.push("/login")}
-        >
-          <LinearGradient
-            colors={["#8B85C2", "#6058AE"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.gradientButton}
-          >
-            <Text style={styles.createAccountText}>Create an account</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <View style={styles.signInContainer}>
-          <Text style={styles.signInText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.push("/login")}>
-            <Text style={styles.signInLink}>Sign In</Text>
-          </TouchableOpacity>
+        {/* Main Content */}
+        <View style={styles.flex1Center}>
+          {/* Brand Name / Wordmark */}
+          <Image source={require("../assets/icons/wordmark.png")} style={styles.wordmarkImg} />
+          {/* Tagline */}
+          <Text style={styles.tagline}>Find Your Perfect</Text>
+          <View style={styles.taglineRow}>
+            <Text style={styles.teamPill}>TEAM</Text>
+            <Text style={styles.plus}>+</Text>
+            <Text style={styles.projectPill}>PROJECT</Text>
+          </View>
+          {/* Feature Pills */}
+          <View style={styles.featurePillsRow}>
+            <Text style={styles.featurePill}>Connect</Text>
+            <Text style={styles.featurePill}>Collaborate</Text>
+            <Text style={styles.featurePill}>Create</Text>
+          </View>
         </View>
+        {/* Bottom Section */}
+        <View style={styles.bottomSection}>
+          <TouchableOpacity style={styles.neoBtnPrimary} onPress={() => router.push("/login")}> 
+            <Text style={styles.neoBtnText}>Get Started</Text>
+          </TouchableOpacity>
+          <Text style={styles.footerText}>
+            By continuing, you agree to our <Text style={styles.terms}>Terms</Text> & <Text style={styles.terms}>Privacy</Text>
+          </Text>
+        </View>
+        {/* Bottom Decorative Pattern */}
+        <View style={styles.hatchedBg} />
       </View>
     </View>
   );
 }
 
+const { width, height } = Dimensions.get("window");
 const styles = StyleSheet.create({
-  container: {
+  bgWrapper: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  slide: {
-    width: width,
-    alignItems: "center",
-    paddingTop: 60,
-  },
-  carouselContainer: {
-    width: width,
-    height: height * 0.45,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  mainCard: {
-    width: width * 0.55,
-    height: height * 0.40,
-    borderRadius: 20,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+  mobileFrame: {
+    width: 390,
+    height: 844,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#000',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 20, height: 20 },
+    shadowOpacity: 0.2,
+    shadowRadius: 0,
     elevation: 10,
-    zIndex: 2,
+    position: 'relative',
   },
-  cardGradient: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 20,
+  geoCircle: {
+    position: 'absolute',
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: '#000',
+    backgroundColor: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
   },
-  peekCard: {
-    width: width * 0.25,
-    height: height * 0.30,
-    borderRadius: 16,
-    overflow: "hidden",
-    position: "absolute",
-    opacity: 0.7,
-    zIndex: 1,
+  geoCircle1: { top: 80, right: 64, width: 16, height: 16, backgroundColor: '#6366F1' },
+  geoCircle2: { bottom: 240, right: 32, width: 24, height: 24, backgroundColor: '#8B5CF6' },
+  geoCircle3: { top: 192, left: 16, width: 12, height: 12, backgroundColor: '#EC4899' },
+  flex1Center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingTop: 40,
   },
-  leftPeek: {
-    left: 10,
+  wordmarkImg: {
+    height: 64,
+    resizeMode: 'contain',
+    marginBottom: 8,
   },
-  rightPeek: {
-    right: 10,
+  tagline: {
+    fontSize: 18,
+    color: '#5B21B6',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
+    letterSpacing: 1,
   },
-  textContainer: {
-    paddingHorizontal: 40,
-    alignItems: "center",
-    marginTop: 30,
+  taglineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 32,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#6058AE",
-    marginBottom: 12,
-    textAlign: "center",
+  teamPill: {
+    backgroundColor: '#EDE9FE',
+    borderWidth: 2,
+    borderColor: '#000',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    fontWeight: 'bold',
+    color: '#5B21B6',
+    fontSize: 14,
+    marginRight: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
   },
-  description: {
-    fontSize: 16,
-    color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 24,
-  },
-  paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 30,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
+  plus: {
+    fontSize: 24,
+    fontWeight: '900',
     marginHorizontal: 4,
   },
-  bottomContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    marginTop: "auto",
+  projectPill: {
+    backgroundColor: '#FCE7F3',
+    borderWidth: 2,
+    borderColor: '#000',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    fontWeight: 'bold',
+    color: '#BE185D',
+    fontSize: 14,
+    marginLeft: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
   },
-  createAccountButton: {
-    borderRadius: 30,
-    overflow: "hidden",
-    marginBottom: 20,
-    shadowColor: "#6058AE",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+  featurePillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 32,
+  },
+  featurePill: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#000',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    fontWeight: 'bold',
+    color: '#000',
+    fontSize: 12,
+    marginHorizontal: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
+  },
+  bottomSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    marginTop: 'auto',
+  },
+  neoBtnPrimary: {
+    backgroundColor: '#8B5CF6',
+    borderWidth: 3,
+    borderColor: '#000',
+    borderRadius: 999,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
     elevation: 4,
   },
-  gradientButton: {
-    paddingVertical: 18,
-    alignItems: "center",
-    borderRadius: 30,
-  },
-  createAccountText: {
-    color: "#FFFFFF",
+  neoBtnText: {
+    color: '#fff',
+    fontWeight: '800',
     fontSize: 18,
-    fontWeight: "700",
   },
-  signInContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
+  footerText: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    fontWeight: '500',
   },
-  signInText: {
-    fontSize: 14,
-    color: "#6B7280",
+  terms: {
+    color: '#5B21B6',
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
   },
-  signInLink: {
-    fontSize: 14,
-    color: "#6058AE",
-    fontWeight: "700",
+  hatchedBg: {
+    height: 24,
+    backgroundColor: '#F9A8D4',
+    borderTopWidth: 3,
+    borderColor: '#000',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 });
