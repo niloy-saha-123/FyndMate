@@ -74,11 +74,11 @@ export default async function notificationRoutes(app: FastifyInstance) {
 
     const payload = {
       to: receiver.pushToken,
-      sound: 'default',
+      sound: 'default' as const,
       title: title ?? 'New message',
       body: message,
-      data: { type: 'message' },
-      priority: 'high',
+      data: { type: 'message', ...(matchId ? { matchId } : {}) },
+      priority: 'high' as const,
       channelId: 'default',
     };
 

@@ -136,8 +136,8 @@ serve(async (req) => {
           to: receiver.pushToken,
           sound: "default",
           title: senderName,
-          body: content ?? "New message",
-          data: { matchId, senderId },
+          body: (content && content.trim()) ? content.trim().slice(0, 200) : "New message",
+          data: { type: "message", matchId, senderId },
           priority: "high",
           channelId: "default"
         })

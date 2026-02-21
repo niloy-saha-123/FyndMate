@@ -626,16 +626,33 @@ export function useLocation() {
                 }
             }
 
-            // Ask once on first app start for this user (mobile-native flow).
+            // Ask once on first app start for this user (when they're in the app).
             if (!hasPrompted) {
                 const foreground = await Location.getForegroundPermissionsAsync();
                 if (foreground.status === 'undetermined') {
-                    const requested = await Location.requestForegroundPermissionsAsync();
-                    if (requested.granted) {
-                        const level = await getPermissionLevel();
-                        effectivePermission = level;
-                        setPermission(level);
-                        await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, level);
+                    // In-app prompt first so the user knows why we're asking
+                    const userWantsToAllow = await new Promise<boolean>((resolve) => {
+                        Alert.alert(
+                            'Use your location?',
+                            'FyndMate uses your location to show your city and country on your profile. You can change this anytime in Settings.',
+                            [
+                                { text: 'Not Now', onPress: () => resolve(false), style: 'cancel' },
+                                { text: 'Allow', onPress: () => resolve(true) },
+                            ]
+                        );
+                    });
+                    if (userWantsToAllow) {
+                        const requested = await Location.requestForegroundPermissionsAsync();
+                        if (requested.granted) {
+                            const level = await getPermissionLevel();
+                            effectivePermission = level;
+                            setPermission(level);
+                            await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, level);
+                        } else {
+                            effectivePermission = 'denied';
+                            setPermission('denied');
+                            await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
+                        }
                     } else {
                         effectivePermission = 'denied';
                         setPermission('denied');
