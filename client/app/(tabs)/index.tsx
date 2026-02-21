@@ -296,8 +296,7 @@ export default function FeedScreen() {
             {currentProfile.experiences && currentProfile.experiences.length > 0 && (
               <View style={styles.sectionPadding}>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="briefcase-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
-                  <Text style={styles.sectionTitle}>Experience</Text>
+                  <Text style={[styles.sectionTitle, styles.iconlessSectionTitle]}>Experience</Text>
                 </View>
                 {currentProfile.experiences.slice(0, 5).map((experience, index) => (
                   <View key={experience.id ?? `experience-${index}`} style={styles.portfolioItem}>
@@ -321,8 +320,7 @@ export default function FeedScreen() {
             {currentProfile.projects && currentProfile.projects.length > 0 && (
               <View style={styles.sectionPadding}>
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="hammer-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
-                  <Text style={styles.sectionTitle}>Projects</Text>
+                  <Text style={[styles.sectionTitle, styles.iconlessSectionTitle]}>Projects</Text>
                 </View>
                 {currentProfile.projects.slice(0, 5).map((project, index) => (
                   <View key={project.id ?? `project-${index}`} style={styles.portfolioItem}>
@@ -685,6 +683,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.textPrimary,
+  },
+  iconlessSectionTitle: {
+    marginLeft: 1,
   },
   bioText: {
     fontSize: 16,
