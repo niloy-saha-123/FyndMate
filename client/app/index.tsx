@@ -29,11 +29,6 @@ export default function Welcome() {
   return (
     <View style={styles.bgWrapper}>
       <View style={styles.mobileFrame}>
-        {/* Decorative Triangles */}
-        <View style={[styles.triangle, styles.trianglePink]} />
-        <View style={[styles.triangle, styles.trianglePurple]} />
-        <View style={[styles.triangle, styles.triangleSmall]} />
-
         {/* Geometric Circles */}
         <View style={[styles.geoCircle, styles.geoCircle1]} />
         <View style={[styles.geoCircle, styles.geoCircle2]} />
@@ -41,13 +36,7 @@ export default function Welcome() {
 
         {/* Main Content */}
         <View style={styles.flex1Center}>
-          {/* Logo Container */}
-          <View style={styles.logoContainer}>
-            <View style={styles.logoBg} />
-            <Image source={require("../assets/icons/icon.png")} style={styles.logoImg} />
-            {/* Sparkle/Star icons can be added here if available */}
-          </View>
-          {/* Brand Name */}
+          {/* Brand Name / Wordmark */}
           <Image source={require("../assets/icons/wordmark.png")} style={styles.wordmarkImg} />
           {/* Tagline */}
           <Text style={styles.tagline}>Find Your Perfect</Text>
@@ -102,46 +91,6 @@ const styles = StyleSheet.create({
     elevation: 10,
     position: 'relative',
   },
-  triangle: {
-    position: 'absolute',
-    width: 0,
-    height: 0,
-    borderStyle: 'solid',
-    zIndex: 10,
-  },
-  trianglePink: {
-    top: 32,
-    right: 24,
-    borderLeftWidth: 35,
-    borderLeftColor: 'transparent',
-    borderRightWidth: 35,
-    borderRightColor: 'transparent',
-    borderBottomWidth: 60,
-    borderBottomColor: '#EC4899',
-    transform: [{ rotate: '12deg' }],
-  },
-  trianglePurple: {
-    bottom: 160,
-    left: 16,
-    borderLeftWidth: 30,
-    borderLeftColor: 'transparent',
-    borderRightWidth: 30,
-    borderRightColor: 'transparent',
-    borderTopWidth: 50,
-    borderTopColor: '#6366F1',
-    transform: [{ rotate: '-12deg' }],
-  },
-  triangleSmall: {
-    top: 128,
-    left: 32,
-    borderLeftWidth: 20,
-    borderLeftColor: 'transparent',
-    borderRightWidth: 20,
-    borderRightColor: 'transparent',
-    borderBottomWidth: 35,
-    borderBottomColor: '#F472B6',
-    transform: [{ rotate: '45deg' }],
-  },
   geoCircle: {
     position: 'absolute',
     borderRadius: 999,
@@ -163,35 +112,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
     paddingTop: 40,
-  },
-  logoContainer: {
-    marginBottom: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  logoBg: {
-    position: 'absolute',
-    top: -16,
-    left: -16,
-    width: 128,
-    height: 128,
-    backgroundColor: '#8B5CF6',
-    borderRadius: 24,
-    borderWidth: 3,
-    borderColor: '#000',
-    shadowColor: '#000',
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 6,
-    transform: [{ rotate: '3deg' }],
-  },
-  logoImg: {
-    width: 128,
-    height: 128,
-    resizeMode: 'contain',
-    zIndex: 2,
   },
   wordmarkImg: {
     height: 64,
