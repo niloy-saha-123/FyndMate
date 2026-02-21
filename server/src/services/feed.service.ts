@@ -6,6 +6,7 @@
 
 import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
+import { createHash } from 'crypto';
 import { filterLocationArrayByPrivacy } from '../utils/locationPrivacy.js';
 import { publicUserFeedSelect, type PublicFeedUser } from '../utils/publicUser.js';
 import { signProfilePicture } from '../utils/profilePicture.js';
@@ -78,6 +79,8 @@ import { computeAge } from '../utils/computeAge.js';
 // PRIVACY: Actual user location still hidden, only search center changes
 
 type FeedUserWithAge = PublicFeedUser & { age: number | null };
+const FEED_CACHE_TTL_SECONDS = 45;
+const FEED_DYNAMIC_ZONE_MIN_RESULTS = 3;
 
 export class FeedService {
     /**
@@ -85,18 +88,23 @@ export class FeedService {
      * Aggregates all exclusions to return fresh profiles.
      */
     async getFeed(userId: string, limit = 20, cursor?: string): Promise<FeedUserWithAge[]> {
-        // Cache Hit: Return cached feed if this is an initial load (no cursor)
-        const cacheKey = `feed:${userId}`;
-        if (!cursor) {
-            try {
-                const cached = await redis.get(cacheKey);
-                if (cached) {
-                    return JSON.parse(cached);
-                }
-            } catch (redisError) {
-                // Redis unavailable - continue without cache
-                console.warn('Redis cache miss (error):', redisError);
+        const TAKE_LIMIT = Math.min(limit, 50);
+        const pageToken = cursor ? `cursor:${cursor}` : 'page:0';
+        const filtersHash = createHash('sha1')
+            .update(`limit:${TAKE_LIMIT}`)
+            .digest('hex')
+            .slice(0, 8);
+        const cacheKey = `feed:${userId}:${pageToken}:${filtersHash}`;
+
+        // Cache Hit: read-through cache for feed pages.
+        try {
+            const cached = await redis.get(cacheKey);
+            if (cached) {
+                return JSON.parse(cached);
             }
+        } catch (redisError) {
+            // Redis unavailable - continue without cache
+            console.warn('Redis cache miss (error):', redisError);
         }
 
         const userExists = await prisma.user.findUnique({
@@ -106,8 +114,6 @@ export class FeedService {
         if (!userExists) {
             return [];
         }
-
-        const TAKE_LIMIT = Math.min(limit, 50);
 
         // Build Exclusion List
         // We exclude:
@@ -221,10 +227,10 @@ export class FeedService {
             }))
         );
 
-        // Cache Miss: Store result for 5 minutes if this was an initial load
-        if (!cursor && result.length > 0) {
+        // Cache Miss: store only when results are outside dynamic low-remaining zone.
+        if (result.length >= FEED_DYNAMIC_ZONE_MIN_RESULTS) {
             try {
-                await redis.setex(cacheKey, 300, JSON.stringify(result));
+                await redis.setex(cacheKey, FEED_CACHE_TTL_SECONDS, JSON.stringify(result));
             } catch (redisError) {
                 // Redis unavailable - continue without caching
                 console.warn('Redis cache write failed:', redisError);

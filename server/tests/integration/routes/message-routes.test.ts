@@ -78,7 +78,7 @@ describe('Message Routes', () => {
             expect(response.statusCode).toBe(401);
         });
 
-        it('rejects invalid match ID', async () => {
+        it('rejects malformed match ID', async () => {
             const { token } = await setupMatch();
 
             const response = await app.inject({
@@ -87,7 +87,7 @@ describe('Message Routes', () => {
                 headers: { authorization: `Bearer ${token}` },
             });
 
-            expect(response.statusCode).toBe(400);
+            expect(response.statusCode).toBe(403);
         });
     });
 
@@ -120,6 +120,49 @@ describe('Message Routes', () => {
             });
 
             expect(response.statusCode).toBe(403);
+        });
+        it('hides old-cycle messages after unmatch and rematch', async () => {
+            const { token, me, other, match } = await setupMatch();
+
+            const oldMessage = await prisma.message.create({
+                data: {
+                    matchId: match.id,
+                    senderId: me.id,
+                    content: 'Old-cycle message',
+                },
+            });
+
+            await matchService.unmatch(match.id, me.id);
+
+            const relike = await likeService.createLike(
+                other.id,
+                me.id,
+                true,
+                'Starting fresh'
+            );
+            await matchService.acceptLike(relike.id);
+
+            const refreshedMatch = await prisma.match.findUnique({
+                where: { id: match.id },
+                select: { conversationStartAt: true },
+            });
+            expect(refreshedMatch).not.toBeNull();
+
+            const response = await app.inject({
+                method: 'GET',
+                url: `/api/matches/${match.id}/messages`,
+                headers: { authorization: `Bearer ${token}` },
+            });
+
+            expect(response.statusCode).toBe(200);
+            const messages = JSON.parse(response.body);
+            const messageIds = messages.map((m: any) => m.id);
+            expect(messageIds).not.toContain(oldMessage.id);
+
+            const boundaryMs = new Date(refreshedMatch!.conversationStartAt).getTime();
+            expect(
+                messages.every((m: any) => new Date(m.createdAt).getTime() >= boundaryMs)
+            ).toBe(true);
         });
     });
 
@@ -179,7 +222,7 @@ describe('Message Routes', () => {
     });
 
     describe('PATCH /api/matches/:matchId/messages/:messageId', () => {
-        it('edits message within 3-minute window', async () => {
+        it('edits message within 5-minute window', async () => {
             const { token, me, match } = await setupMatch();
             const msg = await prisma.message.create({
                 data: {
@@ -232,6 +275,9 @@ describe('Message Routes', () => {
     describe('POST /api/matches/:matchId/block', () => {
         it('blocks match successfully', async () => {
             const { token, me, other, match } = await setupMatch();
+            const messageCountBefore = await prisma.message.count({
+                where: { matchId: match.id },
+            });
 
             const response = await app.inject({
                 method: 'POST',
@@ -243,15 +289,17 @@ describe('Message Routes', () => {
             const body = JSON.parse(response.body);
             expect(body.success).toBe(true);
 
-            const deletedMatch = await prisma.match.findUnique({
+            const blockedMatch = await prisma.match.findUnique({
                 where: { id: match.id },
             });
-            expect(deletedMatch).toBeNull();
+            expect(blockedMatch).not.toBeNull();
+            expect(blockedMatch?.status).toBe('blocked');
+            expect(blockedMatch?.blockedBy).toBe(me.id);
 
-            const deletedMessages = await prisma.message.count({
+            const messageCountAfter = await prisma.message.count({
                 where: { matchId: match.id },
             });
-            expect(deletedMessages).toBe(0);
+            expect(messageCountAfter).toBe(messageCountBefore);
 
             const block = await prisma.block.findUnique({
                 where: {

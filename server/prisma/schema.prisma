@@ -119,6 +119,7 @@ model Match {
   status                      String                        @default("active")
   createdAt                   DateTime                      @default(now())
   blockedBy                   String?
+  conversationStartAt         DateTime                      @default(now()) @db.Timestamp(6)
   user1                       User                          @relation("User1Matches", fields: [user1Id], references: [id], onDelete: Cascade)
   user2                       User                          @relation("User2Matches", fields: [user2Id], references: [id], onDelete: Cascade)
   MatchNotificationPreference MatchNotificationPreference[]

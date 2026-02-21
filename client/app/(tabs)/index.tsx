@@ -70,13 +70,13 @@ export default function FeedScreen() {
 
   const handleSkip = async () => {
     if (!currentProfile) return;
-    await swipe(currentProfile.id, false);
+    await swipe(currentProfile.id, false, undefined, 'skip_button');
   };
 
   const handleLike = async () => {
     if (!currentProfile) return;
     if (!isIntroValid) return;
-    const result = await swipe(currentProfile.id, true, message);
+    const result = await swipe(currentProfile.id, true, message, 'request_modal');
     if (result && (result.matched || !result.error)) {
       setMessage('');
       setShowRequestModal(false);
@@ -86,7 +86,7 @@ export default function FeedScreen() {
 
   const handleRetrySwipe = async () => {
     if (!swipeError) return;
-    await swipe(swipeError.profileId, swipeError.liked, swipeError.message);
+    await swipe(swipeError.profileId, swipeError.liked, swipeError.message, 'retry');
   };
 
   const showSwipeRetry = swipeError && currentProfile && swipeError.profileId === currentProfile.id;
@@ -404,7 +404,7 @@ export default function FeedScreen() {
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <Ionicons name="star" size={20} color={COLORS.accent} />
-              <Text style={styles.modalTitle}>Send Troupe Request</Text>
+              <Text style={styles.modalTitle}>Send Request</Text>
             </View>
             <Text style={styles.modalSubtitle}>
               Include a short message so they know why you reached out.

@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLikes } from '@/src/hooks/useLikes';
 import { Like } from '@/src/services/matchingService';
 import { useAuth } from '@/src/auth/AuthProvider';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { COLORS, SHADOWS, BORDERS, RADIUS } from '@/src/theme/colors';
 import { NeoCard } from '@/src/components/NeoCard';
 import { NeoButton } from '@/src/components/NeoButton';
@@ -29,6 +29,8 @@ export default function LikesScreen() {
     const { top, bottom } = useSafeAreaInsets();
     const { isAuthenticated } = useAuth();
     const { likes, loading, error, fetchLikes, onAccept, onDecline } = useLikes();
+    const { refreshAt } = useLocalSearchParams<{ refreshAt?: string | string[] }>();
+    const normalizedRefreshAt = Array.isArray(refreshAt) ? refreshAt[0] : refreshAt;
 
     const [selectedLike, setSelectedLike] = useState<Like | null>(null);
     const [replyText, setReplyText] = useState('');
@@ -38,7 +40,7 @@ export default function LikesScreen() {
 
     useEffect(() => {
         fetchLikes({ silent: true });
-    }, [fetchLikes]);
+    }, [fetchLikes, normalizedRefreshAt]);
 
     const handleAccept = async () => {
         if (!selectedLike) return;
@@ -78,7 +80,12 @@ export default function LikesScreen() {
                         onPress={() =>
                             router.push({
                                 pathname: '/messages/profile/[userId]',
-                                params: { userId: item.likerUser.id },
+                                params: {
+                                    userId: item.likerUser.id,
+                                    mode: 'request',
+                                    likeId: item.id,
+                                    introMessage: item.message ?? '',
+                                },
                             })
                         }
                     >

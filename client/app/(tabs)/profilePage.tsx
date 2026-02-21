@@ -3,7 +3,7 @@
  * @description User Profile Screen with Neo-brutalist design
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,6 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  Switch,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,6 +34,8 @@ import { NeoButton } from '../../src/components/NeoButton';
 import { NeoChip, ChipContainer } from '../../src/components/NeoChip';
 import { useProfilePictureUpload } from '../../src/hooks/useProfilePictureUpload';
 import { useLocationContext } from '../../src/location/LocationProvider';
+import { useNotifications } from '../../src/notifications/NotificationProvider';
+import type { UserProfile } from '../../src/types/profile';
 import {
   PROFILE_BIO_MAX_LENGTH,
   PROFILE_MAX_SKILLS,
@@ -121,19 +122,157 @@ function toMonthValue(value?: string | null): string {
   return `${year}-${month}`;
 }
 
+type EditableProfileSnapshot = {
+  birthDate: string;
+  bio: string;
+  skills: string[];
+  interests: string[];
+  projects: Array<{ name: string; description: string }>;
+  experiences: Array<{
+    company: string;
+    position: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+  }>;
+  githubUsername: string;
+};
+
+function normalizeProfileSnapshotValue(profile: UserProfile | null): EditableProfileSnapshot {
+  return {
+    birthDate: profile?.birthDate ?? '',
+    bio: profile?.bio ?? '',
+    skills: (profile?.skills ?? []).map((item) => normalizeTagInput(item)),
+    interests: (profile?.interests ?? []).map((item) => normalizeTagInput(item)),
+    projects: (profile?.projects ?? []).map((project) => ({
+      name: normalizeTagInput(project.name ?? ''),
+      description: normalizeTagInput(project.description ?? ''),
+    })),
+    experiences: (profile?.experiences ?? []).map((experience) => ({
+      company: normalizeTagInput(experience.company ?? ''),
+      position: normalizeTagInput(experience.position ?? ''),
+      description: normalizeTagInput(experience.description ?? ''),
+      startDate: toMonthValue(experience.startDate),
+      endDate: toMonthValue(experience.endDate),
+    })),
+    githubUsername: normalizeTagInput(profile?.githubUsername ?? ''),
+  };
+}
+
+function normalizeFormSnapshotValue(formData: {
+  birthDate: string;
+  bio: string;
+  skills: string[];
+  interests: string[];
+  projects: Array<{ name: string; description: string }>;
+  experiences: Array<{
+    company: string;
+    position: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+  }>;
+  githubUsername: string;
+}): EditableProfileSnapshot {
+  return {
+    birthDate: formData.birthDate,
+    bio: formData.bio,
+    skills: formData.skills.map((item) => normalizeTagInput(item)),
+    interests: formData.interests.map((item) => normalizeTagInput(item)),
+    projects: formData.projects.map((project) => ({
+      name: normalizeTagInput(project.name),
+      description: normalizeTagInput(project.description),
+    })),
+    experiences: formData.experiences.map((experience) => ({
+      company: normalizeTagInput(experience.company),
+      position: normalizeTagInput(experience.position),
+      description: normalizeTagInput(experience.description ?? ''),
+      startDate: normalizeTagInput(experience.startDate),
+      endDate: normalizeTagInput(experience.endDate),
+    })),
+    githubUsername: normalizeTagInput(formData.githubUsername),
+  };
+}
+
+function buildChangedProfilePayload(
+  profile: UserProfile | null,
+  formData: {
+    birthDate: string;
+    bio: string;
+    skills: string[];
+    interests: string[];
+    projects: Array<{ name: string; description: string }>;
+    experiences: Array<{
+      company: string;
+      position: string;
+      description: string;
+      startDate: string;
+      endDate: string;
+    }>;
+    githubUsername: string;
+  }
+): Partial<UserProfile> {
+  const previous = normalizeProfileSnapshotValue(profile);
+  const current = normalizeFormSnapshotValue(formData);
+  const changed: Partial<UserProfile> = {};
+
+  if (previous.birthDate !== current.birthDate) changed.birthDate = current.birthDate || null;
+  if (previous.bio !== current.bio) changed.bio = current.bio;
+  if (previous.githubUsername !== current.githubUsername) changed.githubUsername = current.githubUsername;
+  if (JSON.stringify(previous.skills) !== JSON.stringify(current.skills)) changed.skills = current.skills;
+  if (JSON.stringify(previous.interests) !== JSON.stringify(current.interests)) changed.interests = current.interests;
+  if (JSON.stringify(previous.projects) !== JSON.stringify(current.projects)) changed.projects = current.projects;
+  if (JSON.stringify(previous.experiences) !== JSON.stringify(current.experiences)) changed.experiences = current.experiences;
+
+  return changed;
+}
+
+function SettingsToggle({
+  value,
+  onValueChange,
+  disabled = false,
+}: {
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        if (!disabled) onValueChange(!value);
+      }}
+      style={[
+        styles.settingsToggleTrack,
+        value && styles.settingsToggleTrackOn,
+        disabled && styles.settingsToggleTrackDisabled,
+      ]}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled }}
+      hitSlop={8}
+    >
+      <View style={[styles.settingsToggleThumb, value ? styles.settingsToggleThumbOn : styles.settingsToggleThumbOff]} />
+    </Pressable>
+  );
+}
+
 export default function ProfilePage() {
   const { top, bottom } = useSafeAreaInsets();
   const { profile, setProfileLocally, session } = useAuth();
   const { upload, uploading, progress, error: uploadError, rateLimit } = useProfilePictureUpload();
   const {
     preference: locationPreference,
-    currentLocation,
     changePreference,
     initialized: locationInitialized,
   } = useLocationContext();
+  const {
+    notificationsEnabled,
+    notificationsReady,
+    setNotificationsEnabled,
+  } = useNotifications();
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showSavingOverlay, setShowSavingOverlay] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorModalMessage, setErrorModalMessage] = useState('');
   const [successModalVisible, setSuccessModalVisible] = useState(false);
@@ -141,6 +280,15 @@ export default function ProfilePage() {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [deleteAccountModalVisible, setDeleteAccountModalVisible] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [locationUpdating, setLocationUpdating] = useState(false);
+  const [notificationsUpdating, setNotificationsUpdating] = useState(false);
+  const profileSaveDebugRef = useRef({
+    attempts: 0,
+    skippedNoChanges: 0,
+    sent: 0,
+    succeeded: 0,
+    failed: 0,
+  });
 
   const [photo, setPhoto] = useState<string | null>(profile?.profilePicture ?? null);
 
@@ -216,22 +364,59 @@ export default function ProfilePage() {
   );
 
   const handleSave = useCallback(async () => {
-    if (!session?.user?.id) return;
+    if (!session?.user?.id || !profile) return;
+
+    profileSaveDebugRef.current.attempts += 1;
+    const changedPayload = buildChangedProfilePayload(profile, formData);
+    const changedFieldCount = Object.keys(changedPayload).length;
+    if (Object.keys(changedPayload).length === 0) {
+      profileSaveDebugRef.current.skippedNoChanges += 1;
+      if (__DEV__) {
+        console.log('[ProfileSave][DEV] skipped no-op save', {
+          ...profileSaveDebugRef.current,
+        });
+      }
+      setIsEditing(false);
+      return;
+    }
+
+    profileSaveDebugRef.current.sent += 1;
+    if (__DEV__) {
+      console.log('[ProfileSave][DEV] sending update', {
+        ...profileSaveDebugRef.current,
+        changedFieldCount,
+        changedFields: Object.keys(changedPayload),
+      });
+    }
 
     setSaving(true);
+    // TODO [10K Users]: Move profile writes to a background write-behind queue with retry + conflict resolution.
+    const overlayTimer = setTimeout(() => setShowSavingOverlay(true), 250);
     try {
-      const updated = await updateProfile(session.user.id, formData);
+      const updated = await updateProfile(session.user.id, changedPayload);
+      profileSaveDebugRef.current.succeeded += 1;
+      if (__DEV__) {
+        console.log('[ProfileSave][DEV] update success', {
+          ...profileSaveDebugRef.current,
+        });
+      }
       setProfileLocally(updated);
       setIsEditing(false);
-      setSuccessModalMessage('Profile updated successfully!');
-      setSuccessModalVisible(true);
     } catch (error: any) {
+      profileSaveDebugRef.current.failed += 1;
+      if (__DEV__) {
+        console.log('[ProfileSave][DEV] update failed', {
+          ...profileSaveDebugRef.current,
+        });
+      }
       setErrorModalMessage(error?.message || 'Failed to update profile');
       setErrorModalVisible(true);
     } finally {
+      clearTimeout(overlayTimer);
+      setShowSavingOverlay(false);
       setSaving(false);
     }
-  }, [session, formData, setProfileLocally]);
+  }, [session, formData, profile, setProfileLocally]);
 
   const toggleSkill = useCallback((skill: string) => {
     setFormData((prev) => {
@@ -495,15 +680,32 @@ export default function ProfilePage() {
 
   const age = calculateAge(profile?.birthDate ?? null);
   const locationEnabled = locationPreference === 'on';
-  const locationLabel = currentLocation || (profile?.city && profile?.country ? `${profile.city}, ${profile.country}` : null);
 
   const handleLocationToggle = useCallback(async (value: boolean) => {
+    if (locationUpdating) return;
+    setLocationUpdating(true);
     try {
       await changePreference(value ? 'on' : 'off');
     } catch (error: any) {
       console.error('Failed to update location setting:', error?.message || error);
+    } finally {
+      setLocationUpdating(false);
     }
-  }, [changePreference]);
+  }, [changePreference, locationUpdating]);
+
+  const handleNotificationsToggle = useCallback(async (value: boolean) => {
+    if (notificationsUpdating) return;
+    setNotificationsUpdating(true);
+    try {
+      await setNotificationsEnabled(value);
+    } catch (error: any) {
+      console.error('Failed to update notifications setting:', error?.message || error);
+      setErrorModalMessage('Failed to update notification settings. Please try again.');
+      setErrorModalVisible(true);
+    } finally {
+      setNotificationsUpdating(false);
+    }
+  }, [notificationsUpdating, setNotificationsEnabled]);
 
   const handleViewProfile = useCallback(() => {
     if (!profile?.id) return;
@@ -525,13 +727,17 @@ export default function ProfilePage() {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.viewButton}
-            onPress={handleViewProfile}
+            onPress={isEditing ? handleSave : handleViewProfile}
+            disabled={saving}
           >
-            <Text style={styles.viewButtonText}>View</Text>
+            <Text style={styles.viewButtonText}>
+              {isEditing ? (saving ? 'Saving...' : 'Save') : 'View'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.editButton, isEditing && styles.editButtonActive]}
             onPress={handleEditToggle}
+            disabled={saving}
           >
             <Text style={[styles.editButtonText, isEditing && styles.editButtonTextActive]}>
               {isEditing ? 'Cancel' : 'Edit'}
@@ -607,33 +813,6 @@ export default function ProfilePage() {
             {profile?.name || 'Add your name'}
             {age && <Text style={styles.ageText}>, {age}</Text>}
           </Text>
-        </NeoCard>
-
-        {/* Location Section */}
-        <NeoCard style={styles.section}>
-          <View style={styles.locationHeaderRow}>
-            <Text style={[styles.sectionLabel, { marginBottom: 0 }]}>LOCATION</Text>
-            {isEditing ? (
-              <Switch
-                value={locationEnabled}
-                onValueChange={handleLocationToggle}
-                disabled={!locationInitialized}
-                trackColor={{ false: COLORS.border, true: COLORS.primary }}
-                thumbColor={locationEnabled ? COLORS.surface : COLORS.textLight}
-              />
-            ) : null}
-          </View>
-          <View style={styles.locationCard}>
-            <View style={styles.locationInfo}>
-              <Ionicons name="location" size={24} color={COLORS.primary} />
-              <View style={styles.locationDetails}>
-                <Text style={styles.locationCity}>Location</Text>
-                {locationEnabled && locationLabel ? (
-                  <Text style={styles.locationUpdatedText}>{locationLabel}</Text>
-                ) : null}
-              </View>
-            </View>
-          </View>
         </NeoCard>
 
         {/* Bio Section */}
@@ -1023,20 +1202,33 @@ export default function ProfilePage() {
           )}
         </NeoCard>
 
-        {/* Save Button (Edit Mode) */}
-        {isEditing && (
-          <NeoButton
-            title={saving ? 'Saving...' : 'Save Changes'}
-            onPress={handleSave}
-            disabled={saving}
-            fullWidth
-            style={{ marginTop: 8 }}
-          />
-        )}
-
         {/* Settings Section */}
         <View style={styles.settingsSection}>
           <Text style={styles.settingsSectionTitle}>Settings</Text>
+
+          <View style={styles.settingsToggleItem}>
+            <View style={styles.settingsToggleMeta}>
+              <Ionicons name="location" size={22} color={COLORS.textPrimary} />
+              <Text style={styles.settingsToggleTitle}>Location</Text>
+            </View>
+            <SettingsToggle
+              value={locationEnabled}
+              onValueChange={handleLocationToggle}
+              disabled={!locationInitialized || locationUpdating}
+            />
+          </View>
+
+          <View style={styles.settingsToggleItem}>
+            <View style={styles.settingsToggleMeta}>
+              <Ionicons name="notifications" size={22} color={COLORS.textPrimary} />
+              <Text style={styles.settingsToggleTitle}>Notifications</Text>
+            </View>
+            <SettingsToggle
+              value={notificationsEnabled}
+              onValueChange={handleNotificationsToggle}
+              disabled={!notificationsReady || notificationsUpdating}
+            />
+          </View>
 
           <TouchableOpacity style={styles.settingsItem} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={22} color={COLORS.danger} />
@@ -1052,7 +1244,7 @@ export default function ProfilePage() {
         </View>
       </ScrollView>
 
-      {saving && (
+      {saving && showSavingOverlay && (
         <View style={styles.savingOverlay}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.savingOverlayText}>Updating profile...</Text>
@@ -1632,38 +1824,6 @@ const styles = StyleSheet.create({
     color: COLORS.surface,
   },
 
-  // Location
-  locationCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  locationHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  locationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  locationDetails: {
-    flex: 1,
-  },
-  locationCity: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  locationUpdatedText: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 4,
-    fontWeight: '500',
-  },
   // GitHub
   githubRow: {
     flexDirection: 'row',
@@ -1717,6 +1877,53 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.textPrimary,
     marginBottom: 16,
+  },
+  settingsToggleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  settingsToggleMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  settingsToggleTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  settingsToggleTrack: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.gray200,
+    paddingHorizontal: 2,
+    justifyContent: 'center',
+  },
+  settingsToggleTrackOn: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.border,
+  },
+  settingsToggleTrackDisabled: {
+    opacity: 0.65,
+  },
+  settingsToggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.surface,
+    ...SHADOWS.small,
+  },
+  settingsToggleThumbOn: {
+    alignSelf: 'flex-end',
+  },
+  settingsToggleThumbOff: {
+    alignSelf: 'flex-start',
   },
   settingsItem: {
     flexDirection: 'row',

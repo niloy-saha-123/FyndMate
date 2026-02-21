@@ -74,11 +74,11 @@ export default async function notificationRoutes(app: FastifyInstance) {
 
     const payload = {
       to: receiver.pushToken,
-      sound: 'default',
+      sound: 'default' as const,
       title: title ?? 'New message',
       body: message,
-      data: { type: 'message' },
-      priority: 'high',
+      data: { type: 'message', ...(matchId ? { matchId } : {}) },
+      priority: 'high' as const,
       channelId: 'default',
     };
 
@@ -131,6 +131,34 @@ export default async function notificationRoutes(app: FastifyInstance) {
       } catch (err: any) {
         request.log.error(err, 'Failed to save push token');
         return reply.status(500).send({ error: 'Failed to save push token' });
+      }
+    }
+  );
+
+  // DELETE /api/notifications/push-token - Disable push notifications for current user
+  app.delete(
+    '/notifications/push-token',
+    {
+      preHandler: [
+        authMiddleware,
+        rateLimit({ limit: 5, windowSec: 3600, keyPrefix: 'push_token' }),
+      ],
+    },
+    async (request, reply) => {
+      const userId = request.user!.id;
+
+      try {
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            pushToken: null,
+            pushTokenUpdatedAt: new Date(),
+          },
+        });
+        return reply.send({ success: true });
+      } catch (err: any) {
+        request.log.error(err, 'Failed to clear push token');
+        return reply.status(500).send({ error: 'Failed to clear push token' });
       }
     }
   );

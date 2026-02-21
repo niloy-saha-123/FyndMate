@@ -9,6 +9,7 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { messageService } from '../services/message.service.js';
 import { matchService } from '../services/match.service.js';
 import { blockService } from '../services/block.service.js';
+import { sendMessagePush } from '../services/push.service.js';
 import {
     sendMessageSchema,
     editMessageSchema,
@@ -119,6 +120,10 @@ export default async function messageRoutes(app: FastifyInstance) {
                     user.id,
                     content
                 );
+                // Send push notification to receiver (fire-and-forget; do not block response)
+                sendMessagePush({ matchId, senderId: user.id, content }).catch((err) => {
+                    request.log.warn({ err, matchId }, 'Push notification failed');
+                });
                 return reply.status(201).send(message);
             } catch (err: any) {
                 if (
@@ -180,6 +185,7 @@ export default async function messageRoutes(app: FastifyInstance) {
                     err.message === 'Message not found' ||
                     err.message === 'Not authorized' ||
                     err.message.includes('not active') ||
+                    err.message.includes('previous conversation') ||
                     err.message.includes('5 minutes')
                 ) {
                     return reply.status(403).send({ error: err.message });
@@ -226,6 +232,7 @@ export default async function messageRoutes(app: FastifyInstance) {
                     err.message === 'Message not found' ||
                     err.message === 'Not authorized' ||
                     err.message.includes('not active') ||
+                    err.message.includes('previous conversation') ||
                     err.message.includes('5 minutes') ||
                     err.message.includes('already deleted')
                 ) {

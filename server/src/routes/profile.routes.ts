@@ -8,11 +8,13 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { prisma } from '../lib/prisma.js';
+import { redis } from '../lib/redis.js';
 import { supabaseAdmin } from '../lib/supabaseAdmin.js';
 import { signProfilePicture } from '../utils/profilePicture.js';
 import { computeAge } from '../utils/computeAge.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
 import { filterLocationByPrivacy } from '../utils/locationPrivacy.js';
+import { invalidateAllFeedCache, invalidateProfileViewCacheForProfile } from '../utils/cacheInvalidation.js';
 import { moveStoragePathToQuarantine, moveUserFilesToQuarantine, toStoragePath } from '../services/storage.service.js';
 import {
   PROFILE_BIO_MAX_LENGTH,
@@ -38,6 +40,7 @@ const ACCOUNT_DELETION_RETENTION_DAYS = Math.max(
   1,
   Number(process.env.ACCOUNT_DELETION_RETENTION_DAYS ?? 14)
 );
+const PROFILE_VIEW_CACHE_TTL_SECONDS = 90;
 
 const projectInputSchema = z.object({
   name: z.string().min(1).max(PROFILE_PROJECT_NAME_MAX_LENGTH),
@@ -237,6 +240,16 @@ export default async function profileRoutes(app: FastifyInstance) {
     }
 
     const data = parse.data;
+    if (Object.keys(data).length === 0) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: selectFields,
+      });
+      if (!user) return reply.status(404).send({ error: 'User not found' });
+      const age = user.birthDate ? computeAge(new Date(user.birthDate)) : null;
+      const profilePicture = await signProfilePicture(user.profilePicture);
+      return reply.send(serializeProfile(user, profilePicture, age));
+    }
 
     // Fetch current birthDate so partial updates don't fail age/onboarding checks.
     const current = await prisma.user.findUnique({
@@ -359,6 +372,7 @@ export default async function profileRoutes(app: FastifyInstance) {
         });
 
         if (sanitizedProjects) {
+          // TODO [10K Users]: Replace deleteMany/createMany with diff-based upserts to avoid write amplification.
           await tx.project.deleteMany({ where: { userId } });
           if (sanitizedProjects.length > 0) {
             await tx.project.createMany({
@@ -368,6 +382,7 @@ export default async function profileRoutes(app: FastifyInstance) {
         }
 
         if (sanitizedExperiences) {
+          // TODO [10K Users]: Replace deleteMany/createMany with diff-based upserts to avoid write amplification.
           await tx.experience.deleteMany({ where: { userId } });
           if (sanitizedExperiences.length > 0) {
             await tx.experience.createMany({
@@ -388,6 +403,12 @@ export default async function profileRoutes(app: FastifyInstance) {
 
       const age = updated.birthDate ? computeAge(new Date(updated.birthDate)) : null;
       const profilePicture = await signProfilePicture(updated.profilePicture);
+      await Promise.all([
+        invalidateAllFeedCache(),
+        invalidateProfileViewCacheForProfile(userId),
+      ]).catch((err: any) => {
+        request.log.warn({ err, userId }, 'Profile cache invalidation failed');
+      });
       return reply.send(serializeProfile(updated, profilePicture, age));
     } catch (error: any) {
       return reply.status(400).send({
@@ -405,20 +426,41 @@ export default async function profileRoutes(app: FastifyInstance) {
     }
 
     if (userId !== requesterId) {
-      const hasConnection = await prisma.match.findFirst({
-        where: {
-          OR: [
-            { user1Id: requesterId, user2Id: userId },
-            { user1Id: userId, user2Id: requesterId },
-          ],
-          status: { in: ['active', 'blocked'] },
-        },
-        select: { id: true },
-      });
+      const [hasMatchConnection, hasIncomingLike] = await Promise.all([
+        prisma.match.findFirst({
+          where: {
+            OR: [
+              { user1Id: requesterId, user2Id: userId },
+              { user1Id: userId, user2Id: requesterId },
+            ],
+            status: { in: ['active', 'blocked'] },
+          },
+          select: { id: true },
+        }),
+        prisma.like.findFirst({
+          where: {
+            likerId: userId,
+            likedId: requesterId,
+            liked: true,
+            status: 'active',
+          },
+          select: { id: true },
+        }),
+      ]);
 
-      if (!hasConnection) {
+      if (!hasMatchConnection && !hasIncomingLike) {
         return reply.status(403).send({ error: 'Not authorized to view this profile' });
       }
+    }
+
+    const cacheKey = `profile:view:${requesterId}:${userId}`;
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return reply.send(JSON.parse(cached));
+      }
+    } catch (err: any) {
+      request.log.warn({ err, cacheKey }, 'Profile cache read failed');
     }
 
     const user = await prisma.user.findUnique({
@@ -432,7 +474,13 @@ export default async function profileRoutes(app: FastifyInstance) {
 
     const age = user.birthDate ? computeAge(new Date(user.birthDate)) : null;
     const profilePicture = await signProfilePicture(user.profilePicture);
-    return reply.send(serializePublicProfile(user, profilePicture, age));
+    const response = serializePublicProfile(user, profilePicture, age);
+    try {
+      await redis.setex(cacheKey, PROFILE_VIEW_CACHE_TTL_SECONDS, JSON.stringify(response));
+    } catch (err: any) {
+      request.log.warn({ err, cacheKey }, 'Profile cache write failed');
+    }
+    return reply.send(response);
   });
 
   app.delete('/profile/me', { preHandler: [authMiddleware] }, async (request, reply) => {

@@ -20,6 +20,10 @@ import type { UserProfile, ProjectItem, ExperienceItem } from "../types/profile"
 
 export type { UserProfile };
 
+const profileUpdateApiDebug = {
+  apiCalls: 0,
+};
+
 // Your table is called "User", not "profiles"
 const PROFILE_TABLE = "User";
 const GITHUB_USERNAME_REGEX = /^(?!-)[A-Za-z0-9-]{1,39}(?<!-)$/;
@@ -311,6 +315,17 @@ export async function updateProfile(
     ...(projects !== undefined ? { projects } : {}),
     ...(experiences !== undefined ? { experiences } : {}),
   };
+
+  if (__DEV__) {
+    profileUpdateApiDebug.apiCalls += 1;
+    const payloadKeys = Object.keys(apiPayload);
+    console.log('[ProfileSave][DEV] /api/profile/me PATCH', {
+      apiCalls: profileUpdateApiDebug.apiCalls,
+      payloadKeys,
+      payloadKeyCount: payloadKeys.length,
+    });
+  }
+
   const result = await apiClient.patch<any>("/api/profile/me", apiPayload);
   return normalizeProfile(result);
 }

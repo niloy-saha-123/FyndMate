@@ -17,7 +17,13 @@ export class MessageService {
   private async ensureMatchParticipant(matchId: string, userId: string) {
     const match = await prisma.match.findUnique({
       where: { id: matchId },
-      select: { id: true, user1Id: true, user2Id: true, status: true },
+      select: {
+        id: true,
+        user1Id: true,
+        user2Id: true,
+        status: true,
+        conversationStartAt: true,
+      },
     });
 
     if (!match) {
@@ -37,10 +43,13 @@ export class MessageService {
    * Includes sender profile data for UI display.
    */
   async getMessages(matchId: string, userId: string) {
-    await this.ensureMatchParticipant(matchId, userId);
+    const match = await this.ensureMatchParticipant(matchId, userId);
 
     const messages = await prisma.message.findMany({
-      where: { matchId },
+      where: {
+        matchId,
+        createdAt: { gte: match.conversationStartAt },
+      },
       orderBy: { createdAt: 'asc' }, // Oldest first - UI will reverse for display
       select: {
         id: true,
@@ -136,6 +145,10 @@ export class MessageService {
       throw new Error('Cannot edit message - match is not active');
     }
 
+    if (new Date(message.createdAt) < new Date(message.match.conversationStartAt)) {
+      throw new Error('Cannot edit message from a previous conversation');
+    }
+
     const elapsed = Date.now() - new Date(message.createdAt).getTime();
     if (elapsed > EDIT_WINDOW_MS) {
       throw new Error('Message can only be edited within 5 minutes');
@@ -187,6 +200,10 @@ export class MessageService {
 
     if (message.match.status !== 'active') {
       throw new Error('Cannot delete message - match is not active');
+    }
+
+    if (new Date(message.createdAt) < new Date(message.match.conversationStartAt)) {
+      throw new Error('Cannot delete message from a previous conversation');
     }
 
     const elapsed = Date.now() - new Date(message.createdAt).getTime();

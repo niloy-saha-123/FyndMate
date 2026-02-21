@@ -42,7 +42,7 @@ export class LikesRateLimitError extends Error {
 
   constructor(retryAfterSeconds: number, message?: string) {
     const hours = Math.ceil(retryAfterSeconds / 3600);
-    super(message || `You've reached your daily limit of ${LIKES_RATE_LIMIT} collaboration requests. Try again in ${hours} hour${hours !== 1 ? 's' : ''}.`);
+    super(message || `You've reached your daily limit of sending requests (${LIKES_RATE_LIMIT} per day). Try again in ${hours} hour${hours !== 1 ? 's' : ''}.`);
     this.name = 'LikesRateLimitError';
     this.retryAfter = retryAfterSeconds;
     this.retryAfterHours = hours;

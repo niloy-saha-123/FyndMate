@@ -3,7 +3,7 @@
  * @description Messages/Matches Screen with Neo-brutalist design
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -61,6 +61,28 @@ export default function MessagesTab() {
   const { user, loading } = useAuth();
   const [matches, setMatches] = useState<any[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
+  const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refetchInFlightRef = useRef(false);
+
+  const scheduleRefetchMatches = useCallback(() => {
+    if (!user) return;
+    if (refetchTimerRef.current) {
+      clearTimeout(refetchTimerRef.current);
+    }
+    refetchTimerRef.current = setTimeout(async () => {
+      if (!user || refetchInFlightRef.current) return;
+      refetchInFlightRef.current = true;
+      try {
+        const fresh = await getMyMatches(user.id);
+        setMatches(fresh);
+        persistMessagesCache(user.id, fresh);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        refetchInFlightRef.current = false;
+      }
+    }, 300);
+  }, [user]);
 
   useEffect(() => {
     if (!user || loading) return;
@@ -110,9 +132,7 @@ export default function MessagesTab() {
         async (payload) => {
           const match = payload.new;
           if (match.user1Id !== user.id && match.user2Id !== user.id) return;
-          const fresh = await getMyMatches(user.id);
-          setMatches(fresh);
-          persistMessagesCache(user.id, fresh);
+          scheduleRefetchMatches();
         }
       )
       .on(
@@ -139,6 +159,7 @@ export default function MessagesTab() {
         },
         async (payload) => {
           const updated = payload.new;
+          if (updated.user1Id !== user.id && updated.user2Id !== user.id) return;
           if (updated.status === 'hidden') {
             setMatches((prev) => {
               const next = prev.filter((m) => m.id !== updated.id);
@@ -146,9 +167,7 @@ export default function MessagesTab() {
               return next;
             });
           } else {
-            const fresh = await getMyMatches(user.id);
-            setMatches(fresh);
-            persistMessagesCache(user.id, fresh);
+            scheduleRefetchMatches();
           }
         }
       )
@@ -162,8 +181,10 @@ export default function MessagesTab() {
         (payload) => {
           const msg = payload.new;
           setMatches((prev) => {
+            let touched = false;
             const next = prev.map((match) => {
               if (match.id !== msg.matchId) return match;
+              touched = true;
               if (match.status === 'blocked') return match;
 
               const unreadIncrement = msg.senderId !== user.id ? 1 : 0;
@@ -174,6 +195,7 @@ export default function MessagesTab() {
                 unreadCount: match.unreadCount + unreadIncrement,
               };
             });
+            if (!touched) return prev;
             persistMessagesCache(user.id, next);
             return next;
           });
@@ -182,9 +204,12 @@ export default function MessagesTab() {
       .subscribe();
 
     return () => {
+      if (refetchTimerRef.current) {
+        clearTimeout(refetchTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, scheduleRefetchMatches]);
 
   if (loading) {
     return (

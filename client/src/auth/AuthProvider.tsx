@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo, useRef } from "react";
 import { supabase } from "./supabaseClient";
 import { Session } from "@supabase/supabase-js";
 import { getOrCreateProfile, UserProfile } from "../services/profileService";
@@ -32,6 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const hasInitializedRef = useRef(false);
+  const bootstrapInFlightRef = useRef(false);
+  const lastBootstrapKeyRef = useRef<string | null>(null);
 
   const loadProfile = useCallback(
     async (currentSession: Session | null) => {
@@ -107,17 +110,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
+    const getBootstrapKey = (nextSession: Session | null) =>
+      nextSession?.access_token ?? `anon:${nextSession?.user?.id ?? 'none'}`;
+
+    const bootstrapAuth = async (nextSession: Session | null) => {
+      if (!mounted) return;
+
+      const nextKey = getBootstrapKey(nextSession);
+      const sameAsLast = lastBootstrapKeyRef.current === nextKey;
+      const alreadyInitialized = hasInitializedRef.current;
+
+      if (alreadyInitialized && sameAsLast) {
+        return;
+      }
+      if (bootstrapInFlightRef.current && sameAsLast) {
+        return;
+      }
+
+      bootstrapInFlightRef.current = true;
+      lastBootstrapKeyRef.current = nextKey;
+      setSession(nextSession ?? null);
+      setLoading(true);
+
+      try {
+        await loadUser(nextSession ?? null);
+      } finally {
+        hasInitializedRef.current = true;
+        bootstrapInFlightRef.current = false;
+      }
+    };
+
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      setSession(data.session ?? null);
-      loadUser(data.session ?? null);
+      bootstrapAuth(data.session ?? null);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return;
-      setSession(nextSession ?? null);
-      setLoading(true);
-      loadUser(nextSession ?? null);
+      bootstrapAuth(nextSession ?? null);
     });
 
     return () => {
