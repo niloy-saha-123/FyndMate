@@ -11,7 +11,7 @@ import {
   Pressable,
   Image,
   StyleSheet,
-  Alert,
+  Modal,
   ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,9 +21,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/auth/AuthProvider';
 import {
   getMyMatches,
-  hideMatch,
   blockMatch,
-  unblockMatch,
+  unmatchMatch,
 } from '../../src/messages/message.service';
 import { supabase } from '../../src/auth/supabaseClient';
 import { COLORS, SHADOWS, BORDERS, RADIUS } from '../../src/theme/colors';
@@ -61,6 +60,9 @@ export default function MessagesTab() {
   const { user, loading } = useAuth();
   const [matches, setMatches] = useState<any[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
+  const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<any | null>(null);
+  const [optionsActionLoading, setOptionsActionLoading] = useState<'unmatch' | 'block' | null>(null);
   const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const refetchInFlightRef = useRef(false);
 
@@ -223,6 +225,53 @@ export default function MessagesTab() {
     return null;
   }
 
+  const openMatchOptions = (match: any) => {
+    setSelectedMatch(match);
+    setOptionsModalVisible(true);
+  };
+
+  const closeMatchOptions = () => {
+    if (optionsActionLoading) return;
+    setOptionsModalVisible(false);
+    setSelectedMatch(null);
+  };
+
+  const handleUnmatchSelected = async () => {
+    if (!selectedMatch || optionsActionLoading) return;
+    setOptionsActionLoading('unmatch');
+    try {
+      await unmatchMatch(selectedMatch.id);
+      setMatches((prev) => {
+        const next = prev.filter((m) => m.id !== selectedMatch.id);
+        persistMessagesCache(user.id, next);
+        return next;
+      });
+      setOptionsModalVisible(false);
+      setSelectedMatch(null);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setOptionsActionLoading(null);
+    }
+  };
+
+  const handleBlockSelected = async () => {
+    if (!selectedMatch || optionsActionLoading) return;
+    setOptionsActionLoading('block');
+    try {
+      await blockMatch(selectedMatch.id);
+      const fresh = await getMyMatches(user.id);
+      setMatches(fresh);
+      persistMessagesCache(user.id, fresh);
+      setOptionsModalVisible(false);
+      setSelectedMatch(null);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setOptionsActionLoading(null);
+    }
+  };
+
   const renderMessageItem = ({ item }: { item: any }) => {
     const isUser1 = item.user1Id === user?.id;
     const otherUser = isUser1 ? item.user2 : item.user1;
@@ -249,46 +298,8 @@ export default function MessagesTab() {
       <Pressable
         onPress={() => router.push(`/messages/${item.id}`)}
         onLongPress={() => {
-          if (iBlockedThem) {
-            Alert.alert('Message options', 'What would you like to do?', [
-              {
-                text: 'Unblock user',
-                onPress: async () => {
-                  await unblockMatch(item.id);
-                  const fresh = await getMyMatches(user.id);
-                  setMatches(fresh);
-                },
-              },
-              {
-                text: 'Remove from my messages',
-                onPress: async () => {
-                  await hideMatch(item.id);
-                  setMatches((prev) => prev.filter((m) => m.id !== item.id));
-                },
-              },
-              { text: 'Cancel', style: 'cancel' },
-            ]);
-          } else if (!theyBlockedMe) {
-            Alert.alert('Message options', 'What would you like to do?', [
-              {
-                text: 'Remove from my messages',
-                onPress: async () => {
-                  await hideMatch(item.id);
-                  setMatches((prev) => prev.filter((m) => m.id !== item.id));
-                },
-              },
-              {
-                text: 'Block user',
-                style: 'destructive',
-                onPress: async () => {
-                  await blockMatch(item.id);
-                  const fresh = await getMyMatches(user.id);
-                  setMatches(fresh);
-                },
-              },
-              { text: 'Cancel', style: 'cancel' },
-            ]);
-          }
+          if (theyBlockedMe) return;
+          openMatchOptions(item);
         }}
       >
         <NeoCard
@@ -407,6 +418,48 @@ export default function MessagesTab() {
           }
         />
       )}
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={optionsModalVisible}
+        onRequestClose={closeMatchOptions}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeMatchOptions}>
+          <Pressable style={styles.modalBox} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Message options</Text>
+            <Text style={styles.modalSubtitle}>What would you like to do?</Text>
+
+            <Pressable
+              style={[styles.modalActionButton, !!optionsActionLoading && styles.modalActionDisabled]}
+              onPress={handleUnmatchSelected}
+              disabled={!!optionsActionLoading}
+            >
+              <Text style={styles.modalActionText}>
+                {optionsActionLoading === 'unmatch' ? 'Unmatching...' : 'Unmatch'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.modalActionButton, !!optionsActionLoading && styles.modalActionDisabled]}
+              onPress={handleBlockSelected}
+              disabled={!!optionsActionLoading}
+            >
+              <Text style={[styles.modalActionText, styles.modalActionDanger]}>
+                {optionsActionLoading === 'block' ? 'Blocking...' : 'Block user'}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.modalActionButton, styles.modalCancelButton]}
+              onPress={closeMatchOptions}
+              disabled={!!optionsActionLoading}
+            >
+              <Text style={styles.modalActionText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -564,6 +617,61 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textSecondary,
     textAlign: 'center',
+  },
+
+  // Message Options Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalBox: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.medium,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    padding: 18,
+    ...SHADOWS.medium,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: COLORS.textPrimary,
+  },
+  modalSubtitle: {
+    marginTop: 6,
+    marginBottom: 14,
+    fontSize: 15,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  modalActionButton: {
+    paddingVertical: 12,
+    borderRadius: RADIUS.small,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.gray100,
+    marginTop: 10,
+  },
+  modalCancelButton: {
+    backgroundColor: COLORS.surface,
+  },
+  modalActionText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  modalActionDanger: {
+    color: COLORS.danger,
+  },
+  modalActionDisabled: {
+    opacity: 0.6,
   },
 
   // Loading

@@ -105,18 +105,6 @@ export default function FeedScreen() {
     setMessage('');
   };
 
-  const insertTemplate = (type: 'hackathon' | 'project' | 'startup') => {
-    const templates = {
-      hackathon:
-        "Hey! I'm looking for a teammate for an upcoming hackathon focused on [topic]. Your experience with ",
-      project:
-        "Hi! I'm working on a side project and think your skills would be a great fit. ",
-      startup:
-        "Hello! I'm building a startup in the [industry] space and looking for a technical co-founder. ",
-    };
-    setMessage(templates[type]);
-  };
-
   // Auto-refresh when feed is empty so newly joined users appear without manual action.
   useEffect(() => {
     if (currentProfile || loading) return;
@@ -403,7 +391,6 @@ export default function FeedScreen() {
 
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <Ionicons name="star" size={20} color={COLORS.accent} />
               <Text style={styles.modalTitle}>Send Request</Text>
             </View>
             <Text style={styles.modalSubtitle}>
@@ -428,34 +415,6 @@ export default function FeedScreen() {
                 <Text style={styles.modalName}>{currentProfile.name}</Text>
                 <Text style={styles.modalRole} />
               </View>
-            </View>
-
-            {/* Template Buttons */}
-            <View style={styles.templateButtons}>
-              <TouchableOpacity
-                style={[styles.templateBtn, { backgroundColor: COLORS.lookingBg }]}
-                onPress={() => insertTemplate('hackathon')}
-              >
-                <Text style={[styles.templateBtnText, { color: COLORS.lookingText }]}>
-                  Hackathon teammate
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.templateBtn, { backgroundColor: COLORS.skillBg }]}
-                onPress={() => insertTemplate('project')}
-              >
-                <Text style={[styles.templateBtnText, { color: COLORS.skillText }]}>
-                  Side project partner
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.templateBtn, { backgroundColor: COLORS.greenBg }]}
-                onPress={() => insertTemplate('startup')}
-              >
-                <Text style={[styles.templateBtnText, { color: COLORS.greenText }]}>
-                  Long-term collaborator
-                </Text>
-              </TouchableOpacity>
             </View>
 
             {/* Message Input */}
@@ -917,7 +876,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: COLORS.textPrimary,
-    marginLeft: 8,
   },
   modalSubtitle: {
     fontSize: 14,
@@ -953,24 +911,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.skillText,
-  },
-  templateButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  templateBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: RADIUS.full,
-    borderWidth: BORDERS.thin,
-    borderColor: COLORS.border,
-    ...SHADOWS.small,
-  },
-  templateBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
   },
   messageInput: {
     borderWidth: BORDERS.thin,

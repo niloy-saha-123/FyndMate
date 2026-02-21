@@ -44,6 +44,7 @@ import {
 import { COLORS, SHADOWS, BORDERS, RADIUS } from "../../src/theme/colors";
 import { NeoCard } from "../../src/components/NeoCard";
 import { Ionicons } from "@expo/vector-icons";
+import { getUserProfileById } from "../../src/services/profileService";
 
 
 interface Message {
@@ -86,10 +87,13 @@ export default function MessageScreen() {
   const { user } = useAuth();
   const navigation = useNavigation();
 
-  // Hide default header initially to prevent flash of "messages/[matchId]"
+  // Show a stable fallback header immediately to avoid header disappearing
   useEffect(() => {
     navigation.setOptions({
-      headerShown: false
+      headerShown: true,
+      title: "Messages",
+      headerBackTitleVisible: false,
+      headerRight: () => null,
     });
   }, [navigation]);
 
@@ -174,40 +178,60 @@ export default function MessageScreen() {
 
     setLoadingThread(true);
     Promise.all([getMatchStatus(normalizedMatchId), getMessages(normalizedMatchId)])
-      .then(([status, msgs]) => {
+      .then(async ([status, msgs]) => {
         setMatchStatus(status);
         setMessages(msgs);
+
+        let resolvedOtherUser: MatchUserInfo | null = null;
+
         if (msgs.length > 0) {
-        // Find the other user (not the current user)
-        const firstMessage = msgs[0];
-        const otherUserInfo = firstMessage.senderId === user.id
-          ? msgs.find(m => m.senderId !== user.id)?.sender
-          : firstMessage.sender;
+          // Find the other user (not the current user)
+          const firstMessage = msgs[0];
+          const otherUserInfo = firstMessage.senderId === user.id
+            ? msgs.find(m => m.senderId !== user.id)?.sender
+            : firstMessage.sender;
 
-        if (otherUserInfo) {
-          setOtherUser({
-            id: otherUserInfo.id,
-            name: otherUserInfo.name,
-            profilePicture: otherUserInfo.profilePicture
-          });
+          if (otherUserInfo) {
+            resolvedOtherUser = {
+              id: otherUserInfo.id,
+              name: otherUserInfo.name,
+              profilePicture: otherUserInfo.profilePicture,
+            };
+          }
+        }
 
-          // Set the navigation header title
+        // Fallback for empty/new threads where messages may not include the other user yet.
+        if (!resolvedOtherUser && status.otherUserId) {
+          try {
+            const profile = await getUserProfileById(status.otherUserId);
+            resolvedOtherUser = {
+              id: profile.id,
+              name: profile.name || "User",
+              profilePicture: profile.profilePicture ?? null,
+            };
+          } catch (error) {
+            console.error("Failed to resolve other user profile for header", error);
+          }
+        }
+
+        if (resolvedOtherUser) {
+          setOtherUser(resolvedOtherUser);
           navigation.setOptions({
             headerShown: true,
-            title: otherUserInfo.name,
+            title: resolvedOtherUser.name,
             headerTitle: () => (
               <Pressable
                 onPress={() =>
                   router.push({
                     pathname: '/messages/profile/[userId]',
-                    params: { userId: otherUserInfo.id, matchId: normalizedMatchId },
+                    params: { userId: resolvedOtherUser.id, matchId: normalizedMatchId },
                   })
                 }
                 style={styles.headerTitleContainer}
               >
-                {otherUserInfo.profilePicture ? (
+                {resolvedOtherUser.profilePicture ? (
                   <Image
-                    source={{ uri: otherUserInfo.profilePicture }}
+                    source={{ uri: resolvedOtherUser.profilePicture }}
                     style={styles.headerAvatar}
                   />
                 ) : (
@@ -215,7 +239,7 @@ export default function MessageScreen() {
                     <Ionicons name="person" size={20} color={COLORS.border} />
                   </View>
                 )}
-                <Text style={styles.headerTitleText}>{otherUserInfo.name}</Text>
+                <Text style={styles.headerTitleText}>{resolvedOtherUser.name}</Text>
               </Pressable>
             ),
             headerRight: () => (
@@ -228,7 +252,6 @@ export default function MessageScreen() {
             ),
             headerBackTitleVisible: false,
           });
-        }
         }
       })
       .catch(console.error)
@@ -466,7 +489,13 @@ export default function MessageScreen() {
 
         try {
           const created = await sendMessage(normalizedMatchId, content);
-          replaceLocalMessage(localPending.id, { ...created, status: "sent" });
+          replaceLocalMessage(localPending.id, {
+            ...localPending,
+            ...created,
+            status: "sent",
+            clientError: null,
+            sender: localPending.sender,
+          });
         } catch (err) {
           markLocalFailed(localPending.id);
           throw err;

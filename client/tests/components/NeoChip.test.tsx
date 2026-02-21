@@ -39,6 +39,9 @@ describe('NeoChip', () => {
 
     const textNode = tree.root.findByProps({ children: 'Startups' });
     const container = textNode.parent;
+    if (!container) {
+      throw new Error('Expected NeoChip text to have a parent container');
+    }
 
     const containerStyle = flattenStyle(container.props.style);
     const textStyle = flattenStyle(textNode.props.style);
