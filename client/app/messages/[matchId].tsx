@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, router, useNavigation } from "expo-router";
 import { useAuth } from "../../src/auth/AuthProvider";
 import {
@@ -78,8 +79,50 @@ interface MatchUserInfo {
   profilePicture: string | null;
 }
 
+interface MatchStatusInfo {
+  status: string;
+  blockedBy: string | null;
+  otherUserId?: string;
+}
+
+interface ThreadCache {
+  messages: Message[];
+  matchStatus: MatchStatusInfo | null;
+  otherUser: MatchUserInfo | null;
+  timestamp: number;
+}
+
 type RealtimeEvent = "upsert" | "delete" | "match_inactive";
 type ConfirmAction = "unmatch" | "block" | null;
+const THREAD_CACHE_PREFIX = "fyndmate_thread_cache:";
+const THREAD_CACHE_MAX_AGE_MS = 2 * 60 * 1000;
+
+function getThreadCacheKey(userId: string, matchId: string): string {
+  return `${THREAD_CACHE_PREFIX}${userId}:${matchId}`;
+}
+
+async function loadThreadCache(cacheKey: string): Promise<ThreadCache | null> {
+  try {
+    const raw = await AsyncStorage.getItem(cacheKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ThreadCache;
+    if (!Array.isArray(parsed.messages)) return null;
+    if (typeof parsed.timestamp !== "number") return null;
+    if (Date.now() - parsed.timestamp > THREAD_CACHE_MAX_AGE_MS) return null;
+    return {
+      messages: parsed.messages,
+      matchStatus: parsed.matchStatus ?? null,
+      otherUser: parsed.otherUser ?? null,
+      timestamp: parsed.timestamp,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistThreadCache(cacheKey: string, payload: ThreadCache) {
+  AsyncStorage.setItem(cacheKey, JSON.stringify(payload)).catch(() => {});
+}
 
 export default function MessageScreen() {
   const { matchId } = useLocalSearchParams<{ matchId?: string | string[] }>();
@@ -106,11 +149,7 @@ export default function MessageScreen() {
   const [visibleTimestamps, setVisibleTimestamps] = useState<Set<string>>(new Set()); // Track which timestamps should be visible
   const [text, setText] = useState("");
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
-  const [matchStatus, setMatchStatus] = useState<{
-    status: string;
-    blockedBy: string | null;
-    otherUserId?: string;
-  } | null>(null);
+  const [matchStatus, setMatchStatus] = useState<MatchStatusInfo | null>(null);
   const [otherUser, setOtherUser] = useState<MatchUserInfo | null>(null);
 
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
@@ -125,8 +164,48 @@ export default function MessageScreen() {
   const [loadingThread, setLoadingThread] = useState(true);
 
   const flatListRef = useRef<FlatList<MessageWithMetadata>>(null);
+  const threadCacheWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const FAILED_MESSAGE_TEXT = "Cannot send message";
   const MESSAGE_SEND_WINDOW_MS = 5 * 60 * 1000;
+
+  const applyHeaderForOtherUser = useCallback((resolvedOtherUser: MatchUserInfo, currentMatchId: string) => {
+    navigation.setOptions({
+      headerShown: true,
+      title: resolvedOtherUser.name,
+      headerTitle: () => (
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: "/messages/profile/[userId]",
+              params: { userId: resolvedOtherUser.id, matchId: currentMatchId },
+            })
+          }
+          style={styles.headerTitleContainer}
+        >
+          {resolvedOtherUser.profilePicture ? (
+            <Image
+              source={{ uri: resolvedOtherUser.profilePicture }}
+              style={styles.headerAvatar}
+            />
+          ) : (
+            <View style={[styles.headerAvatar, styles.noHeaderAvatar]}>
+              <Ionicons name="person" size={20} color={COLORS.border} />
+            </View>
+          )}
+          <Text style={styles.headerTitleText}>{resolvedOtherUser.name}</Text>
+        </Pressable>
+      ),
+      headerRight: () => (
+        <Pressable
+          onPress={() => setMenuVisible(true)}
+          style={styles.headerMenuButton}
+        >
+          <Ionicons name="ellipsis-vertical" size={24} color={COLORS.textPrimary} />
+        </Pressable>
+      ),
+      headerBackTitleVisible: false,
+    });
+  }, [navigation]);
 
   // Process messages with metadata for UI rendering
   useEffect(() => {
@@ -176,31 +255,37 @@ export default function MessageScreen() {
   useEffect(() => {
     if (!normalizedMatchId || !user) return;
 
-    setLoadingThread(true);
-    Promise.all([getMatchStatus(normalizedMatchId), getMessages(normalizedMatchId)])
-      .then(async ([status, msgs]) => {
+    let mounted = true;
+    const cacheKey = getThreadCacheKey(user.id, normalizedMatchId);
+
+    const resolveOtherUserFromMessages = (msgs: Message[]): MatchUserInfo | null => {
+      if (msgs.length === 0) return null;
+      const firstMessage = msgs[0];
+      const otherUserInfo = firstMessage.senderId === user.id
+        ? msgs.find(m => m.senderId !== user.id)?.sender
+        : firstMessage.sender;
+
+      if (!otherUserInfo) return null;
+      return {
+        id: otherUserInfo.id,
+        name: otherUserInfo.name,
+        profilePicture: otherUserInfo.profilePicture,
+      };
+    };
+
+    const fetchThreadFromNetwork = async () => {
+      try {
+        const [status, msgs] = await Promise.all([
+          getMatchStatus(normalizedMatchId),
+          getMessages(normalizedMatchId)
+        ]);
+        if (!mounted) return;
+
         setMatchStatus(status);
         setMessages(msgs);
 
-        let resolvedOtherUser: MatchUserInfo | null = null;
+        let resolvedOtherUser = resolveOtherUserFromMessages(msgs);
 
-        if (msgs.length > 0) {
-          // Find the other user (not the current user)
-          const firstMessage = msgs[0];
-          const otherUserInfo = firstMessage.senderId === user.id
-            ? msgs.find(m => m.senderId !== user.id)?.sender
-            : firstMessage.sender;
-
-          if (otherUserInfo) {
-            resolvedOtherUser = {
-              id: otherUserInfo.id,
-              name: otherUserInfo.name,
-              profilePicture: otherUserInfo.profilePicture,
-            };
-          }
-        }
-
-        // Fallback for empty/new threads where messages may not include the other user yet.
         if (!resolvedOtherUser && status.otherUserId) {
           try {
             const profile = await getUserProfileById(status.otherUserId);
@@ -214,48 +299,36 @@ export default function MessageScreen() {
           }
         }
 
+        if (!mounted) return;
         if (resolvedOtherUser) {
           setOtherUser(resolvedOtherUser);
-          navigation.setOptions({
-            headerShown: true,
-            title: resolvedOtherUser.name,
-            headerTitle: () => (
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: '/messages/profile/[userId]',
-                    params: { userId: resolvedOtherUser.id, matchId: normalizedMatchId },
-                  })
-                }
-                style={styles.headerTitleContainer}
-              >
-                {resolvedOtherUser.profilePicture ? (
-                  <Image
-                    source={{ uri: resolvedOtherUser.profilePicture }}
-                    style={styles.headerAvatar}
-                  />
-                ) : (
-                  <View style={[styles.headerAvatar, styles.noHeaderAvatar]}>
-                    <Ionicons name="person" size={20} color={COLORS.border} />
-                  </View>
-                )}
-                <Text style={styles.headerTitleText}>{resolvedOtherUser.name}</Text>
-              </Pressable>
-            ),
-            headerRight: () => (
-              <Pressable
-                onPress={() => setMenuVisible(true)}
-                style={styles.headerMenuButton}
-              >
-                <Ionicons name="ellipsis-vertical" size={24} color={COLORS.textPrimary} />
-              </Pressable>
-            ),
-            headerBackTitleVisible: false,
-          });
+          applyHeaderForOtherUser(resolvedOtherUser, normalizedMatchId);
         }
-      })
-      .catch(console.error)
-      .finally(() => setLoadingThread(false));
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (mounted) {
+          setLoadingThread(false);
+        }
+      }
+    };
+
+    (async () => {
+      const cached = await loadThreadCache(cacheKey);
+      if (mounted && cached) {
+        setMessages(cached.messages);
+        setMatchStatus(cached.matchStatus);
+        if (cached.otherUser) {
+          setOtherUser(cached.otherUser);
+          applyHeaderForOtherUser(cached.otherUser, normalizedMatchId);
+        }
+        setLoadingThread(false);
+      } else if (mounted) {
+        setLoadingThread(true);
+      }
+
+      await fetchThreadFromNetwork();
+    })();
 
     const unsubscribe = subscribeToMessages(
       normalizedMatchId,
@@ -287,8 +360,35 @@ export default function MessageScreen() {
       }
     );
 
-    return unsubscribe;
-  }, [normalizedMatchId, user]);
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [normalizedMatchId, user, applyHeaderForOtherUser]);
+
+  useEffect(() => {
+    if (!normalizedMatchId || !user) return;
+    const cacheKey = getThreadCacheKey(user.id, normalizedMatchId);
+    if (threadCacheWriteTimerRef.current) {
+      clearTimeout(threadCacheWriteTimerRef.current);
+    }
+    threadCacheWriteTimerRef.current = setTimeout(() => {
+      persistThreadCache(cacheKey, {
+        messages,
+        matchStatus,
+        otherUser,
+        timestamp: Date.now(),
+      });
+      threadCacheWriteTimerRef.current = null;
+    }, 200);
+
+    return () => {
+      if (threadCacheWriteTimerRef.current) {
+        clearTimeout(threadCacheWriteTimerRef.current);
+        threadCacheWriteTimerRef.current = null;
+      }
+    };
+  }, [normalizedMatchId, user, messages, matchStatus, otherUser]);
 
   useEffect(() => {
     if (messages.length > 0) {
