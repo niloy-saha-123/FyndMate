@@ -106,7 +106,7 @@ export default async function notificationRoutes(app: FastifyInstance) {
     {
       preHandler: [
         authMiddleware,
-        rateLimit({ limit: 5, windowSec: 3600, keyPrefix: 'push_token' }),
+        rateLimit({ limit: 15, windowSec: 3600, keyPrefix: 'push_token_save' }),
       ],
     },
     async (request, reply) => {
@@ -141,7 +141,7 @@ export default async function notificationRoutes(app: FastifyInstance) {
     {
       preHandler: [
         authMiddleware,
-        rateLimit({ limit: 5, windowSec: 3600, keyPrefix: 'push_token' }),
+        rateLimit({ limit: 10, windowSec: 3600, keyPrefix: 'push_token_clear' }),
       ],
     },
     async (request, reply) => {
