@@ -30,6 +30,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const initialPushDoneRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
 
   const refreshPushToken = useCallback(async () => {
     if (!user || !notificationsEnabled) return;
@@ -78,6 +80,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  // Load preference and set ready in one update so push effect runs once with correct value (avoids clear+save in same startup).
   useEffect(() => {
     let mounted = true;
     if (!user) {
@@ -90,8 +93,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       try {
         const stored = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
         if (!mounted) return;
-        setNotificationsEnabledState(stored == null ? true : stored === '1');
-      } finally {
+        const enabled = stored == null ? true : stored === '1';
+        setNotificationsEnabledState(enabled);
+        setNotificationsReady(true);
+      } catch {
         if (mounted) {
           setNotificationsReady(true);
         }
@@ -105,6 +110,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user || !notificationsReady) return;
+    // Reset so we run initial push setup again after re-login.
+    if (lastUserIdRef.current !== user.id) {
+      lastUserIdRef.current = user.id;
+      initialPushDoneRef.current = false;
+    }
+    // Only run initial clear or save once per mount to avoid burning rate limit (clear + save in same startup).
+    if (initialPushDoneRef.current) return;
+    initialPushDoneRef.current = true;
 
     if (!notificationsEnabled) {
       clearPushToken().catch(err => {
@@ -113,7 +126,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Initial registration
+    // Initial registration (single flight)
     registerForPushNotifications()
       .then(async token => {
         if (token) {
