@@ -21,6 +21,9 @@ const NotificationContext = createContext<NotificationContextType>({
 });
 
 const NOTIFICATIONS_ENABLED_KEY = 'fyndmate_notifications_enabled';
+const NOTIFICATIONS_LAST_TOKEN_KEY = 'fyndmate_notifications_last_token';
+const NOTIFICATIONS_LAST_SYNC_KEY = 'fyndmate_notifications_last_sync';
+const MIN_SYNC_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -30,21 +33,42 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const lastSavedTokenRef = useRef<string | null>(null);
+  const lastSyncAtRef = useRef<number | null>(null);
 
-  const refreshPushToken = useCallback(async () => {
+  const persistTokenState = useCallback(async (token: string) => {
+    lastSavedTokenRef.current = token;
+    lastSyncAtRef.current = Date.now();
+    await AsyncStorage.multiSet([
+      [NOTIFICATIONS_LAST_TOKEN_KEY, token],
+      [NOTIFICATIONS_LAST_SYNC_KEY, String(lastSyncAtRef.current)],
+    ]).catch(() => {});
+  }, []);
+
+  const shouldSyncToken = useCallback((token: string | null) => {
+    if (!token) return false;
+    if (token !== lastSavedTokenRef.current) return true;
+    if (!lastSyncAtRef.current) return true;
+    return Date.now() - lastSyncAtRef.current > MIN_SYNC_INTERVAL_MS;
+  }, []);
+
+  const ensureRegistered = useCallback(async (forceOpenSettingsOnDeny: boolean) => {
     if (!user || !notificationsEnabled) return;
-
     try {
-      const token = await registerForPushNotifications();
-      if (token) {
-        console.log('📱 Push token refreshed:', token);
+      const token = await registerForPushNotifications(forceOpenSettingsOnDeny);
+      if (token && shouldSyncToken(token)) {
         await savePushToken(token);
+        await persistTokenState(token);
         console.log('✅ Push token saved to database');
       }
     } catch (error) {
       console.error('❌ Failed to refresh push token:', error);
     }
-  }, [user, notificationsEnabled]);
+  }, [notificationsEnabled, persistTokenState, shouldSyncToken, user]);
+
+  const refreshPushToken = useCallback(async () => {
+    await ensureRegistered(false);
+  }, [ensureRegistered]);
 
   const setNotificationsEnabled = useCallback(async (enabled: boolean) => {
     setNotificationsEnabledState(enabled);
@@ -53,30 +77,45 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     if (!enabled) {
+      // Only clear once when transitioning from on -> off
+      if (lastSavedTokenRef.current) {
+        try {
+          await clearPushToken();
+          console.log('✅ Push notifications disabled');
+        } catch (error) {
+          console.error('❌ Failed to disable push notifications:', error);
+        }
+      }
+      lastSavedTokenRef.current = null;
+      lastSyncAtRef.current = null;
+      await AsyncStorage.multiRemove([NOTIFICATIONS_LAST_TOKEN_KEY, NOTIFICATIONS_LAST_SYNC_KEY]).catch(() => {});
       try {
-        await clearPushToken();
-        console.log('✅ Push notifications disabled');
-      } catch (error) {
-        console.error('❌ Failed to disable push notifications:', error);
+        await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, '0');
+      } catch {
+        //
       }
       return;
     }
 
     try {
-      const token = await registerForPushNotifications();
-      if (token) {
-        await savePushToken(token);
-        console.log('✅ Push notifications enabled');
-      } else {
+      const token = await registerForPushNotifications(true);
+      if (!token) {
         setNotificationsEnabledState(false);
         await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, '0');
+        return;
       }
+
+      if (shouldSyncToken(token)) {
+        await savePushToken(token);
+        await persistTokenState(token);
+      }
+      console.log('✅ Push notifications enabled');
     } catch (error) {
       console.error('❌ Failed to enable push notifications:', error);
       setNotificationsEnabledState(false);
       await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, '0');
     }
-  }, [user]);
+  }, [persistTokenState, shouldSyncToken, user]);
 
   useEffect(() => {
     let mounted = true;
@@ -88,9 +127,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       try {
-        const stored = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
+        const [storedEnabled, storedToken, storedSync] = await AsyncStorage.multiGet([
+          NOTIFICATIONS_ENABLED_KEY,
+          NOTIFICATIONS_LAST_TOKEN_KEY,
+          NOTIFICATIONS_LAST_SYNC_KEY,
+        ]);
         if (!mounted) return;
-        setNotificationsEnabledState(stored == null ? true : stored === '1');
+        setNotificationsEnabledState(storedEnabled?.[1] == null ? true : storedEnabled[1] === '1');
+        lastSavedTokenRef.current = storedToken?.[1] || null;
+        lastSyncAtRef.current = storedSync?.[1] ? Number(storedSync[1]) : null;
       } finally {
         if (mounted) {
           setNotificationsReady(true);
@@ -106,25 +151,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user || !notificationsReady) return;
 
-    if (!notificationsEnabled) {
-      clearPushToken().catch(err => {
-        console.error('❌ Failed to clear push token during startup:', err);
-      });
-      return;
-    }
+    if (!notificationsEnabled) return;
 
     // Initial registration
-    registerForPushNotifications()
-      .then(async token => {
-        if (token) {
-          console.log('📱 Push token:', token);
-          await savePushToken(token);
-          console.log('✅ Push token saved for user:', user.id);
-        } else {
-          console.log('⚠️ No push token received (emulator or permissions denied)');
-        }
-      })
-      .catch(err => console.error('❌ Push registration error:', err));
+    ensureRegistered(false);
 
     // Refresh token when app comes to foreground (token can expire)
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
@@ -148,10 +178,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         console.log('👆 Notification tapped:', response);
 
         const data = response.notification.request.content.data as {
+          type?: string;
           matchId?: string;
         };
 
-        if (data?.matchId) {
+        if (data?.type === 'request') {
+          router.push('/(tabs)/likes');
+          return;
+        }
+
+        if ((data?.type === 'message' || data?.type === 'match') && data?.matchId) {
           router.push(`/messages/${data.matchId}`);
         }
       });

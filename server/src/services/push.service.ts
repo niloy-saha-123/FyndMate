@@ -14,6 +14,18 @@ export interface SendMessagePushParams {
   content: string;
 }
 
+export interface SendMatchPushParams {
+  matchId: string;
+  receiverId: string;
+  otherUserId: string;
+}
+
+export interface SendRequestPushParams {
+  receiverId: string;
+  senderId: string;
+  message?: string | null;
+}
+
 /**
  * Send a push notification to the receiver of a message.
  * Respects MatchNotificationPreference (no push if receiver muted).
@@ -82,5 +94,98 @@ export async function sendMessagePush(params: SendMessagePushParams): Promise<vo
     }
   } catch (err) {
     console.error('[push] sendMessagePush failed:', err);
+  }
+}
+
+export async function sendMatchPush(params: SendMatchPushParams): Promise<void> {
+  const { matchId, receiverId, otherUserId } = params;
+  try {
+    const [pref, receiver, otherUser] = await Promise.all([
+      prisma.matchNotificationPreference.findUnique({
+        where: { matchId_userId: { matchId, userId: receiverId } },
+        select: { enabled: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: receiverId },
+        select: { pushToken: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: otherUserId },
+        select: { name: true },
+      }),
+    ]);
+
+    if (pref?.enabled === false) return;
+    if (!receiver?.pushToken) return;
+
+    const title = 'It’s a match!';
+    const body = otherUser?.name ? `${otherUser.name} is ready to chat.` : 'You have a new match.';
+
+    const payload = {
+      to: receiver.pushToken,
+      sound: 'default' as const,
+      title,
+      body,
+      data: {
+        type: 'match',
+        matchId,
+        senderId: otherUserId,
+      },
+      priority: 'high' as const,
+      channelId: 'default',
+    };
+
+    await fetch(EXPO_PUSH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error('[push] sendMatchPush failed:', err);
+  }
+}
+
+export async function sendRequestPush(params: SendRequestPushParams): Promise<void> {
+  const { receiverId, senderId, message } = params;
+
+  try {
+    const [receiver, sender] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: receiverId },
+        select: { pushToken: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: senderId },
+        select: { name: true },
+      }),
+    ]);
+
+    if (!receiver?.pushToken) return;
+
+    const title = 'New request';
+    const body = sender?.name ? `${sender.name} wants to connect.` : 'You have a new request.';
+    const preview = message && message.trim() ? message.trim().slice(0, 120) : undefined;
+
+    const payload = {
+      to: receiver.pushToken,
+      sound: 'default' as const,
+      title,
+      body,
+      data: {
+        type: 'request',
+        senderId,
+        preview,
+      },
+      priority: 'high' as const,
+      channelId: 'default',
+    };
+
+    await fetch(EXPO_PUSH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error('[push] sendRequestPush failed:', err);
   }
 }

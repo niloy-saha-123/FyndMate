@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import Constants from 'expo-constants';
 import { apiClient } from '../lib/apiClient';
 
@@ -63,7 +63,7 @@ export async function sendTestNotification() {
   });
 }
 
-export async function registerForPushNotifications(): Promise<string | null> {
+export async function registerForPushNotifications(forceOpenSettingsOnDeny = false): Promise<string | null> {
 
   if (!Device.isDevice) {
     console.log('⚠️ Push notifications only work on physical devices');
@@ -87,6 +87,9 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
     if (finalStatus !== 'granted') {
       console.log('❌ Failed to get push notification permissions');
+      if (forceOpenSettingsOnDeny) {
+        Linking.openSettings().catch(() => {});
+      }
       return null;
     }
 
@@ -159,7 +162,7 @@ export async function setNotificationPreference(
   matchId: string,
   enabled: boolean
 ) {
-  return apiClient.patch(`/api/notifications/preferences/${matchId}`, { enabled });
+  return apiClient.put(`/api/notifications/preferences/${matchId}`, { enabled });
 }
 
 

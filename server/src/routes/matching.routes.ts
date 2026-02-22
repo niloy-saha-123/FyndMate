@@ -9,6 +9,7 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { likeService } from '../services/like.service.js';
 import { matchService } from '../services/match.service.js';
 import { blockService } from '../services/block.service.js';
+import { sendMatchPush, sendRequestPush } from '../services/push.service.js';
 import { reportService } from '../services/report.service.js';
 import {
     createLikeSchema,
@@ -69,6 +70,18 @@ export default async function matchingRoutes(app: FastifyInstance) {
         try {
             const result = await likeService.createLike(user.id, likedId, liked, message);
             const matched = (result as any).user1Id !== undefined && (result as any).user2Id !== undefined;
+            if (!matched && liked) {
+                // Fire-and-forget request notification
+                sendRequestPush({ receiverId: likedId, senderId: user.id, message }).catch((err) =>
+                    request.log.warn({ err, likedId }, 'Request push failed')
+                );
+            } else if (matched) {
+                const matchRecord: any = result;
+                const receiverId = matchRecord.user1Id === user.id ? matchRecord.user2Id : matchRecord.user1Id;
+                sendMatchPush({ matchId: matchRecord.id, receiverId, otherUserId: user.id }).catch((err) =>
+                    request.log.warn({ err, matchId: matchRecord.id }, 'Match push failed')
+                );
+            }
             return reply.send({
                 matched,
                 match: matched ? result : null,
@@ -130,6 +143,11 @@ export default async function matchingRoutes(app: FastifyInstance) {
             if (like.likedId !== user.id) return reply.status(403).send({ error: 'Not authorized' });
 
             const match = await matchService.acceptLike(likeId, replyMessage);
+            // Notify the other user of the new match
+            const receiverId = match.user1Id === user.id ? match.user2Id : match.user1Id;
+            sendMatchPush({ matchId: match.id, receiverId, otherUserId: user.id }).catch((err) =>
+                request.log.warn({ err, matchId: match.id }, 'Match push failed')
+            );
             return reply.send(match);
         } catch (error: any) {
             request.log.error(error);
