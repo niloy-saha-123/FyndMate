@@ -30,6 +30,12 @@ vi.mock('react-native', () => {
     },
   };
 
+  class MockAnimatedValue {
+    constructor(public _val: number) {}
+    interpolate = () => '100%';
+  }
+  const mockTiming = { start: () => {} };
+
   return {
     View: makePrimitive('View'),
     Text: makePrimitive('Text'),
@@ -49,8 +55,17 @@ vi.mock('react-native', () => {
     Dimensions: {
       get: () => ({ width: 390, height: 844 }),
     },
+    Animated: {
+      Value: MockAnimatedValue,
+      View: makePrimitive('Animated.View'),
+      timing: () => mockTiming,
+    },
   };
 });
+
+vi.mock('@expo/vector-icons', () => ({
+  Ionicons: makePrimitive('Ionicons'),
+}));
 
 vi.mock('expo-linear-gradient', () => ({
   LinearGradient: makePrimitive('LinearGradient'),

@@ -4,6 +4,7 @@ import {
   formatRelativeTime,
   formatDateSection,
   isLastInBurst,
+  formatMessageTime,
 } from '../../../src/utils/timeFormatting';
 
 describe('timeFormatting utils', () => {
@@ -37,7 +38,8 @@ describe('timeFormatting utils', () => {
   it('formatDateSection returns Today/Yesterday/date', () => {
     expect(formatDateSection(new Date('2026-02-12T08:00:00.000Z'))).toBe('Today');
     expect(formatDateSection(new Date('2026-02-11T08:00:00.000Z'))).toBe('Yesterday');
-    expect(formatDateSection(new Date('2026-01-15T00:00:00.000Z'))).toBe('January 15, 2026');
+    // Use noon UTC so the calendar day is consistent across timezones
+    expect(formatDateSection(new Date('2026-01-15T12:00:00.000Z'))).toBe('January 15, 2026');
   });
 
   it('isLastInBurst identifies burst boundaries correctly', () => {
@@ -52,5 +54,11 @@ describe('timeFormatting utils', () => {
     expect(isLastInBurst(messages, 1)).toBe(true);
     expect(isLastInBurst(messages, 2)).toBe(true);
     expect(isLastInBurst(messages, 3)).toBe(true);
+  });
+
+  it('formatMessageTime returns locale time string (HH:MM AM/PM)', () => {
+    const date = new Date('2026-02-12T18:30:00.000Z');
+    const formatted = formatMessageTime(date);
+    expect(formatted).toMatch(/\d{1,2}:\d{2}\s*(AM|PM)/i);
   });
 });

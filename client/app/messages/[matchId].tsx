@@ -35,6 +35,7 @@ import {
   REPORT_REASON_MIN_LENGTH,
   REPORT_REASON_MAX_LENGTH,
 } from "../../src/constants/validation";
+import { isSuspiciousContent } from "../../src/utils/contentSecurity";
 import {
   convertToLocalTime,
   formatRelativeTime,
@@ -426,18 +427,6 @@ export default function MessageScreen() {
       message.status === "failed" &&
       message.senderId === user.id
     );
-  }
-
-  function isSuspiciousContent(content: string): boolean {
-    const lower = content.toLowerCase();
-    if (lower.includes("<script")) return true;
-    if (content.includes("\u0000")) return true;
-
-    const sqlPattern = /\b(drop|alter|delete|insert|update|union|select)\b/i;
-    const injectionMarkers = /(--|\/\*|\*\/|;)/;
-    if (sqlPattern.test(content) && injectionMarkers.test(content)) return true;
-
-    return false;
   }
 
   function getDeletedLabel(message: Message): string {

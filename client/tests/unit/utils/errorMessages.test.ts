@@ -25,4 +25,11 @@ describe('getUserFriendlyErrorMessage', () => {
       'Something went wrong. Please try again.'
     );
   });
+
+  it('handles non-Error values (UX: always show a message)', () => {
+    expect(getUserFriendlyErrorMessage('timeout')).toBe(
+      "Couldn't connect. Check your internet connection."
+    );
+    expect(getUserFriendlyErrorMessage(null)).toBe('Something went wrong. Please try again.');
+  });
 });

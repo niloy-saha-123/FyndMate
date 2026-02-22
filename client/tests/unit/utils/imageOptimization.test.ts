@@ -25,4 +25,12 @@ describe('imageOptimization utils', () => {
     const url = getOptimizedImageWithPreset('https://cdn.example.com/avatar.jpg', ImageSizes.THUMBNAIL);
     expect(url).toBe('https://cdn.example.com/avatar.jpg?width=200&quality=80');
   });
+
+  it('all presets produce valid query params (performance/UX)', () => {
+    const base = 'https://cdn.example.com/img.jpg';
+    expect(getOptimizedImageWithPreset(base, ImageSizes.PROFILE_LARGE)).toContain('width=800');
+    expect(getOptimizedImageWithPreset(base, ImageSizes.CARD)).toContain('width=500');
+    expect(getOptimizedImageWithPreset(base, ImageSizes.AVATAR_SMALL)).toContain('width=100');
+    expect(getOptimizedImageWithPreset(base, ImageSizes.AVATAR_MESSAGE)).toContain('width=150');
+  });
 });

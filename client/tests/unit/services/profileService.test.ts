@@ -1,21 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockApiGet = vi.fn();
-const mockApiPatch = vi.fn();
-const mockApiDelete = vi.fn();
-const mockFrom = vi.fn();
+const mocks = vi.hoisted(() => ({
+  mockApiGet: vi.fn(),
+  mockApiPatch: vi.fn(),
+  mockApiDelete: vi.fn(),
+  mockFrom: vi.fn(),
+}));
 
 vi.mock('../../../src/lib/apiClient', () => ({
   apiClient: {
-    get: mockApiGet,
-    patch: mockApiPatch,
-    delete: mockApiDelete,
+    get: mocks.mockApiGet,
+    patch: mocks.mockApiPatch,
+    delete: mocks.mockApiDelete,
   },
 }));
 
 vi.mock('../../../src/auth/supabaseClient', () => ({
   supabase: {
-    from: mockFrom,
+    from: mocks.mockFrom,
   },
 }));
 
@@ -32,7 +34,7 @@ describe('profileService', () => {
   });
 
   it('updateProfile maps name to fullName and trims project/experience fields', async () => {
-    mockApiPatch.mockResolvedValue({
+    mocks.mockApiPatch.mockResolvedValue({
       id: 'u1',
       name: 'Niloy',
       bio: 'Bio',
@@ -72,8 +74,8 @@ describe('profileService', () => {
       ],
     } as any);
 
-    expect(mockApiPatch).toHaveBeenCalledTimes(1);
-    const [, payload] = mockApiPatch.mock.calls[0];
+    expect(mocks.mockApiPatch).toHaveBeenCalledTimes(1);
+    const [, payload] = mocks.mockApiPatch.mock.calls[0];
 
     expect(payload.fullName).toBe('Niloy');
     expect(payload.projects[0]).toEqual({
@@ -96,7 +98,7 @@ describe('profileService', () => {
       } as any)
     ).rejects.toThrow('GitHub username is invalid');
 
-    expect(mockApiPatch).not.toHaveBeenCalled();
+    expect(mocks.mockApiPatch).not.toHaveBeenCalled();
   });
 
   it('updateProfile throws when end date exists without start date', async () => {
@@ -112,11 +114,11 @@ describe('profileService', () => {
       } as any)
     ).rejects.toThrow('Experience end date requires a start date');
 
-    expect(mockApiPatch).not.toHaveBeenCalled();
+    expect(mocks.mockApiPatch).not.toHaveBeenCalled();
   });
 
   it('getUserProfileById normalizes response shape', async () => {
-    mockApiGet.mockResolvedValue({
+    mocks.mockApiGet.mockResolvedValue({
       id: 'u2',
       fullName: 'Rahbir',
       bio: 'Hi',
@@ -130,7 +132,7 @@ describe('profileService', () => {
 
     const profile = await getUserProfileById('u2');
 
-    expect(mockApiGet).toHaveBeenCalledWith('/api/profile/u2');
+    expect(mocks.mockApiGet).toHaveBeenCalledWith('/api/profile/u2');
     expect(profile.name).toBe('Rahbir');
     expect(profile.projects[0]).toEqual({ id: 'p2', name: 'FyndMate', description: 'A platform' });
     expect(profile.interests).toEqual(['Open Source']);
@@ -139,11 +141,11 @@ describe('profileService', () => {
   });
 
   it('deleteMyAccount calls DELETE endpoint', async () => {
-    mockApiDelete.mockResolvedValue({ success: true });
+    mocks.mockApiDelete.mockResolvedValue({ success: true });
 
     const result = await deleteMyAccount();
 
-    expect(mockApiDelete).toHaveBeenCalledWith('/api/profile/me');
+    expect(mocks.mockApiDelete).toHaveBeenCalledWith('/api/profile/me');
     expect(result).toEqual({ success: true });
   });
 
@@ -154,7 +156,7 @@ describe('profileService', () => {
       maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
     };
 
-    mockFrom.mockReturnValue(userQuery);
+    mocks.mockFrom.mockReturnValue(userQuery);
 
     const profile = await getOrCreateProfile('sb-999', { name: 'Fallback User' });
 
@@ -201,7 +203,7 @@ describe('profileService', () => {
       }),
     };
 
-    mockFrom.mockImplementation((table: string) => {
+    mocks.mockFrom.mockImplementation((table: string) => {
       if (table === 'User') return userQuery;
       if (table === 'Project') return projectQuery;
       if (table === 'Experience') return experienceQuery;
