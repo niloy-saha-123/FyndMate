@@ -19,6 +19,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/auth/AuthProvider';
+import { useTabBadge } from '../../src/contexts/TabBadgeContext';
 import {
   getMyMatches,
   blockMatch,
@@ -58,6 +59,7 @@ function persistMessagesCache(userId: string, matches: any[]) {
 export default function MessagesTab() {
   const { top, bottom } = useSafeAreaInsets();
   const { user, loading } = useAuth();
+  const { setMessagesUnread } = useTabBadge();
   const [matches, setMatches] = useState<any[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [optionsModalVisible, setOptionsModalVisible] = useState(false);
@@ -118,6 +120,11 @@ export default function MessagesTab() {
       mounted = false;
     };
   }, [user, loading]);
+
+  useEffect(() => {
+    const total = matches.reduce((sum, m) => sum + (Number(m.unreadCount) || 0), 0);
+    setMessagesUnread(total);
+  }, [matches, setMessagesUnread]);
 
   useEffect(() => {
     if (!user) return;

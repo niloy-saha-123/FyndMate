@@ -128,6 +128,13 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         const visibleIndex = visibleRoutes.indexOf(route);
         const isProfileTab = route.name === 'profilePage';
 
+        const showDot =
+          options.tabBarBadgeDot === true &&
+          options.tabBarBadge != null &&
+          Number(options.tabBarBadge) > 0;
+        const dotColor =
+          (options.tabBarBadgeColor as string) || COLORS.primary;
+
         const renderIcon = () => {
           if (isProfileTab && profile?.profilePicture) {
             return (
@@ -166,6 +173,9 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               {/* Icon wrapper — pill-sized so the sliding pill aligns */}
               <View style={styles.iconWrapper}>
                 {renderIcon()}
+                {showDot && (
+                  <View style={[styles.badgeDot, { backgroundColor: dotColor }]} />
+                )}
               </View>
 
               <Text
@@ -175,7 +185,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 {config.label}
               </Text>
 
-              {options.tabBarBadge != null && (
+              {!options.tabBarBadgeDot && options.tabBarBadge != null && (
                 <View style={styles.badgeContainer}>
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>{options.tabBarBadge}</Text>
@@ -233,6 +243,17 @@ const styles = StyleSheet.create({
     height: PILL_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  badgeDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: COLORS.navBackground,
   },
 
   label: {

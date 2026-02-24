@@ -1,22 +1,34 @@
 import { Tabs, Redirect } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   configureReanimatedLogger,
   ReanimatedLogLevel,
 } from "react-native-reanimated";
-import { StyleSheet } from 'react-native';
 import { TabBar } from "../../src/components/TabBar"
 import { useAuth } from '../../src/auth/AuthProvider';
 import { LoadingGate } from "../../src/components/LoadingGate";
+import { TabBadgeProvider, useTabBadge } from '../../src/contexts/TabBadgeContext';
+import { useLikes } from '../../src/hooks/useLikes';
+import { COLORS } from '../../src/theme/colors';
 
 configureReanimatedLogger({
   level: ReanimatedLogLevel.warn,
   strict: false,
 });
 
-export default function TabLayout() {
-
+function TabLayoutContent() {
   const { user, loading, profile, profileLoading } = useAuth();
+  const { messagesUnread, pendingRequests, setPendingRequests } = useTabBadge();
+  const { likes, fetchLikes } = useLikes();
+
+  useEffect(() => {
+    setPendingRequests(likes.length);
+  }, [likes.length, setPendingRequests]);
+
+  useEffect(() => {
+    fetchLikes({ silent: true });
+  }, [fetchLikes]);
+
   if (loading || profileLoading) return <LoadingGate message="Loading your profile" />;
 
   if (!user) return <Redirect href="/login" />;
@@ -35,7 +47,8 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
       }}
-      tabBar={props => <TabBar {...props} />}>
+      tabBar={props => <TabBar {...props} />}
+    >
       <Tabs.Screen
         name="index"
         options={{
@@ -53,16 +66,18 @@ export default function TabLayout() {
         name="likes"
         options={{
           title: 'Requests',
-          // TODO: Pass badge state here
-          // tabBarBadge: hasNewLikes ? " " : undefined, 
+          tabBarBadgeDot: true,
+          tabBarBadge: pendingRequests,
+          tabBarBadgeColor: COLORS.accent,
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
           title: 'Messages',
-          // TODO: Pass badge state here
-          // tabBarBadge: hasNewMatches ? " " : undefined,
+          tabBarBadgeDot: true,
+          tabBarBadge: messagesUnread,
+          tabBarBadgeColor: COLORS.primary,
         }}
       />
       <Tabs.Screen
@@ -71,7 +86,14 @@ export default function TabLayout() {
           title: 'Profile',
         }}
       />
-
     </Tabs>
+  );
+}
+
+export default function TabLayout() {
+  return (
+    <TabBadgeProvider>
+      <TabLayoutContent />
+    </TabBadgeProvider>
   );
 }
