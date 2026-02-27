@@ -53,6 +53,7 @@ interface Message {
   matchId: string;
   senderId: string;
   content: string;
+  tempId?: string;
   createdAt: string;
   editedAt?: string | null;
   isDeleted?: boolean;
@@ -350,9 +351,28 @@ export default function MessageScreen() {
         }
 
         setMessages(prev => {
-          const exists = prev.some(m => m.id === payload.id);
-          if (exists) {
-            return prev.map(m => (m.id === payload.id ? { ...m, ...payload } : m));
+          const byIdIndex = prev.findIndex(m => m.id === payload.id);
+          if (byIdIndex !== -1) {
+            const next = [...prev];
+            next[byIdIndex] = { ...next[byIdIndex], ...payload };
+            return next;
+          }
+
+          const pendingIndex = prev.findIndex(
+            m =>
+              m.status === "pending" &&
+              m.senderId === payload.senderId &&
+              m.content === payload.content
+          );
+          if (pendingIndex !== -1) {
+            const next = [...prev];
+            next[pendingIndex] = {
+              ...next[pendingIndex],
+              ...payload,
+              status: "sent",
+              tempId: next[pendingIndex].tempId ?? next[pendingIndex].id,
+            };
+            return next.filter((msg, idx) => msg.id !== payload.id || idx === pendingIndex);
           }
 
           return [...prev, payload];
@@ -457,8 +477,10 @@ export default function MessageScreen() {
 
   function createLocalMessage(content: string, status: "pending" | "failed"): Message {
     const now = new Date().toISOString();
+    const tempId = `local-${Date.now()}`;
     return {
-      id: `local-${Date.now()}`,
+      id: tempId,
+      tempId,
       matchId: normalizedMatchId || "local",
       senderId: user?.id || "local",
       content,
@@ -478,7 +500,14 @@ export default function MessageScreen() {
   }
 
   function replaceLocalMessage(localId: string, next: Message) {
-    setMessages(prev => prev.map(m => (m.id === localId ? next : m)));
+    setMessages(prev => {
+      const withoutDup = prev.filter(m => m.id !== next.id || m.id === localId);
+      return withoutDup.map(m =>
+        m.id === localId
+          ? { ...next, status: "sent", tempId: m.tempId ?? m.id }
+          : m
+      );
+    });
   }
 
   function markLocalFailed(localId: string) {
@@ -652,7 +681,7 @@ export default function MessageScreen() {
         <FlatList
           ref={flatListRef}
           data={processedMessages}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.id || item.tempId || Math.random().toString()}
           contentContainerStyle={styles.messageList}
           renderItem={({ item, index }) => {
             const isMyMessage = item.senderId === user.id;
