@@ -1,26 +1,45 @@
 /**
  * @file client/src/components/TabBar.tsx
- * @description Neo-brutalist bottom tab navigation
+ * @description Neo-brutalist bottom tab bar with animated sliding pill.
+ *
+ * Icons: Compass · People · Mail · Person (always outline, never filled)
+ * Active: icon stroke turns indigo + soft pill slides behind icon with spring physics
+ * Inactive: icon stroke is black
  */
 
-import React from 'react';
-import { View, StyleSheet, Text, Image } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Text, Image, LayoutChangeEvent } from 'react-native';
 import { useLinkBuilder } from '@react-navigation/native';
 import { PlatformPressable } from '@react-navigation/elements';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
 import { useAuth } from '../auth/AuthProvider';
 import { getOptimizedImageUrl, ImageSizes } from '../utils/imageOptimization';
 import { COLORS, BORDERS } from '../theme/colors';
 
-// Brofist icon
-const BrofistIcon = require('../../assets/icons/brofist.png');
+const TAB_CONFIG: Record<string, {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+}> = {
+  index: { icon: 'compass-outline', label: 'Discover' },
+  likes: { icon: 'people-outline', label: 'Requests' },
+  messages: { icon: 'mail-outline', label: 'Messages' },
+  profilePage: { icon: 'person-outline', label: 'Profile' },
+};
 
-// Map route names to Ionicons icon names
-const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
-  index: 'home',
-  chat: 'chatbubble',
+const ICON_SIZE = 26;
+const PILL_SIZE = 46;
+
+const SPRING_CONFIG = {
+  stiffness: 400,
+  damping: 30,
+  mass: 1,
 };
 
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -28,19 +47,65 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { bottom } = useSafeAreaInsets();
   const { profile } = useAuth();
 
-  const bottomInset = Math.max(bottom, 12);
+  const bottomInset = Math.max(bottom, 10);
+
+  // Store the center-X of each icon wrapper (relative to navbar)
+  const iconCentersX = useRef<number[]>([]);
+  // Store the center-Y of each icon wrapper (relative to navbar)
+  const iconCenterY = useRef<number>(0);
+  const pillX = useSharedValue(0);
+  const pillReady = useSharedValue(0); // 0 = hidden until first layout
+
+  const visibleRoutes = state.routes.filter(r => TAB_CONFIG[r.name]);
+  const activeVisibleIndex = visibleRoutes.findIndex(r => r.key === state.routes[state.index]?.key);
+
+  useEffect(() => {
+    if (iconCentersX.current[activeVisibleIndex] !== undefined) {
+      pillX.value = withSpring(
+        iconCentersX.current[activeVisibleIndex] - PILL_SIZE / 2,
+        SPRING_CONFIG
+      );
+    }
+  }, [activeVisibleIndex]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: pillX.value }],
+    opacity: pillReady.value,
+  }));
+
+  // Measure each icon wrapper's center position relative to the navbar
+  const handleIconLayout = (index: number) => (e: LayoutChangeEvent) => {
+    // We need position relative to the navbar. PlatformPressable > iconColumn > iconWrapper
+    // Use the pageX from measure, but simpler: track tab item layout + offset
+  };
+
+  // Track each tab item's layout to find the icon center X
+  const handleTabLayout = (index: number) => (e: LayoutChangeEvent) => {
+    const { x, width } = e.nativeEvent.layout;
+    // Icon wrapper is centered inside the tab item
+    iconCentersX.current[index] = x + width / 2;
+
+    if (index === activeVisibleIndex) {
+      pillX.value = x + width / 2 - PILL_SIZE / 2;
+      pillReady.value = 1;
+    }
+  };
+
+  // The icon wrapper top position inside the navbar (paddingTop)
+  const PILL_TOP = 8; // matches paddingTop of navbar
 
   return (
     <View style={[styles.navbar, { paddingBottom: bottomInset }]}>
-      {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
-        const isFocused = state.index === index;
-        const color = isFocused ? COLORS.navActive : COLORS.navInactive;
+      {/* Sliding pill — positioned at icon row height, slides horizontally */}
+      <Animated.View style={[styles.pill, { top: PILL_TOP }, pillStyle]} />
 
-        const label =
-          typeof options.tabBarLabel === 'string'
-            ? options.tabBarLabel
-            : options.title || route.name;
+      {visibleRoutes.map((route) => {
+        const { options } = descriptors[route.key];
+        const isFocused = route.key === state.routes[state.index]?.key;
+        const config = TAB_CONFIG[route.name];
+        if (!config) return null;
+
+        const iconColor = isFocused ? COLORS.primary : '#1F2937';
 
         const onPress = () => {
           const event = navigation.emit({
@@ -48,7 +113,6 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             target: route.key,
             canPreventDefault: true,
           });
-
           if (!isFocused && !event.defaultPrevented) {
             navigation.navigate(route.name, route.params);
           }
@@ -61,58 +125,28 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           });
         };
 
-        const iconName = ICON_MAP[route.name];
-        const isLikesTab = route.name === 'likes';
+        const visibleIndex = visibleRoutes.indexOf(route);
         const isProfileTab = route.name === 'profilePage';
 
-        // Skip routes without icons (like communities), but allow likes and profile tabs
-        if (!iconName && !isLikesTab && !isProfileTab) return null;
-
         const renderIcon = () => {
-          if (isLikesTab) {
+          if (isProfileTab && profile?.profilePicture) {
             return (
-              <Image
-                source={BrofistIcon}
-                style={{ width: 24, height: 24, tintColor: color }}
-              />
-            );
-          }
-          if (isProfileTab) {
-            if (profile?.profilePicture) {
-              return (
-                <View
-                  style={[
-                    styles.profileAvatar,
-                    { borderColor: isFocused ? COLORS.navActive : COLORS.border },
-                  ]}
-                >
-                  <Image
-                    source={{
-                      uri: getOptimizedImageUrl(
-                        profile.profilePicture,
-                        ImageSizes.AVATAR_SMALL.width,
-                        ImageSizes.AVATAR_SMALL.quality
-                      ),
-                    }}
-                    style={styles.profileAvatarImage}
-                  />
-                </View>
-              );
-            }
-            return (
-              <Ionicons
-                name={isFocused ? 'person' : 'person-outline'}
-                size={24}
-                color={color}
-              />
+              <View style={[styles.profileAvatar, { borderColor: isFocused ? COLORS.primary : '#1F2937' }]}>
+                <Image
+                  source={{
+                    uri: getOptimizedImageUrl(
+                      profile.profilePicture,
+                      ImageSizes.AVATAR_SMALL.width,
+                      ImageSizes.AVATAR_SMALL.quality
+                    ),
+                  }}
+                  style={styles.profileAvatarImage}
+                />
+              </View>
             );
           }
           return (
-            <Ionicons
-              name={isFocused ? iconName : (`${iconName}-outline` as any)}
-              size={24}
-              color={color}
-            />
+            <Ionicons name={config.icon} size={ICON_SIZE} color={iconColor} />
           );
         };
 
@@ -125,28 +159,27 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             testID={options.tabBarButtonTestID}
             onPress={onPress}
             onLongPress={onLongPress}
+            onLayout={handleTabLayout(visibleIndex)}
             style={styles.tabItem}
           >
-            <View style={styles.iconContainer}>
-              <View style={[styles.iconWrapper, isFocused && styles.iconWrapperActive]}>
+            <View style={styles.iconColumn}>
+              {/* Icon wrapper — pill-sized so the sliding pill aligns */}
+              <View style={styles.iconWrapper}>
                 {renderIcon()}
               </View>
 
               <Text
-                style={[
-                  styles.label,
-                  { color },
-                  isFocused && styles.labelActive,
-                ]}
+                style={[styles.label, { color: isFocused ? COLORS.primary : '#1F2937' }]}
                 numberOfLines={1}
               >
-                {label}
+                {config.label}
               </Text>
 
-              {/* Badge indicator */}
-              {options.tabBarBadge && (
-                <View style={styles.badge}>
-                  <View style={styles.badgeDot} />
+              {options.tabBarBadge != null && (
+                <View style={styles.badgeContainer}>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{options.tabBarBadge}</Text>
+                  </View>
                 </View>
               )}
             </View>
@@ -171,12 +204,16 @@ const styles = StyleSheet.create({
     borderTopWidth: BORDERS.medium,
     borderTopColor: COLORS.border,
     paddingTop: 8,
-    // Neo-brutalist shadow effect at top
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 0,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 8,
+  },
+
+  // Sliding pill — absolute in navbar, slides along X axis with spring
+  pill: {
+    position: 'absolute',
+    left: 0,
+    width: PILL_SIZE,
+    height: PILL_SIZE,
+    borderRadius: PILL_SIZE / 2,
+    backgroundColor: 'rgba(99, 102, 241, 0.10)',
   },
 
   tabItem: {
@@ -185,57 +222,58 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  iconContainer: {
+  iconColumn: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
   iconWrapper: {
-    padding: 4,
-  },
-
-  iconWrapperActive: {
-    transform: [{ scale: 1.1 }],
+    width: PILL_SIZE,
+    height: PILL_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   label: {
-    marginTop: 4,
+    marginTop: 2,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.2,
   },
 
-  labelActive: {
-    color: COLORS.navActive,
-  },
-
-  badge: {
+  badgeContainer: {
     position: 'absolute',
     top: 0,
-    right: -4,
+    right: -6,
   },
-
-  badgeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.primary,
-    borderWidth: 2,
-    borderColor: COLORS.border,
+  badge: {
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: COLORS.navBackground,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 
   profileAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 2,
     overflow: 'hidden',
   },
-
   profileAvatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 13,
+    borderRadius: 14,
   },
 });

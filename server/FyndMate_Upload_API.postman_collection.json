@@ -1,7 +1,7 @@
 {
     "info": {
-        "name": "FyndMate - API Test Suite",
-        "description": "Complete API test suite: uploads, matching engine, likes, matches, blocks",
+        "name": "FyndMate - Complete API Test Suite",
+        "description": "Comprehensive API test suite covering all 20 endpoints: health, auth, profile, feed, likes, matches, blocks, uploads, location, and notifications.\n\nSETUP:\n1. Run `npx ts-node scripts/get_test_token.ts` to generate a JWT token\n2. Set the `jwtToken` variable with the generated token\n3. Run requests in order within each folder (some depend on previous responses)\n\nNOTE: Run against local server (localhost:3000) with Docker PostgreSQL only.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "variable": [
@@ -24,553 +24,47 @@
             "key": "uploadPath",
             "value": "",
             "type": "string"
+        },
+        {
+            "key": "targetUserId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "likeId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "matchId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "messageId",
+            "value": "",
+            "type": "string"
         }
     ],
     "item": [
         {
-            "name": "✅ Happy Path Tests",
+            "name": "Health Checks",
             "item": [
                 {
-                    "name": "1. Request Upload URL",
+                    "name": "GET /health",
                     "event": [
                         {
                             "listen": "test",
                             "script": {
                                 "exec": [
-                                    "pm.test(\"Status is 200\", function () {",
+                                    "pm.test('Status is 200', function () {",
                                     "    pm.response.to.have.status(200);",
                                     "});",
                                     "",
-                                    "pm.test(\"Response has signedUrl\", function () {",
+                                    "pm.test('Server is healthy', function () {",
                                     "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.signedUrl).to.exist;",
-                                    "    pm.collectionVariables.set(\"signedUrl\", jsonData.signedUrl);",
-                                    "});",
-                                    "",
-                                    "pm.test(\"Response has uploadPath\", function () {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.uploadPath).to.exist;",
-                                    "    pm.collectionVariables.set(\"uploadPath\", jsonData.uploadPath);",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"fileExtension\": \"jpg\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{baseUrl}}/api/upload/profile-picture/request",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "upload",
-                                "profile-picture",
-                                "request"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "2. Upload Image to Supabase",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test(\"Status is 200\", function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "PUT",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "image/jpeg",
-                                "type": "text"
-                            }
-                        ],
-                        "body": {
-                            "mode": "file",
-                            "file": {}
-                        },
-                        "url": {
-                            "raw": "{{signedUrl}}",
-                            "host": [
-                                "{{signedUrl}}"
-                            ]
-                        },
-                        "description": "Select a JPG image file from your computer"
-                    }
-                },
-                {
-                    "name": "3. Confirm Upload",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test(\"Status is 200\", function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "",
-                                    "pm.test(\"Response has publicUrl\", function () {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.publicUrl).to.exist;",
-                                    "});",
-                                    "",
-                                    "pm.test(\"Success message\", function () {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.message).to.include(\"successfully\");",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"uploadPath\": \"{{uploadPath}}\",\n  \"idempotencyKey\": \"test-upload-123\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{baseUrl}}/api/upload/profile-picture/confirm",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "upload",
-                                "profile-picture",
-                                "confirm"
-                            ]
-                        }
-                    }
-                }
-            ]
-        },
-        {
-            "name": "🔒 Security Tests",
-            "item": [
-                {
-                    "name": "❌ No Auth Token (Should Fail)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test(\"Status is 401\", function () {",
-                                    "    pm.response.to.have.status(401);",
-                                    "});",
-                                    "",
-                                    "pm.test(\"Error mentions authorization\", function () {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.error.toLowerCase()).to.include(\"authorization\");",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"fileExtension\": \"jpg\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{baseUrl}}/api/upload/profile-picture/request",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "upload",
-                                "profile-picture",
-                                "request"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "❌ Invalid Token (Should Fail)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test(\"Status is 401\", function () {",
-                                    "    pm.response.to.have.status(401);",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer invalid-token-xyz123",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"fileExtension\": \"jpg\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{baseUrl}}/api/upload/profile-picture/request",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "upload",
-                                "profile-picture",
-                                "request"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "❌ Reuse Upload URL (Should Fail)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test(\"Status is 403\", function () {",
-                                    "    pm.response.to.have.status(403);",
-                                    "});",
-                                    "",
-                                    "pm.test(\"Error mentions already used\", function () {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.error.toLowerCase()).to.include(\"used\");",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"uploadPath\": \"{{uploadPath}}\"\n}",
-                            "options": {
-                                "raw": {
-                                    "language": "json"
-                                }
-                            }
-                        },
-                        "url": {
-                            "raw": "{{baseUrl}}/api/upload/profile-picture/confirm",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "upload",
-                                "profile-picture",
-                                "confirm"
-                            ]
-                        },
-                        "description": "Run this AFTER completing a successful upload. Should fail with 'already used'."
-                    }
-                },
-                {
-                    "name": "❌ Wrong User's Path (Should Fail)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test(\"Status is 403\", function () {",
-                                    "    pm.response.to.have.status(403);",
-                                    "});",
-                                    "",
-                                    "pm.test(\"Error mentions access denied\", function () {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.error.toLowerCase()).to.include(\"access\");",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"uploadPath\": \"different-user-id/123456-abc.jpg\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{baseUrl}}/api/upload/profile-picture/confirm",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "upload",
-                                "profile-picture",
-                                "confirm"
-                            ]
-                        },
-                        "description": "Try to confirm upload for a different user's path"
-                    }
-                },
-                {
-                    "name": "❌ Expired URL (Should Fail)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test(\"Status is 403\", function () {",
-                                    "    pm.response.to.have.status(403);",
-                                    "});",
-                                    "",
-                                    "pm.test(\"Error mentions expired\", function () {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.error.toLowerCase()).to.include(\"expir\");",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"uploadPath\": \"{{uploadPath}}\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{baseUrl}}/api/upload/profile-picture/confirm",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "upload",
-                                "profile-picture",
-                                "confirm"
-                            ]
-                        },
-                        "description": "MANUAL TEST: Request upload URL, wait 2+ minutes, then run this. Should fail with 'expired'."
-                    }
-                },
-                {
-                    "name": "❌ Invalid Session (Should Fail)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test(\"Status is 403\", function () {",
-                                    "    pm.response.to.have.status(403);",
-                                    "});",
-                                    "",
-                                    "pm.test(\"Error mentions session\", function () {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.error.toLowerCase()).to.include(\"session\");",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"uploadPath\": \"fake-user-id/123456789-fake.jpg\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{baseUrl}}/api/upload/profile-picture/confirm",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "upload",
-                                "profile-picture",
-                                "confirm"
-                            ]
-                        },
-                        "description": "Try to confirm upload that was never requested (no upload session exists)"
-                    }
-                },
-                {
-                    "name": "❌ Invalid File Extension (Should Fail)",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test(\"Status is 400\", function () {",
-                                    "    pm.response.to.have.status(400);",
-                                    "});",
-                                    "",
-                                    "pm.test(\"Error mentions validation\", function () {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.error.toLowerCase()).to.include(\"validation\");",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"fileExtension\": \"exe\"\n}"
-                        },
-                        "url": {
-                            "raw": "{{baseUrl}}/api/upload/profile-picture/request",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "upload",
-                                "profile-picture",
-                                "request"
-                            ]
-                        },
-                        "description": "Try to upload .exe file - should be rejected"
-                    }
-                }
-            ]
-        },
-        {
-            "name": "ℹ️ Health Check",
-            "item": [
-                {
-                    "name": "Server Health",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "pm.test(\"Status is 200\", function () {",
-                                    "    pm.response.to.have.status(200);",
-                                    "});",
-                                    "",
-                                    "pm.test(\"Server is healthy\", function () {",
-                                    "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.status).to.eql(\"ok\");",
+                                    "    pm.expect(jsonData.status).to.eql('ok');",
+                                    "    pm.expect(jsonData.timestamp).to.exist;",
                                     "});"
                                 ],
                                 "type": "text/javascript"
@@ -582,34 +76,33 @@
                         "header": [],
                         "url": {
                             "raw": "{{baseUrl}}/health",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "health"
-                            ]
+                            "host": ["{{baseUrl}}"],
+                            "path": ["health"]
                         }
                     }
-                }
-            ]
-        },
-        {
-            "name": "❤️ Matching Engine",
-            "item": [
+                },
                 {
-                    "name": "1. Get Discovery Feed",
+                    "name": "GET /health/redis",
                     "event": [
                         {
                             "listen": "test",
                             "script": {
                                 "exec": [
-                                    "pm.test(\"Status is 200\", function () {",
+                                    "pm.test('Status is 200', function () {",
                                     "    pm.response.to.have.status(200);",
                                     "});",
                                     "",
-                                    "pm.test(\"Response has data array\", function () {",
+                                    "pm.test('Redis status is reported', function () {",
                                     "    var jsonData = pm.response.json();",
-                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "    pm.expect(['healthy', 'degraded']).to.include(jsonData.status);",
+                                    "    pm.expect(jsonData.timestamp).to.exist;",
+                                    "});",
+                                    "",
+                                    "pm.test('No internal details exposed', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.consecutiveFailures).to.be.undefined;",
+                                    "    pm.expect(jsonData.lastError).to.be.undefined;",
+                                    "    pm.expect(jsonData.inMemoryStoreSize).to.be.undefined;",
                                     "});"
                                 ],
                                 "type": "text/javascript"
@@ -618,237 +111,1630 @@
                     ],
                     "request": {
                         "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            }
-                        ],
+                        "header": [],
                         "url": {
-                            "raw": "{{baseUrl}}/api/feed?limit=10",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "feed"
-                            ],
-                            "query": [
-                                {
-                                    "key": "limit",
-                                    "value": "10"
-                                }
-                            ]
+                            "raw": "{{baseUrl}}/health/redis",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["health", "redis"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Authentication",
+            "item": [
+                {
+                    "name": "POST /auth/signup - Valid",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Signup succeeds', function () {",
+                                    "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"postman_test@fyndmate.com\",\n  \"password\": \"testpass123\",\n  \"name\": \"Postman Test\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/signup",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "signup"]
                         }
                     }
                 },
                 {
-                    "name": "2. Send Like",
+                    "name": "POST /auth/signup - Missing Email",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
                     "request": {
                         "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"password\": \"testpass123\",\n  \"name\": \"No Email User\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/signup",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "signup"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /auth/signup - Reserved Name",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});",
+                                    "",
+                                    "pm.test('Error mentions reserved', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.error.toLowerCase()).to.include('reserved');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
                             }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"admin_test@fyndmate.com\",\n  \"password\": \"testpass123\",\n  \"name\": \"admin\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/signup",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "signup"]
+                        }
+                    }
+                },
+                {
+                    "name": "GET /auth/me - Authenticated",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Returns user info', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.id).to.exist;",
+                                    "    pm.expect(jsonData.email).to.exist;",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/me",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "me"]
+                        }
+                    }
+                },
+                {
+                    "name": "GET /auth/me - No Auth (401)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 401', function () {",
+                                    "    pm.response.to.have.status(401);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/auth/me",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["auth", "me"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Profile",
+            "item": [
+                {
+                    "name": "GET /api/profile/me",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Profile has expected fields', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.id).to.exist;",
+                                    "    pm.expect(jsonData.name).to.exist;",
+                                    "    pm.expect(jsonData).to.not.have.property('latitude');",
+                                    "    pm.expect(jsonData).to.not.have.property('longitude');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/profile/me",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "profile", "me"]
+                        }
+                    }
+                },
+                {
+                    "name": "PATCH /api/profile/me - Update Bio",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Bio was updated', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.bio).to.eql('Updated bio from Postman test');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"likedId\": \"TARGET_USER_ID_HERE\",\n    \"liked\": true,\n    \"message\": \"Hey! This is a test message longer than 20 chars.\"\n}"
+                            "raw": "{\n  \"bio\": \"Updated bio from Postman test\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/profile/me",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "profile", "me"]
+                        }
+                    }
+                },
+                {
+                    "name": "PATCH /api/profile/me - Update Skills",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Skills were updated', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.skills).to.be.an('array');",
+                                    "    pm.expect(jsonData.skills).to.include('TypeScript');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"skills\": [\"TypeScript\", \"React\", \"Node.js\"]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/profile/me",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "profile", "me"]
+                        }
+                    }
+                },
+                {
+                    "name": "PATCH /api/profile/me - Bio Too Long (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"bio\": \"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat.\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/profile/me",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "profile", "me"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Discovery Feed",
+            "item": [
+                {
+                    "name": "GET /api/feed",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Response is array', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "    // Capture first user ID for like test",
+                                    "    if (jsonData.data.length > 0) {",
+                                    "        pm.collectionVariables.set('targetUserId', jsonData.data[0].id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/feed?limit=10",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "feed"],
+                            "query": [{"key": "limit", "value": "10"}]
+                        }
+                    }
+                },
+                {
+                    "name": "GET /api/feed - Limit Too High (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/feed?limit=100",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "feed"],
+                            "query": [{"key": "limit", "value": "100"}]
+                        }
+                    }
+                },
+                {
+                    "name": "GET /api/feed - Invalid Cursor (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/feed?cursor=not-a-uuid",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "feed"],
+                            "query": [{"key": "cursor", "value": "not-a-uuid"}]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Likes",
+            "item": [
+                {
+                    "name": "POST /api/likes - Send Like",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Like response has expected fields', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('like');",
+                                    "    if (jsonData.like && jsonData.like.id) {",
+                                    "        pm.collectionVariables.set('likeId', jsonData.like.id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"likedId\": \"{{targetUserId}}\",\n  \"liked\": true,\n  \"message\": \"Hey! I would love to collaborate on a project together.\"\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/likes",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "likes"
-                            ]
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "likes"]
                         }
                     }
                 },
                 {
-                    "name": "3. Get Received Likes (Inbox)",
+                    "name": "POST /api/likes - Send Pass",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"likedId\": \"{{targetUserId}}\",\n  \"liked\": false\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/likes",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "likes"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/likes - Missing Message (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"likedId\": \"{{targetUserId}}\",\n  \"liked\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/likes",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "likes"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/likes - Invalid likedId (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"likedId\": \"not-a-valid-uuid\",\n  \"liked\": true,\n  \"message\": \"This should fail validation\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/likes",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "likes"]
+                        }
+                    }
+                },
+                {
+                    "name": "GET /api/likes/received",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Response is array', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.data).to.be.an('array');",
+                                    "    if (jsonData.data.length > 0) {",
+                                    "        pm.collectionVariables.set('likeId', jsonData.data[0].id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
                     "request": {
                         "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            }
-                        ],
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
                         "url": {
                             "raw": "{{baseUrl}}/api/likes/received",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "likes",
-                                "received"
-                            ]
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "likes", "received"]
                         }
                     }
                 },
                 {
-                    "name": "4. Accept Like (Handshake / Match)",
+                    "name": "POST /api/likes/:likeId/accept",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Match was created', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    if (jsonData.match && jsonData.match.id) {",
+                                    "        pm.collectionVariables.set('matchId', jsonData.match.id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
                     "request": {
                         "method": "POST",
                         "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"replyMessage\": \"I'd love to chat! Your profile is great.\"\n}"
+                            "raw": "{\n  \"replyMessage\": \"Thanks for reaching out! Let us build something great.\"\n}"
                         },
                         "url": {
-                            "raw": "{{baseUrl}}/api/likes/LIKE_ID_HERE/accept",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "likes",
-                                "LIKE_ID_HERE",
-                                "accept"
-                            ]
+                            "raw": "{{baseUrl}}/api/likes/{{likeId}}/accept",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "likes", "{{likeId}}", "accept"]
                         }
                     }
                 },
                 {
-                    "name": "5. Decline Like",
+                    "name": "POST /api/likes/:likeId/decline",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
                     "request": {
                         "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            }
-                        ],
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
                         "body": {
                             "mode": "raw",
                             "raw": "{}"
                         },
                         "url": {
-                            "raw": "{{baseUrl}}/api/likes/LIKE_ID_HERE/decline",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "likes",
-                                "LIKE_ID_HERE",
-                                "decline"
-                            ]
+                            "raw": "{{baseUrl}}/api/likes/{{likeId}}/decline",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "likes", "{{likeId}}", "decline"]
                         }
                     }
-                },
+                }
+            ]
+        },
+        {
+            "name": "Matches",
+            "item": [
                 {
-                    "name": "6. Get Active Matches",
+                    "name": "GET /api/matches",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Response has data and nextCursor', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('data');",
+                                    "    pm.expect(jsonData).to.have.property('nextCursor');",
+                                    "    if (jsonData.data.length > 0) {",
+                                    "        pm.collectionVariables.set('matchId', jsonData.data[0].id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
                     "request": {
                         "method": "GET",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            }
-                        ],
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
                         "url": {
                             "raw": "{{baseUrl}}/api/matches",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "matches"
-                            ]
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "matches"]
                         }
                     }
                 },
                 {
-                    "name": "7. Unmatch User",
+                    "name": "GET /api/matches/:matchId (status)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Returns status and blockedBy', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('status');",
+                                    "    pm.expect(jsonData).to.have.property('blockedBy');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/matches/{{matchId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "matches", "{{matchId}}"]
+                        }
+                    }
+                },
+                {
+                    "name": "GET /api/matches/:matchId/messages",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Returns messages array', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/matches/{{matchId}}/messages",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "matches", "{{matchId}}", "messages"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/matches/:matchId/messages",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 201', function () {",
+                                    "    pm.response.to.have.status(201);",
+                                    "});",
+                                    "",
+                                    "pm.test('Saves messageId for edit test', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    if (jsonData.id) {",
+                                    "        pm.collectionVariables.set('messageId', jsonData.id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
                     "request": {
                         "method": "POST",
                         "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
-                            }
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{}"
+                            "raw": "{\n  \"content\": \"Hello from Postman test!\"\n}"
                         },
                         "url": {
-                            "raw": "{{baseUrl}}/api/matches/MATCH_ID_HERE/unmatch",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "matches",
-                                "MATCH_ID_HERE",
-                                "unmatch"
-                            ]
+                            "raw": "{{baseUrl}}/api/matches/{{matchId}}/messages",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "matches", "{{matchId}}", "messages"]
                         }
                     }
                 },
                 {
-                    "name": "8. Block User",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Authorization",
-                                "value": "Bearer {{jwtToken}}",
-                                "type": "text"
-                            },
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json",
-                                "type": "text"
+                    "name": "PATCH /api/matches/:matchId/messages/:messageId",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
                             }
+                        }
+                    ],
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"userId\": \"TARGET_USER_ID_HERE\"\n}"
+                            "raw": "{\n  \"content\": \"Edited message from Postman\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/matches/{{matchId}}/messages/{{messageId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "matches", "{{matchId}}", "messages", "{{messageId}}"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/matches/:matchId/block",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/matches/{{matchId}}/block",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "matches", "{{matchId}}", "block"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/matches/:matchId/unblock",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/matches/{{matchId}}/unblock",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "matches", "{{matchId}}", "unblock"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/matches/:matchId/hide",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/matches/{{matchId}}/hide",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "matches", "{{matchId}}", "hide"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/matches/:matchId/unmatch",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {"mode": "raw", "raw": "{}"},
+                        "url": {
+                            "raw": "{{baseUrl}}/api/matches/{{matchId}}/unmatch",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "matches", "{{matchId}}", "unmatch"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/matches/invalid/unmatch (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {"mode": "raw", "raw": "{}"},
+                        "url": {
+                            "raw": "{{baseUrl}}/api/matches/00000000-0000-4000-a000-000000000000/unmatch",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "matches", "00000000-0000-4000-a000-000000000000", "unmatch"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Blocking",
+            "item": [
+                {
+                    "name": "POST /api/users/block",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"userId\": \"{{targetUserId}}\"\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/users/block",
-                            "host": [
-                                "{{baseUrl}}"
-                            ],
-                            "path": [
-                                "api",
-                                "users",
-                                "block"
-                            ]
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "users", "block"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/users/block - Invalid UUID (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"userId\": \"not-a-valid-uuid\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/block",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "users", "block"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/users/block - Missing userId (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {"mode": "raw", "raw": "{}"},
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/block",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "users", "block"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Upload (Profile Picture)",
+            "item": [
+                {
+                    "name": "1. Request Upload URL",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Response has signedUrl', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.signedUrl).to.exist;",
+                                    "    pm.collectionVariables.set('signedUrl', jsonData.signedUrl);",
+                                    "});",
+                                    "",
+                                    "pm.test('Response has uploadPath', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.uploadPath).to.exist;",
+                                    "    pm.collectionVariables.set('uploadPath', jsonData.uploadPath);",
+                                    "});",
+                                    "",
+                                    "pm.test('Response has expiresAt', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.expiresAt).to.exist;",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {"mode": "raw", "raw": "{\n  \"fileExtension\": \"jpg\"\n}"},
+                        "url": {
+                            "raw": "{{baseUrl}}/api/upload/profile-picture/request",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "upload", "profile-picture", "request"]
+                        }
+                    }
+                },
+                {
+                    "name": "2. Upload Image to Supabase",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [{"key": "Content-Type", "value": "image/jpeg"}],
+                        "body": {"mode": "file", "file": {}},
+                        "url": {
+                            "raw": "{{signedUrl}}",
+                            "host": ["{{signedUrl}}"]
+                        },
+                        "description": "Select a JPG image file from your computer"
+                    }
+                },
+                {
+                    "name": "3. Confirm Upload",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Response has publicUrl', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.publicUrl).to.exist;",
+                                    "});",
+                                    "",
+                                    "pm.test('Success message', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.message).to.include('successfully');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"uploadPath\": \"{{uploadPath}}\",\n  \"idempotencyKey\": \"test-upload-123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/upload/profile-picture/confirm",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "upload", "profile-picture", "confirm"]
+                        }
+                    }
+                },
+                {
+                    "name": "No Auth Token (401)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 401', function () {",
+                                    "    pm.response.to.have.status(401);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {"mode": "raw", "raw": "{\n  \"fileExtension\": \"jpg\"\n}"},
+                        "url": {
+                            "raw": "{{baseUrl}}/api/upload/profile-picture/request",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "upload", "profile-picture", "request"]
+                        }
+                    }
+                },
+                {
+                    "name": "Invalid Token (401)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 401', function () {",
+                                    "    pm.response.to.have.status(401);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer invalid-token-xyz123"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {"mode": "raw", "raw": "{\n  \"fileExtension\": \"jpg\"\n}"},
+                        "url": {
+                            "raw": "{{baseUrl}}/api/upload/profile-picture/request",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "upload", "profile-picture", "request"]
+                        }
+                    }
+                },
+                {
+                    "name": "Invalid File Extension (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {"mode": "raw", "raw": "{\n  \"fileExtension\": \"exe\"\n}"},
+                        "url": {
+                            "raw": "{{baseUrl}}/api/upload/profile-picture/request",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "upload", "profile-picture", "request"]
+                        }
+                    }
+                },
+                {
+                    "name": "Reuse Upload URL (403)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 403', function () {",
+                                    "    pm.response.to.have.status(403);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {"mode": "raw", "raw": "{\n  \"uploadPath\": \"{{uploadPath}}\"\n}"},
+                        "url": {
+                            "raw": "{{baseUrl}}/api/upload/profile-picture/confirm",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "upload", "profile-picture", "confirm"]
+                        },
+                        "description": "Run AFTER completing a successful upload. Should fail with 'already used'."
+                    }
+                },
+                {
+                    "name": "Wrong User Path (403)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 403', function () {",
+                                    "    pm.response.to.have.status(403);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {"mode": "raw", "raw": "{\n  \"uploadPath\": \"different-user-id/123456-abc.jpg\"\n}"},
+                        "url": {
+                            "raw": "{{baseUrl}}/api/upload/profile-picture/confirm",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "upload", "profile-picture", "confirm"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Location",
+            "item": [
+                {
+                    "name": "GET /api/users/me/location-secret",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Returns location secret', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.locationSecret).to.exist;",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/me/location-secret",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "users", "me", "location-secret"]
+                        }
+                    }
+                },
+                {
+                    "name": "PATCH /api/users/me/location-settings",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"locationSharing\": \"on\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/me/location-settings",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "users", "me", "location-settings"]
+                        }
+                    }
+                },
+                {
+                    "name": "PATCH /api/users/me/location - Missing Fields (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {"mode": "raw", "raw": "{}"},
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/me/location",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "users", "me", "location"]
+                        }
+                    }
+                },
+                {
+                    "name": "GET /api/users/me/location-secret - No Auth (401)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 401', function () {",
+                                    "    pm.response.to.have.status(401);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/users/me/location-secret",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "users", "me", "location-secret"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Notifications",
+            "item": [
+                {
+                    "name": "PATCH /api/notifications/push-token",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Push token saved', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.success).to.eql(true);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"pushToken\": \"ExponentPushToken[postman-test-token]\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/notifications/push-token",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "notifications", "push-token"]
+                        }
+                    }
+                },
+                {
+                    "name": "GET /api/notifications/preferences/:matchId",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Returns enabled preference', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData).to.have.property('enabled');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [{"key": "Authorization", "value": "Bearer {{jwtToken}}"}],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/notifications/preferences/{{matchId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "notifications", "preferences", "{{matchId}}"]
+                        }
+                    }
+                },
+                {
+                    "name": "PUT /api/notifications/preferences/:matchId",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200', function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "});",
+                                    "",
+                                    "pm.test('Preference updated', function () {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.success).to.eql(true);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"enabled\": false\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/notifications/preferences/{{matchId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "notifications", "preferences", "{{matchId}}"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/notifications/send",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 200, 400, or 403', function () {",
+                                    "    pm.expect(pm.response.code).to.be.oneOf([200, 400, 403]);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"receiverUserId\": \"{{targetUserId}}\",\n  \"message\": \"Test notification from Postman\",\n  \"title\": \"New Message\",\n  \"matchId\": \"{{matchId}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/notifications/send",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "notifications", "send"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/notifications/send - No Auth (401)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 401', function () {",
+                                    "    pm.response.to.have.status(401);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"receiverUserId\": \"some-user-id\",\n  \"message\": \"Should fail\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/notifications/send",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "notifications", "send"]
+                        }
+                    }
+                },
+                {
+                    "name": "POST /api/notifications/send - Missing Message (400)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Status is 400', function () {",
+                                    "    pm.response.to.have.status(400);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {"key": "Authorization", "value": "Bearer {{jwtToken}}"},
+                            {"key": "Content-Type", "value": "application/json"}
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"receiverUserId\": \"{{targetUserId}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/notifications/send",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "notifications", "send"]
                         }
                     }
                 }

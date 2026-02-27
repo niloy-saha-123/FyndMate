@@ -6,8 +6,8 @@
  * has explicitly allowed it via their `locationSharing` preference.
  * 
  * Privacy Rules:
- * - If locationSharing = "never" → hide city/country
- * - If locationSharing = "whileOpen" or "always" → show city/country
+ * - If locationSharing = "off" or "never" → hide city/country
+ * - If locationSharing = "on" / "whileOpen" / "always" → show city/country
  * - NEVER expose latitude/longitude to other users (internal use only)
  */
 
@@ -30,8 +30,9 @@ export interface UserWithLocation {
  * // If user.locationSharing === "never", publicProfile.city and publicProfile.country will be null
  */
 export function filterLocationByPrivacy<T extends UserWithLocation>(user: T): T {
-    // If user has disabled location sharing, hide city and country
-    if (user.locationSharing === 'never') {
+    // If user has disabled location sharing, hide city and country.
+    // Supports both legacy values (never) and current values (off).
+    if (user.locationSharing === 'never' || user.locationSharing === 'off') {
         return {
             ...user,
             city: null,

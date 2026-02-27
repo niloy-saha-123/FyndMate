@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLikes } from '@/src/hooks/useLikes';
 import { Like } from '@/src/services/matchingService';
 import { useAuth } from '@/src/auth/AuthProvider';
+import { router, useLocalSearchParams } from 'expo-router';
 import { COLORS, SHADOWS, BORDERS, RADIUS } from '@/src/theme/colors';
 import { NeoCard } from '@/src/components/NeoCard';
 import { NeoButton } from '@/src/components/NeoButton';
@@ -28,14 +29,18 @@ export default function LikesScreen() {
     const { top, bottom } = useSafeAreaInsets();
     const { isAuthenticated } = useAuth();
     const { likes, loading, error, fetchLikes, onAccept, onDecline } = useLikes();
+    const { refreshAt } = useLocalSearchParams<{ refreshAt?: string | string[] }>();
+    const normalizedRefreshAt = Array.isArray(refreshAt) ? refreshAt[0] : refreshAt;
 
     const [selectedLike, setSelectedLike] = useState<Like | null>(null);
     const [replyText, setReplyText] = useState('');
+    const [declineTarget, setDeclineTarget] = useState<Like | null>(null);
+    const [declineSubmitting, setDeclineSubmitting] = useState(false);
     const MAX_REPLY_LENGTH = 500;
 
     useEffect(() => {
-        fetchLikes();
-    }, [fetchLikes]);
+        fetchLikes({ silent: true });
+    }, [fetchLikes, normalizedRefreshAt]);
 
     const handleAccept = async () => {
         if (!selectedLike) return;
@@ -48,19 +53,42 @@ export default function LikesScreen() {
         await onDecline(likeId);
     };
 
-    const renderItem = ({ item }: { item: Like }) => {
-        const isOnline = Math.random() > 0.5; // Mock online status
+    const confirmDecline = async () => {
+        if (!declineTarget) return;
+        setDeclineSubmitting(true);
+        try {
+            await onDecline(declineTarget.id);
+        } finally {
+            setDeclineSubmitting(false);
+            setDeclineTarget(null);
+        }
+    };
 
+    const renderItem = ({ item }: { item: Like }) => {
         return (
             <NeoCard style={styles.requestCard}>
                 {/* Star Badge */}
-                <View style={styles.starBadge}>
+                {/* Star Badge - REMOVED as per user request */}
+                {/* <View style={styles.starBadge}>
                     <Ionicons name="star" size={12} color={COLORS.textPrimary} />
-                </View>
+                </View> */}
 
                 {/* Header */}
                 <View style={styles.requestHeader}>
-                    <View style={styles.avatarContainer}>
+                    <TouchableOpacity
+                        style={styles.avatarContainer}
+                        onPress={() =>
+                            router.push({
+                                pathname: '/messages/profile/[userId]',
+                                params: {
+                                    userId: item.likerUser.id,
+                                    mode: 'request',
+                                    likeId: item.id,
+                                    introMessage: item.message ?? '',
+                                },
+                            })
+                        }
+                    >
                         {item.likerUser.profilePicture ? (
                             <Image
                                 source={{ uri: item.likerUser.profilePicture }}
@@ -71,8 +99,7 @@ export default function LikesScreen() {
                                 <Ionicons name="person" size={30} color={COLORS.border} />
                             </View>
                         )}
-                        {isOnline && <View style={styles.onlineIndicator} />}
-                    </View>
+                    </TouchableOpacity>
                     <View style={styles.requestHeaderInfo}>
                         <Text style={styles.requestName}>{item.likerUser.name}</Text>
                         <Text style={styles.requestMeta}>
@@ -89,19 +116,25 @@ export default function LikesScreen() {
 
                 {/* Actions */}
                 <View style={styles.requestActions}>
-                    <NeoButton
-                        title="Chat first"
-                        onPress={() => setSelectedLike(item)}
-                        variant="secondary"
-                        size="small"
-                        style={{ flex: 1 }}
-                    />
-                    <NeoButton
-                        title="Accept"
-                        onPress={() => setSelectedLike(item)}
-                        size="small"
-                        style={{ flex: 1, marginLeft: 8 }}
-                    />
+                    <View style={styles.requestActionSlot}>
+                        <NeoButton
+                            title="Decline"
+                            onPress={() => setDeclineTarget(item)}
+                            variant="secondary"
+                            size="small"
+                            fullWidth
+                            style={styles.requestActionButton}
+                        />
+                    </View>
+                    <View style={styles.requestActionSlot}>
+                        <NeoButton
+                            title="Accept"
+                            onPress={() => setSelectedLike(item)}
+                            size="small"
+                            fullWidth
+                            style={styles.requestActionButton}
+                        />
+                    </View>
                 </View>
             </NeoCard>
         );
@@ -111,10 +144,7 @@ export default function LikesScreen() {
         <View style={[styles.container, { paddingTop: top }]}>
             {/* Header */}
             <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <View style={styles.geoCircle} />
-                    <Text style={styles.headerTitle}>Requests</Text>
-                </View>
+                <Text style={styles.headerTitle}>Requests</Text>
             </View>
 
             {/* Content */}
@@ -178,7 +208,7 @@ export default function LikesScreen() {
                         <Text style={styles.modalTitle}>
                             Match with {selectedLike?.likerUser.name}
                         </Text>
-                        <Text style={styles.modalSubtitle}>Respond to their message:</Text>
+                        <Text style={styles.modalSubtitle}>Send a message or match instantly</Text>
 
                         {/* Quote */}
                         <View style={styles.quoteBox}>
@@ -209,10 +239,57 @@ export default function LikesScreen() {
                                 variant="secondary"
                             />
                             <NeoButton
-                                title="Send & Match"
+                                title="Accept"
                                 onPress={handleAccept}
-                                disabled={replyText.length < 1 || replyText.length > MAX_REPLY_LENGTH}
+                                disabled={replyText.length > MAX_REPLY_LENGTH}
                                 style={{ flex: 1, marginLeft: 12 }}
+                            />
+                        </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* Decline Confirmation Modal */}
+            <Modal
+                visible={!!declineTarget}
+                animationType="fade"
+                transparent
+                onRequestClose={() => {
+                    if (!declineSubmitting) setDeclineTarget(null);
+                }}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => {
+                        if (!declineSubmitting) setDeclineTarget(null);
+                    }}
+                >
+                    <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+                        <View style={styles.modalHandle} />
+                        <Text style={styles.modalTitle}>
+                            Decline {declineTarget?.likerUser.name}?
+                        </Text>
+                        <Text style={styles.modalSubtitle}>
+                            This will remove their request.
+                        </Text>
+
+                        <View style={styles.modalActionsRow}>
+                            <NeoButton
+                                title="Cancel"
+                                onPress={() => setDeclineTarget(null)}
+                                variant="secondary"
+                                size="small"
+                                style={{ flex: 1 }}
+                                disabled={declineSubmitting}
+                            />
+                            <NeoButton
+                                title={declineSubmitting ? "Declining..." : "Decline"}
+                                onPress={confirmDecline}
+                                variant="danger"
+                                size="small"
+                                style={{ flex: 1, marginLeft: 8 }}
+                                disabled={declineSubmitting}
                             />
                         </View>
                     </TouchableOpacity>
@@ -248,33 +325,20 @@ const styles = StyleSheet.create({
 
     // Header
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
         paddingHorizontal: 16,
-        paddingVertical: 16,
+        paddingVertical: 8,
         backgroundColor: COLORS.background,
         borderBottomWidth: BORDERS.thin,
         borderBottomColor: COLORS.border,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    geoCircle: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: COLORS.primary,
-        borderWidth: 2,
-        borderColor: COLORS.border,
-        marginRight: 8,
-        ...SHADOWS.small,
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
     },
     headerTitle: {
         fontSize: 24,
-        fontWeight: '800',
+        fontWeight: '900',
         color: COLORS.textPrimary,
+        letterSpacing: -0.5,
+        textAlign: 'left',
     },
 
     // List
@@ -322,17 +386,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: COLORS.gray200,
     },
-    onlineIndicator: {
-        position: 'absolute',
-        bottom: -2,
-        right: -2,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: COLORS.success,
-        borderWidth: 2,
-        borderColor: COLORS.border,
-    },
     requestHeaderInfo: {
         flex: 1,
         justifyContent: 'center',
@@ -377,6 +430,14 @@ const styles = StyleSheet.create({
     // Actions
     requestActions: {
         flexDirection: 'row',
+        gap: 8,
+    },
+    requestActionSlot: {
+        flex: 1,
+        minWidth: 0,
+    },
+    requestActionButton: {
+        width: '100%',
     },
 
     // Loading/Error/Empty
@@ -464,6 +525,11 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         color: COLORS.textMuted,
         marginBottom: 16,
+    },
+    modalActionsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
     },
     quoteBox: {
         borderLeftWidth: 4,

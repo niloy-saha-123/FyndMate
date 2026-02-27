@@ -1,15 +1,16 @@
 /**
  * @file src/services/match.service.ts
- * @description Manages active connections, chat initiation, and unmatching logic.
+ * @description Manages active connections, message initiation, and unmatching logic.
  */
 
 import { Prisma, Match } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { redis } from '../lib/redis.js';
 import { publicUserMatchSelect } from '../utils/publicUser.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
 import { filterLocationByPrivacy } from '../utils/locationPrivacy.js';
 import { signProfilePicture } from '../utils/profilePicture.js';
+import { computeAge } from '../utils/computeAge.js';
+import { invalidateFeedCacheForUsers } from '../utils/cacheInvalidation.js';
 
 type MatchWithUsers = Prisma.MatchGetPayload<{
     include: {
@@ -18,17 +19,6 @@ type MatchWithUsers = Prisma.MatchGetPayload<{
         messages: true;
     }
 }>;
-
-function computeAge(birthDate: Date | null): number | null {
-    if (!birthDate) return null;
-    const now = new Date();
-    let age = now.getUTCFullYear() - birthDate.getUTCFullYear();
-    const m = now.getUTCMonth() - birthDate.getUTCMonth();
-    if (m < 0 || (m === 0 && now.getUTCDate() < birthDate.getUTCDate())) {
-        age--;
-    }
-    return age;
-}
 
 export class MatchService {
     /**
@@ -53,8 +43,6 @@ export class MatchService {
                     likedUser: { select: { id: true } }
                 }
             });
-
-            console.log('DEBUG: Like record fetched:', JSON.stringify(like, null, 2));
 
             if (!like) {
                 console.warn('Accept attempt on non-existent like', {
@@ -95,8 +83,6 @@ export class MatchService {
             outerLikerId = likerId;
             outerLikedId = likedId;
 
-            console.log('DEBUG: Extracted IDs - likerId:', likerId, 'likedId:', likedId);
-
             const [u1, u2] = [likerId, likedId].sort();
 
             const existingMatch = await tx.match.findUnique({
@@ -104,10 +90,26 @@ export class MatchService {
             });
 
             if (existingMatch) {
+                let resolvedMatch: Match;
                 if (existingMatch.status === 'unmatched') {
-                    throw new Error("Cannot re-match with this user.");
+                    resolvedMatch = await tx.match.update({
+                        where: { id: existingMatch.id },
+                        data: {
+                            status: 'active',
+                            blockedBy: null,
+                            conversationStartAt: new Date(),
+                        },
+                    });
+                } else {
+                    resolvedMatch = existingMatch;
                 }
-                return existingMatch;
+
+                await tx.like.update({
+                    where: { id: likeId },
+                    data: { status: 'archived' },
+                });
+
+                return resolvedMatch;
             }
 
             const newMatch = await tx.match.create({
@@ -138,10 +140,9 @@ export class MatchService {
             // 4. Create Initial Messages
             // Message 1: The Liker's Intro (User B)
             const now = new Date();
-            
+
             // Create Intro Message (from Liker)
             if (introContent && likerId) {
-                console.log('Creating intro message with senderId:', likerId);
                 await tx.message.create({
                     data: {
                         match: { connect: { id: newMatch.id } },
@@ -156,15 +157,14 @@ export class MatchService {
             if (replyMessage && replyMessage.trim().length > 0 && likedId) {
                 const sanitizedReply = sanitizeText(replyMessage);
                 if (sanitizedReply.length > 0) {
-                console.log('Creating reply message with senderId:', likedId);
-                await tx.message.create({
-                    data: {
-                        match: { connect: { id: newMatch.id } },
-                        sender: { connect: { id: likedId } },
-                        content: sanitizedReply,
-                        createdAt: new Date(now.getTime() + 1),
-                    }
-                });
+                    await tx.message.create({
+                        data: {
+                            match: { connect: { id: newMatch.id } },
+                            sender: { connect: { id: likedId } },
+                            content: sanitizedReply,
+                            createdAt: new Date(now.getTime() + 1),
+                        }
+                    });
                 }
             }
 
@@ -179,10 +179,7 @@ export class MatchService {
 
         // Cache invalidation AFTER transaction succeeds (prevents inconsistency on rollback)
         // Non-critical: If Redis is down, caches will just stay stale for 5 minutes
-        await Promise.all([
-            redis.del(`feed:${outerLikerId}`),
-            redis.del(`feed:${outerLikedId}`)
-        ]).catch(err => {
+        await invalidateFeedCacheForUsers([outerLikerId, outerLikedId]).catch(err => {
             console.warn('Cache invalidation failed (non-critical):', err.message);
             // Not throwing - match was created successfully, cache will expire naturally
         });
@@ -192,7 +189,7 @@ export class MatchService {
 
     /**
      * Unmatch a user.
-     * Soft-deletes the match by setting status to 'unmatched'.
+     * Soft-updates match status so chat history remains in DB for moderation/audit.
      */
     async unmatch(matchId: string, requestingUserId: string) {
         const match = await prisma.match.findUnique({ where: { id: matchId } });
@@ -212,10 +209,36 @@ export class MatchService {
             throw new Error("Not authorized.");
         }
 
-        return await prisma.match.update({
-            where: { id: matchId },
-            data: { status: 'unmatched' }
+        const user1Id = match.user1Id;
+        const user2Id = match.user2Id;
+
+        const updatedMatch = await prisma.$transaction(async (tx) => {
+            await tx.like.updateMany({
+                where: {
+                    OR: [
+                        { likerId: match.user1Id, likedId: match.user2Id },
+                        { likerId: match.user2Id, likedId: match.user1Id },
+                    ],
+                },
+                data: { status: 'archived' },
+            });
+
+            return await tx.match.update({
+                where: { id: matchId },
+                data: {
+                    status: 'unmatched',
+                    blockedBy: null,
+                    conversationStartAt: new Date(),
+                },
+            });
         });
+
+        // Ensure both users can rediscover each other immediately after unmatch.
+        await invalidateFeedCacheForUsers([user1Id, user2Id]).catch((err) => {
+            console.warn('Cache invalidation failed after unmatch (non-critical):', err.message);
+        });
+
+        return updatedMatch;
     }
 
     /**
@@ -239,7 +262,17 @@ export class MatchService {
                 messages: {
                     take: 1,
                     orderBy: { createdAt: 'desc' },
-                    select: { id: true, content: true, senderId: true, createdAt: true, readAt: true }, // TODO [POST-MVP]: Implement proper read receipts and unread counts server-side.
+                    select: {
+                        id: true,
+                        content: true,
+                        senderId: true,
+                        createdAt: true,
+                        readAt: true,
+                        editedAt: true,
+                        isDeleted: true,
+                        deletedBy: true,
+                        deletedAt: true,
+                    }, // TODO [POST-MVP]: Implement proper read receipts and unread counts server-side.
                 }
             },
             orderBy: {
@@ -252,25 +285,168 @@ export class MatchService {
             const age2 = computeAge(m.user2.birthDate as any);
             const sanitizedUser1 = filterLocationByPrivacy(m.user1);
             const sanitizedUser2 = filterLocationByPrivacy(m.user2);
-            const { birthDate: _b1, city: _c1, country: _ct1, ...u1 } = sanitizedUser1 as any;
-            const { birthDate: _b2, city: _c2, country: _ct2, ...u2 } = sanitizedUser2 as any;
+            const { birthDate: _b1, locationSharing: _ls1, city: _c1, country: _ct1, ...u1 } = sanitizedUser1 as any;
+            const { birthDate: _b2, locationSharing: _ls2, city: _c2, country: _ct2, ...u2 } = sanitizedUser2 as any;
+
+            // Sign both profile pictures in parallel instead of sequentially
+            const [pic1, pic2] = await Promise.all([
+                signProfilePicture(u1.profilePicture),
+                signProfilePicture(u2.profilePicture),
+            ]);
+
+            const conversationStartMs = new Date(m.conversationStartAt).getTime();
+            const visibleMessages = (m.messages ?? []).filter((msg: any) => {
+                return new Date(msg.createdAt).getTime() >= conversationStartMs;
+            });
+
+            const normalizedMessages = visibleMessages.map((msg: any) => {
+                if (!msg?.isDeleted) return msg;
+                const senderName = msg.senderId === userId
+                    ? 'You'
+                    : (msg.senderId === m.user1Id ? u1.name : u2.name);
+                const content = senderName === 'You'
+                    ? 'You deleted a message'
+                    : `${senderName} deleted a message`;
+                return { ...msg, content };
+            });
+
             return {
                 ...m,
-                user1: {
-                    ...u1,
-                    profilePicture: await signProfilePicture(u1.profilePicture),
-                    age: age1
-                },
-                user2: {
-                    ...u2,
-                    profilePicture: await signProfilePicture(u2.profilePicture),
-                    age: age2
-                }
+                user1: { ...u1, profilePicture: pic1, age: age1 },
+                user2: { ...u2, profilePicture: pic2, age: age2 },
+                messages: normalizedMessages,
             };
         }));
 
         const nextCursor = matches.length === limit ? matches[matches.length - 1].id : null;
         return { data: transformed, nextCursor };
+    }
+
+    /**
+     * Get match status (status, blockedBy) for a participant.
+     */
+    async getMatchStatus(matchId: string, userId: string): Promise<{ status: string; blockedBy: string | null; otherUserId: string }> {
+        const match = await prisma.match.findUnique({
+            where: { id: matchId },
+            select: { status: true, blockedBy: true, user1Id: true, user2Id: true },
+        });
+
+        if (
+            !match ||
+            (match.user1Id !== userId && match.user2Id !== userId)
+        ) {
+            throw new Error('Not authorized');
+        }
+
+        const otherUserId = match.user1Id === userId ? match.user2Id : match.user1Id;
+        return { status: match.status, blockedBy: match.blockedBy, otherUserId };
+    }
+
+    /**
+     * Block a match (set status to 'blocked', blockedBy to requesting user).
+     * Only participants can block.
+     */
+    async blockMatch(matchId: string, userId: string) {
+        const match = await prisma.match.findUnique({ where: { id: matchId } });
+
+        if (
+            !match ||
+            match.status === 'unmatched' ||
+            (match.user1Id !== userId && match.user2Id !== userId)
+        ) {
+            throw new Error('Not authorized');
+        }
+
+        const blockedId = match.user1Id === userId ? match.user2Id : match.user1Id;
+
+        const result = await prisma.$transaction(async (tx) => {
+            await tx.block.upsert({
+                where: {
+                    blockerId_blockedId: {
+                        blockerId: userId,
+                        blockedId,
+                    },
+                },
+                create: {
+                    blockerId: userId,
+                    blockedId,
+                },
+                update: {},
+            });
+
+            await tx.like.updateMany({
+                where: {
+                    OR: [
+                        { likerId: userId, likedId: blockedId },
+                        { likerId: blockedId, likedId: userId },
+                    ],
+                },
+                data: { status: 'archived' },
+            });
+
+            return tx.match.update({
+                where: { id: matchId },
+                data: { status: 'blocked', blockedBy: userId },
+            });
+        });
+
+        await invalidateFeedCacheForUsers([userId, blockedId]).catch(() => {});
+
+        return result;
+    }
+
+    /**
+     * Unblock a match. Only the user who blocked can unblock.
+     */
+    async unblockMatch(matchId: string, userId: string) {
+        const match = await prisma.match.findUnique({ where: { id: matchId } });
+
+        if (!match) {
+            throw new Error('Match not found');
+        }
+        if (match.blockedBy !== userId) {
+            throw new Error('Not authorized');
+        }
+
+        const otherUserId = match.user1Id === userId ? match.user2Id : match.user1Id;
+
+        const result = await prisma.$transaction(async (tx) => {
+            await tx.block.deleteMany({
+                where: {
+                    blockerId: userId,
+                    blockedId: otherUserId,
+                },
+            });
+
+            return tx.match.update({
+                where: { id: matchId },
+                data: { status: 'active', blockedBy: null },
+            });
+        });
+
+        await invalidateFeedCacheForUsers([userId, otherUserId]).catch(() => {});
+
+        return result;
+    }
+
+    /**
+     * Hide a match from the requesting user's message list.
+     * Only participants can hide.
+     */
+    async hideMatch(matchId: string, userId: string) {
+        const match = await prisma.match.findUnique({ where: { id: matchId } });
+
+        if (
+            !match ||
+            (match.user1Id !== userId && match.user2Id !== userId)
+        ) {
+            throw new Error('Not authorized');
+        }
+
+        return prisma.match.update({
+            where: { id: matchId },
+            data: { status: 'hidden' },
+        });
     }
 }
 

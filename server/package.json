@@ -37,7 +37,8 @@
     "clean:all": "rm -rf dist node_modules",
     "test": "dotenv -e .env.test -- vitest run",
     "test:watch": "dotenv -e .env.test -- vitest",
-    "test:setup": "echo 'DATABASE_URL=\"postgresql://postgres:postgres@127.0.0.1:54322/postgres\"' > .env.test && echo 'DIRECT_URL=\"postgresql://postgres:postgres@127.0.0.1:54322/postgres\"' >> .env.test && dotenv -e .env.test -- prisma db push",
+    "test:push-location": "npx tsx scripts/test-push-and-location.ts",
+    "test:setup": "echo 'DATABASE_URL=\"postgresql://postgres:postgres@127.0.0.1:54322/postgres\"' > .env.test && echo 'DIRECT_URL=\"postgresql://postgres:postgres@127.0.0.1:54322/postgres\"' >> .env.test && echo 'SUPABASE_URL=\"http://127.0.0.1:54321\"' >> .env.test && echo 'SUPABASE_SERVICE_ROLE_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU\"' >> .env.test && echo 'REDIS_URL=\"redis://127.0.0.1:6379\"' >> .env.test && dotenv -e .env.test -- prisma db push",
     "// === PRE-DEPLOYMENT ===": "",
     "prebuild": "npm run db:generate",
     "prestart:prod": "npm run db:prod:migrate"

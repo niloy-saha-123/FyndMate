@@ -14,14 +14,34 @@ export const publicUserFeedSelect = {
   name: true,
   profilePicture: true,
   bio: true,
-  experience: true,
-  commitment: true,
   skills: true,
   interests: true,
   city: true,
   country: true,
   locationSharing: true,
   githubUsername: true,
+  gender: true,
+  projects: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+  },
+  experiences: {
+    select: {
+      id: true,
+      company: true,
+      position: true,
+      description: true,
+      startDate: true,
+      endDate: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+  },
 } as const;
 
 // Minimal fields for likes inbox preview

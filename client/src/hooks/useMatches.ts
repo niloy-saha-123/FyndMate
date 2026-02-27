@@ -1,11 +1,11 @@
 /**
  * @file client/src/hooks/useMatches.ts
- * @description Custom hook to manage the Active Matches (Chats) state.
+ * @description Custom hook to manage the Active Matches (Messages) state.
  * 
  * RESPONSIBILITIES:
  * 1. Fetching Active Matches.
  * 2. Unmatching users.
- * 3. Blocking users (optional, usually done in chat settings).
+ * 3. Blocking users (optional, usually done in message settings).
  * 
  * NOTE: Token is automatically attached via apiClient from auth context.
  */

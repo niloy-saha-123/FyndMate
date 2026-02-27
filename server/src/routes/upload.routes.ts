@@ -13,6 +13,7 @@ import {
   getPublicUrl,
   deleteFile,
 } from '../services/storage.service.js';
+import { invalidateSignedUrl } from '../utils/profilePicture.js';
 import {
   requestUploadSchema,
   confirmUploadSchema,
@@ -328,8 +329,9 @@ export default async function uploadRoutes(app: FastifyInstance) {
           );
         }
 
-        // Delete old profile picture
+        // Delete old profile picture and invalidate its cached signed URL
         if (currentUser?.profilePicture) {
+          invalidateSignedUrl(currentUser.profilePicture);
           await deleteFile(currentUser.profilePicture);
         }
 

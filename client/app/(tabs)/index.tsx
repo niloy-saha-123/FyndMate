@@ -8,12 +8,11 @@
  * - Skip, Request, and Save actions
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -22,9 +21,9 @@ import {
   Dimensions,
   Linking,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeOutLeft, SlideInRight } from 'react-native-reanimated';
 
 import { useFeed } from '@/src/hooks/useFeed';
@@ -33,45 +32,64 @@ import { COLORS, SHADOWS, BORDERS, RADIUS } from '@/src/theme/colors';
 import { NeoCard } from '@/src/components/NeoCard';
 import { NeoButton } from '@/src/components/NeoButton';
 import { NeoChip, ChipContainer } from '@/src/components/NeoChip';
+import {
+  INTRO_MESSAGE_MIN_LENGTH,
+  INTRO_MESSAGE_MAX_LENGTH,
+  isIntroMessageValid,
+  getIntroMessageError,
+} from '@/src/constants/validation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function FeedScreen() {
   const { top, bottom } = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
-  const { profiles, loading, error, hasMore, fetchFeed, swipe } = useFeed();
+  const { profiles, loading, error, hasMore, fetchFeed, swipe, swipeError, clearSwipeError } = useFeed();
 
   const [message, setMessage] = useState('');
-  const MAX_MESSAGE_LENGTH = 500;
-  const MIN_MESSAGE_LENGTH = 10;
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const autoRefreshInFlight = useRef(false);
 
-  useEffect(() => {
-    // Fetch once on mount. Avoid depending on `fetchFeed` which recreates
-    // when internal hook state changes and can cause an infinite fetch loop.
-    fetchFeed();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Computed validation state
+  const introMessageError = getIntroMessageError(message);
+  const isIntroValid = isIntroMessageValid(message);
+
+  // useFeed loads cache + fetches 5 on mount. No explicit fetch needed.
 
   const currentProfile = profiles[currentIndex];
+  const formatMonth = (value?: string | null) => {
+    if (!value) return '';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      const monthMatch = /^(\d{4}-\d{2})/.exec(value);
+      return monthMatch ? monthMatch[1] : value;
+    }
+    return parsed.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  };
 
   const handleSkip = async () => {
     if (!currentProfile) return;
-    await swipe(currentProfile.id, false);
-    // Note: Don't increment currentIndex - swipe() removes the profile from array
+    await swipe(currentProfile.id, false, undefined, 'skip_button');
   };
 
   const handleLike = async () => {
     if (!currentProfile) return;
-    if (message.length < MIN_MESSAGE_LENGTH || message.length > MAX_MESSAGE_LENGTH) {
-      return;
+    if (!isIntroValid) return;
+    const result = await swipe(currentProfile.id, true, message, 'request_modal');
+    if (result && (result.matched || !result.error)) {
+      setMessage('');
+      setShowRequestModal(false);
     }
-    await swipe(currentProfile.id, true, message);
-    setMessage('');
-    setShowRequestModal(false);
-    // Note: Don't increment currentIndex - swipe() removes the profile from array
+    // On error, modal stays open so user can fix validation (e.g. field 'message') and retry
   };
+
+  const handleRetrySwipe = async () => {
+    if (!swipeError) return;
+    await swipe(swipeError.profileId, swipeError.liked, swipeError.message, 'retry');
+  };
+
+  const showSwipeRetry = swipeError && currentProfile && swipeError.profileId === currentProfile.id;
 
   const handleSave = () => {
     // Visual feedback - bookmark functionality
@@ -87,17 +105,22 @@ export default function FeedScreen() {
     setMessage('');
   };
 
-  const insertTemplate = (type: 'hackathon' | 'project' | 'startup') => {
-    const templates = {
-      hackathon:
-        "Hey! I'm looking for a teammate for an upcoming hackathon focused on [topic]. Your experience with ",
-      project:
-        "Hi! I'm working on a side project and think your skills would be a great fit. ",
-      startup:
-        "Hello! I'm building a startup in the [industry] space and looking for a technical co-founder. ",
-    };
-    setMessage(templates[type]);
-  };
+  // Auto-refresh when feed is empty so newly joined users appear without manual action.
+  useEffect(() => {
+    if (currentProfile || loading) return;
+
+    const interval = setInterval(async () => {
+      if (autoRefreshInFlight.current) return;
+      autoRefreshInFlight.current = true;
+      try {
+        await fetchFeed(true);
+      } finally {
+        autoRefreshInFlight.current = false;
+      }
+    }, 90 * 1000);
+
+    return () => clearInterval(interval);
+  }, [currentProfile, loading, fetchFeed]);
 
   // Loading state
   if (loading && profiles.length === 0) {
@@ -133,7 +156,9 @@ export default function FeedScreen() {
             <Ionicons name="search" size={48} color={COLORS.primary} />
           </View>
           <Text style={styles.emptyTitle}>No more profiles</Text>
-          <Text style={styles.emptySubtitle}>Check back later for more collaborators!</Text>
+          <Text style={styles.emptySubtitle}>
+            Check back later for more profiles or refresh to see people you have passed.
+          </Text>
           <NeoButton
             title="Refresh"
             onPress={() => {
@@ -151,23 +176,15 @@ export default function FeedScreen() {
     <View style={[styles.container, { paddingTop: top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.geoCircle} />
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Collab</Text>
-          <Text style={styles.headerSubtitle}>FIND COLLABORATORS IN TECH</Text>
+          <Text style={styles.headerTitle}>Troupe</Text>
         </View>
-        <Ionicons
-          name="sparkles"
-          size={20}
-          color={COLORS.accent}
-          style={styles.sparkle}
-        />
       </View>
 
       {/* Profile Card */}
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottom + 120 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottom + 80 }]}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View
@@ -176,60 +193,58 @@ export default function FeedScreen() {
           exiting={FadeOutLeft.duration(200)}
         >
           <NeoCard style={styles.profileCard}>
-            {/* Card Header */}
-            <View style={styles.cardHeader}>
-              <View style={styles.cardBadge}>
-                <Text style={styles.cardBadgeText}>COLLAB</Text>
+            {/* Swipe failure retry banner */}
+            {showSwipeRetry && (
+              <View style={styles.swipeErrorBanner}>
+                <Ionicons name="alert-circle" size={20} color={COLORS.danger} />
+                <Text style={styles.swipeErrorText}>Couldn&apos;t send. Tap Retry to try again.</Text>
+                <TouchableOpacity
+                  style={styles.swipeRetryButton}
+                  onPress={handleRetrySwipe}
+                >
+                  <Text style={styles.swipeRetryButtonText}>Retry</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.swipeDismissButton}
+                  onPress={clearSwipeError}
+                >
+                  <Ionicons name="close" size={20} color={COLORS.textSecondary} />
+                </TouchableOpacity>
               </View>
-              <Ionicons name="star" size={16} color={COLORS.accent} />
-            </View>
+            )}
 
-            {/* Profile Image */}
-            <View style={styles.imageContainer}>
-              {currentProfile.profilePicture ? (
-                <Image
-                  source={{ uri: currentProfile.profilePicture }}
-                  style={styles.profileImage}
-                />
-              ) : (
-                <View style={[styles.profileImage, styles.noPhotoPlaceholder]}>
-                  <Ionicons name="person" size={80} color={COLORS.border} />
-                </View>
-              )}
-              <View style={styles.imageGeoCircle} />
+
+            {/* Profile Image - progressive load with placeholder → sharp transition */}
+            <View style={{ paddingHorizontal: 12, paddingTop: 12 }}>
+              <View style={styles.imageContainer}>
+                {currentProfile.profilePicture ? (
+                  <Image
+                    source={{ uri: currentProfile.profilePicture }}
+                    style={styles.profileImage}
+                    contentFit="cover"
+                    transition={300}
+                  />
+                ) : (
+                  <View style={[styles.profileImage, styles.noPhotoPlaceholder]}>
+                    <Ionicons name="person" size={80} color={COLORS.border} />
+                  </View>
+                )}
+              </View>
             </View>
 
             {/* Basic Info */}
             <View style={styles.infoSection}>
-              <Text style={styles.profileName}>{currentProfile.name}</Text>
-              <Text style={styles.profileMeta}>
-                {currentProfile.age ? `${currentProfile.age}` : ''}
+              <Text style={styles.profileName}>
+                {currentProfile.name}
+                {currentProfile.age != null ? ` | ${currentProfile.age}` : ''}
               </Text>
             </View>
-
-            {/* Hatched Divider */}
-            <LinearGradient
-              colors={['#F9A8D4', '#F472B6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.hatchedDivider}
-            />
 
             {/* Bio */}
             <View style={styles.sectionPadding}>
               <Text style={styles.bioText} numberOfLines={3}>
                 {currentProfile.bio || 'No bio available'}
               </Text>
-
-              {/* Meta tags */}
-              <ChipContainer style={{ marginTop: 12 }}>
-                {currentProfile.experience && (
-                  <NeoChip label={`${currentProfile.experience} experience`} variant="meta" />
-                )}
-                {currentProfile.commitment && (
-                  <NeoChip label={currentProfile.commitment} variant="meta" />
-                )}
-              </ChipContainer>
 
               {/* GitHub Link */}
               {currentProfile.githubUsername && (
@@ -244,26 +259,10 @@ export default function FeedScreen() {
               )}
             </View>
 
-            {/* Looking For */}
-            {currentProfile.lookingFor && currentProfile.lookingFor.length > 0 && (
-              <View style={styles.sectionPadding}>
-                <View style={styles.sectionHeader}>
-                  <View style={styles.geoCircleSmall} />
-                  <Text style={styles.sectionTitle}>Looking for</Text>
-                </View>
-                <ChipContainer>
-                  {currentProfile.lookingFor.map((item: string, idx: number) => (
-                    <NeoChip key={idx} label={item} variant="looking" />
-                  ))}
-                </ChipContainer>
-              </View>
-            )}
-
             {/* Skills */}
             {currentProfile.skills && currentProfile.skills.length > 0 && (
               <View style={styles.sectionPadding}>
                 <View style={styles.sectionHeader}>
-                  <View style={styles.diamondIcon} />
                   <Text style={styles.sectionTitle}>Skills</Text>
                 </View>
                 <ChipContainer>
@@ -279,8 +278,75 @@ export default function FeedScreen() {
               </View>
             )}
 
+            {/* Interests */}
+            {(currentProfile.interests ?? []).length > 0 && (
+              <View style={styles.sectionPadding}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Interests</Text>
+                </View>
+                <ChipContainer>
+                  {(currentProfile.interests ?? []).map((item: string, idx: number) => (
+                    <NeoChip key={idx} label={item} variant="looking" />
+                  ))}
+                </ChipContainer>
+              </View>
+            )}
+
+            {/* Experience */}
+            {currentProfile.experiences && currentProfile.experiences.length > 0 && (
+              <View style={styles.sectionPadding}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, styles.iconlessSectionTitle]}>Experience</Text>
+                </View>
+                {currentProfile.experiences.slice(0, 5).map((experience, index) => (
+                  <View key={experience.id ?? `experience-${index}`} style={styles.portfolioItem}>
+                    <Text style={styles.portfolioTitle}>
+                      {experience.position}{experience.company ? ` @ ${experience.company}` : ''}
+                    </Text>
+                    {experience.description ? (
+                      <Text style={styles.portfolioDescription}>{experience.description}</Text>
+                    ) : null}
+                    {(experience.startDate || experience.endDate) ? (
+                      <Text style={styles.portfolioTimeline}>
+                        {(formatMonth(experience.startDate) || 'Start')} - {(formatMonth(experience.endDate) || 'Present')}
+                      </Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Projects */}
+            {currentProfile.projects && currentProfile.projects.length > 0 && (
+              <View style={styles.sectionPadding}>
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, styles.iconlessSectionTitle]}>Projects</Text>
+                </View>
+                {currentProfile.projects.slice(0, 5).map((project, index) => (
+                  <View key={project.id ?? `project-${index}`} style={styles.portfolioItem}>
+                    <Text style={styles.portfolioTitle}>{project.name}</Text>
+                    <Text style={styles.portfolioDescription}>{project.description}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Location - at bottom (city and country only) */}
+            {(currentProfile.city || currentProfile.country) && (
+              <View style={styles.sectionPadding}>
+                <View style={styles.sectionHeader}>
+                  <Ionicons name="location-outline" size={16} color={COLORS.primary} style={{ marginRight: 8 }} />
+                  <Text style={styles.sectionTitle}>Location</Text>
+                </View>
+                <Text style={styles.profileLocation}>
+                  {[currentProfile.city, currentProfile.country].filter(Boolean).join(', ')}
+                </Text>
+              </View>
+            )}
+
             {/* CTA at bottom of card */}
-            <View style={styles.cardCTA}>
+            {/* CTA at bottom of card - REMOVED as per user request */}
+            {/* <View style={styles.cardCTA}>
               <Text style={styles.ctaText}>
                 Want to collaborate with {currentProfile.name?.split(' ')[0]}?
               </Text>
@@ -290,34 +356,20 @@ export default function FeedScreen() {
                 icon={<Ionicons name="star" size={16} color="#FDE047" />}
                 fullWidth
               />
+            </View> */}
+
+            {/* Action Buttons - at bottom of card */}
+            <View style={styles.cardActions}>
+              <NeoButton title="Skip" onPress={handleSkip} variant="secondary" />
+              <NeoButton
+                title="Request"
+                onPress={openRequestModal}
+                style={{ flex: 2, marginHorizontal: 12 }}
+              />
             </View>
           </NeoCard>
         </Animated.View>
       </ScrollView>
-
-      {/* Bottom Action Bar */}
-      <LinearGradient
-        colors={['#F9A8D4', '#F472B6']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.actionBar, { paddingBottom: bottom + 16 }]}
-      >
-        <View style={styles.actionBarInner}>
-          <NeoButton title="Skip" onPress={handleSkip} variant="secondary" />
-          <NeoButton
-            title="Request"
-            onPress={openRequestModal}
-            icon={<Ionicons name="star" size={16} color="#FDE047" />}
-            style={{ flex: 2, marginHorizontal: 12 }}
-          />
-          <TouchableOpacity
-            onPress={handleSave}
-            style={[styles.bookmarkButton, SHADOWS.medium]}
-          >
-            <Ionicons name="bookmark-outline" size={20} color={COLORS.textPrimary} />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
 
       {/* Request Modal */}
       <Modal
@@ -337,8 +389,7 @@ export default function FeedScreen() {
 
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <Ionicons name="star" size={20} color={COLORS.accent} />
-              <Text style={styles.modalTitle}>Send Collaboration Request</Text>
+              <Text style={styles.modalTitle}>Send Request</Text>
             </View>
             <Text style={styles.modalSubtitle}>
               Include a short message so they know why you reached out.
@@ -350,6 +401,8 @@ export default function FeedScreen() {
                 <Image
                   source={{ uri: currentProfile.profilePicture || '' }}
                   style={styles.modalAvatar}
+                  contentFit="cover"
+                  transition={200}
                 />
               ) : (
                 <View style={[styles.modalAvatar, styles.noPhotoPlaceholderSmall]}>
@@ -362,53 +415,32 @@ export default function FeedScreen() {
               </View>
             </View>
 
-            {/* Template Buttons */}
-            <View style={styles.templateButtons}>
-              <TouchableOpacity
-                style={[styles.templateBtn, { backgroundColor: COLORS.lookingBg }]}
-                onPress={() => insertTemplate('hackathon')}
-              >
-                <Text style={[styles.templateBtnText, { color: COLORS.lookingText }]}>
-                  Hackathon teammate
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.templateBtn, { backgroundColor: COLORS.skillBg }]}
-                onPress={() => insertTemplate('project')}
-              >
-                <Text style={[styles.templateBtnText, { color: COLORS.skillText }]}>
-                  Side project partner
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.templateBtn, { backgroundColor: COLORS.greenBg }]}
-                onPress={() => insertTemplate('startup')}
-              >
-                <Text style={[styles.templateBtnText, { color: COLORS.greenText }]}>
-                  Long-term collaborator
-                </Text>
-              </TouchableOpacity>
-            </View>
-
             {/* Message Input */}
             <TextInput
-              style={styles.messageInput}
+              style={[
+                styles.messageInput,
+                message.length > INTRO_MESSAGE_MAX_LENGTH && styles.messageInputError
+              ]}
               placeholder="Explain what you're building or learning and why you want to collaborate."
               placeholderTextColor={COLORS.textLight}
               value={message}
               onChangeText={setMessage}
-              maxLength={MAX_MESSAGE_LENGTH}
+              maxLength={INTRO_MESSAGE_MAX_LENGTH + 50} // Allow slight overflow to show error
               multiline
               textAlignVertical="top"
             />
 
             <View style={styles.charCountRow}>
-              <Text style={styles.charCount}>{message.length}/{MAX_MESSAGE_LENGTH}</Text>
-              {message.length > 0 && message.length < MIN_MESSAGE_LENGTH && (
-                <Text style={styles.charError}>Minimum {MIN_MESSAGE_LENGTH} characters required</Text>
-              )}
-              {message.length > MAX_MESSAGE_LENGTH && (
-                <Text style={styles.charError}>Maximum {MAX_MESSAGE_LENGTH} characters</Text>
+              <Text style={[
+                styles.charCount,
+                message.length > INTRO_MESSAGE_MAX_LENGTH && styles.charCountError
+              ]}>
+                {message.length}/{INTRO_MESSAGE_MAX_LENGTH}
+              </Text>
+              {(introMessageError || (swipeError?.field === 'message' && swipeError?.profileId === currentProfile?.id && swipeError?.errorMessage)) && (
+                <Text style={styles.charError}>
+                  {introMessageError || swipeError?.errorMessage}
+                </Text>
               )}
             </View>
 
@@ -422,18 +454,13 @@ export default function FeedScreen() {
               <NeoButton
                 title="Send request"
                 onPress={handleLike}
-                disabled={message.length < MIN_MESSAGE_LENGTH || message.length > MAX_MESSAGE_LENGTH}
+                disabled={!isIntroValid}
                 style={{ flex: 1, marginLeft: 12 }}
               />
             </View>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-
-      {/* Debug info */}
-      <Text style={styles.debugText}>
-        {profiles.length - currentIndex - 1} profiles remaining
-      </Text>
     </View>
   );
 }
@@ -457,7 +484,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
     backgroundColor: COLORS.background,
     borderBottomWidth: BORDERS.thin,
     borderBottomColor: COLORS.border,
@@ -506,6 +533,40 @@ const styles = StyleSheet.create({
   profileCard: {
     marginBottom: 16,
   },
+  swipeErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 8,
+    borderRadius: RADIUS.small,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.danger,
+    gap: 10,
+  },
+  swipeErrorText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.danger,
+  },
+  swipeRetryButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: RADIUS.small,
+  },
+  swipeRetryButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.surface,
+  },
+  swipeDismissButton: {
+    padding: 4,
+  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -530,7 +591,7 @@ const styles = StyleSheet.create({
 
   // Image
   imageContainer: {
-    marginHorizontal: 16,
+    width: '100%',
     aspectRatio: 4 / 5,
     borderRadius: RADIUS.medium,
     overflow: 'hidden',
@@ -577,20 +638,16 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 4,
   },
+  profileLocation: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
   profileMeta: {
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.skillText,
-  },
-
-  // Divider
-  hatchedDivider: {
-    height: 20,
-    marginHorizontal: 16,
-    borderRadius: 4,
-    borderLeftWidth: BORDERS.medium,
-    borderRightWidth: BORDERS.medium,
-    borderColor: COLORS.border,
   },
 
   // Sections
@@ -627,11 +684,40 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.textPrimary,
   },
+  iconlessSectionTitle: {
+    marginLeft: 1,
+  },
   bioText: {
     fontSize: 16,
     fontWeight: '500',
     color: COLORS.textPrimary,
     lineHeight: 24,
+  },
+  portfolioItem: {
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.small,
+    padding: 12,
+    marginBottom: 10,
+  },
+  portfolioTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  portfolioDescription: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+    color: COLORS.textSecondary,
+  },
+  portfolioTimeline: {
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.textMuted,
   },
   moreSkills: {
     fontSize: 12,
@@ -674,6 +760,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
+  // Card Actions (Skip/Request buttons)
+  cardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderTopWidth: BORDERS.thin,
+    borderTopColor: COLORS.border,
+    marginTop: 8,
+  },
+
   // Action Bar
   actionBar: {
     position: 'absolute',
@@ -682,8 +778,7 @@ const styles = StyleSheet.create({
     right: 0,
     paddingTop: 16,
     paddingHorizontal: 16,
-    borderTopWidth: BORDERS.medium,
-    borderTopColor: COLORS.border,
+
   },
   actionBarInner: {
     flexDirection: 'row',
@@ -782,7 +877,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: COLORS.textPrimary,
-    marginLeft: 8,
   },
   modalSubtitle: {
     fontSize: 14,
@@ -819,24 +913,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.skillText,
   },
-  templateButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  templateBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: RADIUS.full,
-    borderWidth: BORDERS.thin,
-    borderColor: COLORS.border,
-    ...SHADOWS.small,
-  },
-  templateBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
   messageInput: {
     borderWidth: BORDERS.thin,
     borderColor: COLORS.border,
@@ -849,6 +925,10 @@ const styles = StyleSheet.create({
     minHeight: 120,
     ...SHADOWS.medium,
   },
+  messageInputError: {
+    borderColor: COLORS.danger,
+    borderWidth: 2,
+  },
   charCountRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -860,25 +940,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textMuted,
   },
+  charCountError: {
+    color: COLORS.danger,
+  },
   charError: {
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.danger,
+    flexShrink: 1,
   },
   modalActions: {
     flexDirection: 'row',
-  },
-
-  // Debug
-  debugText: {
-    position: 'absolute',
-    bottom: 70,
-    alignSelf: 'center',
-    fontSize: 12,
-    color: COLORS.textLight,
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
   },
 });

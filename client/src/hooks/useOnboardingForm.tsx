@@ -31,7 +31,7 @@ export function OnboardingProvider({
   const startingData = useMemo<OnboardingData>(() => {
     if (!initialProfile) return defaultData;
     return {
-      fullName: initialProfile.fullName ?? "",
+      fullName: initialProfile.name ?? "",
       birthDate: initialProfile.birthDate ?? null,
       gender: initialProfile.gender ?? null,
     };

@@ -28,6 +28,7 @@
 
 import pRetry from 'p-retry';
 import { getApiBaseUrl } from '../lib/apiClient';
+import { PROFILE_PICTURE_MAX_SIZE_MB } from '../constants/validation';
 
 // API base URL - use centralized resolver for consistent localhost handling
 const API_BASE_URL = getApiBaseUrl();
@@ -48,6 +49,24 @@ export interface UploadError {
   error: string;
   details?: string;
   remainingUploads?: number;
+  retryAfter?: number;
+}
+
+/**
+ * Custom error class for rate limit exceeded
+ * Contains retry information for UI display
+ */
+export class RateLimitError extends Error {
+  public retryAfter: number;
+  public retryAfterMinutes: number;
+
+  constructor(retryAfterSeconds: number, message?: string) {
+    const minutes = Math.ceil(retryAfterSeconds / 60);
+    super(message || `Rate limit exceeded. Try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`);
+    this.name = 'RateLimitError';
+    this.retryAfter = retryAfterSeconds;
+    this.retryAfterMinutes = minutes;
+  }
 }
 
 /**
@@ -83,6 +102,7 @@ export async function requestUploadUrl(
 ): Promise<UploadRequestResponse> {
   // Retry network requests up to 3 times with exponential backoff
   // This handles temporary network issues (WiFi drops, 4G->WiFi switches, etc.)
+  // NOTE: 429 rate limit errors are NOT retried - they are thrown immediately
   return await pRetry(
     async () => {
       const response = await fetch(`${API_BASE_URL}/api/upload/profile-picture/request`, {
@@ -94,6 +114,13 @@ export async function requestUploadUrl(
         body: JSON.stringify({ fileExtension }),
       });
 
+      // Handle rate limiting (429) - do not retry, throw immediately
+      if (response.status === 429) {
+        const retryAfterHeader = response.headers.get('Retry-After');
+        const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 3600;
+        throw new RateLimitError(retryAfterSeconds);
+      }
+
       if (!response.ok) {
         const error: UploadError = await response.json();
         throw new Error(error.details || error.error || 'Failed to request upload URL');
@@ -103,7 +130,11 @@ export async function requestUploadUrl(
     },
     {
       retries: 3,
+      // Don't retry rate limit errors
+      shouldRetry: (error) => !(error instanceof RateLimitError),
       onFailedAttempt: (error) => {
+        // Skip logging for rate limit errors (they won't be retried anyway)
+        if (error instanceof RateLimitError) return;
         console.log(
           `Request upload URL attempt ${error.attemptNumber} failed. ` +
           `${error.retriesLeft} retries left.`
@@ -232,20 +263,15 @@ export async function uploadProfilePicture(
   onProgress?: (step: string, progress: number) => void
 ): Promise<string> {
   try {
-    // Step 1: Extract file extension and validate
     const fileExtension = getFileExtension(imageUri);
 
-    // Step 2: Request signed upload URL
-    // (Kabbo: This is very fast, ~100-200ms)
+    onProgress?.('uploading', 0);
     const uploadRequest = await requestUploadUrl(fileExtension, authToken);
 
-    // Step 3: Upload file to Supabase
-    // (Kabbo: This is the slow part, 1-3 seconds depending on image size and network)
     await uploadToSupabase(uploadRequest.signedUrl, imageUri);
 
-    // Step 4: Confirm upload and get final URL
-    // (Kabbo: Fast again, ~200-400ms)
     const confirmation = await confirmUpload(uploadRequest.uploadPath, authToken);
+    onProgress?.('complete', 100);
 
     return confirmation.publicUrl;
 
@@ -279,8 +305,8 @@ export async function validateImage(imageUri: string): Promise<{
     const blob = await response.blob();
     const sizeInMB = blob.size / (1024 * 1024);
 
-    if (sizeInMB > 5) {
-      return { valid: false, error: 'Image file is too large (max 5MB)' };
+    if (sizeInMB > PROFILE_PICTURE_MAX_SIZE_MB) {
+      return { valid: false, error: `Image file is too large (max ${PROFILE_PICTURE_MAX_SIZE_MB}MB)` };
     }
 
     return { valid: true, size: blob.size };

@@ -8,7 +8,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-
 model User {
   id                          String                        @id @default(uuid())
   supabaseId                  String                        @unique
@@ -16,7 +15,6 @@ model User {
   name                        String
   profilePicture              String?
   bio                         String?
-  experience                  String?
   skills                      String[]
   interests                   String[]
   commitment                  String?
@@ -37,15 +35,6 @@ model User {
   locationSharing             String                        @default("off")
   longitude                   Float?
   locationPermission          String?
-  // TODO [PREMIUM FEATURE]: Add radius-based matching fields:
-  //   searchLatitude            Float?       // User's search center (can differ from actual location)
-  //   searchLongitude           Float?       // For "search in New York" while living elsewhere
-  //   searchCity                String?      // Display "Currently searching in X"
-  //   searchCountry             String?      // Display country
-  //   searchRadiusKm            Int?         // User's preferred radius (5, 10, 25, 50 km)
-  //   searchSetAt               DateTime?    // When they set custom search location
-  // NOTE: These fields separate "where I am" from "where I'm searching"
-  // SECURITY: These are INTERNAL ONLY for distance calculations, NEVER expose in API responses
   pushToken                   String?
   pushTokenUpdatedAt          DateTime?                     @db.Timestamp(6)
   location                    String?                       @default("Unknown")
@@ -56,6 +45,7 @@ model User {
   auditLogs                   AuditLog[]                    @relation("UserAuditLogs")
   blocksReceived              Block[]                       @relation("BlocksReceived")
   blocksMade                  Block[]                       @relation("BlocksMade")
+  experiences                 Experience[]
   likesReceived               Like[]                        @relation("LikesReceived")
   likesMade                   Like[]                        @relation("LikesMade")
   matchesAsUser1              Match[]                       @relation("User1Matches")
@@ -63,6 +53,8 @@ model User {
   MatchNotificationPreference MatchNotificationPreference[]
   sentMessages                Message[]                     @relation("SentMessages")
   projects                    Project[]
+  reportsReceived             Report[]                      @relation("ReportsReceived")
+  reportsMade                 Report[]                      @relation("ReportsMade")
   uploadSessions              UploadSession[]               @relation("UserUploadSessions")
 
   @@index([supabaseId])
@@ -84,6 +76,22 @@ model Project {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model Experience {
+  id          String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId      String
+  company     String
+  position    String
+  description String?
+  startDate   DateTime? @db.Date
+  endDate     DateTime? @db.Date
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Like {
@@ -111,6 +119,7 @@ model Match {
   status                      String                        @default("active")
   createdAt                   DateTime                      @default(now())
   blockedBy                   String?
+  conversationStartAt         DateTime                      @default(now()) @db.Timestamp(6)
   user1                       User                          @relation("User1Matches", fields: [user1Id], references: [id], onDelete: Cascade)
   user2                       User                          @relation("User2Matches", fields: [user2Id], references: [id], onDelete: Cascade)
   MatchNotificationPreference MatchNotificationPreference[]
@@ -135,6 +144,19 @@ model Block {
   @@index([blockedId])
 }
 
+model Report {
+  id         String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  reporterId String
+  reportedId String
+  reason     String
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  reported   User     @relation("ReportsReceived", fields: [reportedId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  reporter   User     @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([reporterId, createdAt])
+  @@index([reportedId, createdAt])
+}
+
 model Message {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   matchId   String
@@ -143,6 +165,9 @@ model Message {
   createdAt DateTime  @default(now())
   readAt    DateTime?
   editedAt  DateTime? @db.Timestamp(6)
+  isDeleted Boolean   @default(false)
+  deletedBy String?
+  deletedAt DateTime? @db.Timestamp(6)
   match     Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
   sender    User      @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
 
@@ -204,6 +229,31 @@ model MatchNotificationPreference {
   User      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([matchId, userId], map: "MatchNotificationPreference_unique")
+  @@unique([matchId, userId], map: "unique_match_user_notification")
   @@index([matchId], map: "idx_match_notification_pref_match")
   @@index([userId], map: "idx_match_notification_pref_user")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model User_experience_backup {
+  id           String?
+  experience   String?
+  backed_up_at DateTime? @db.Timestamptz(6)
+
+  @@map("_User_experience_backup")
+  @@ignore
+}
+
+model deleted_account_retention {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                String
+  supabase_id            String
+  email                  String?
+  deleted_at             DateTime  @default(now()) @db.Timestamptz(6)
+  retention_ends_at      DateTime  @db.Timestamptz(6)
+  quarantined_file_paths String[]  @default([])
+  metadata               Json      @default("{}")
+  purged_at              DateTime? @db.Timestamptz(6)
+
+  @@index([deleted_at(sort: Desc)], map: "idx_deleted_account_retention_deleted_at")
 }

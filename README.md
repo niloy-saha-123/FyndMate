@@ -44,7 +44,7 @@ FyndMate uses a **Supabase + Fastify Hybrid** architecture designed for rapid MV
 |-------|------------|------------------|
 | **Auth & Storage** | Supabase | User authentication, PostgreSQL hosting, image/file storage |
 | **Core Logic** | Fastify (Node.js) | Swiping logic, match algorithms, feed generation, Socket.io messaging |
-| **Real-time Chat** | Socket.io | Direct WebSocket connections (NOT Supabase Realtime) |
+| **Real-time Messages** | Socket.io | Direct WebSocket connections (NOT Supabase Realtime) |
 | **Database Access** | Prisma ORM | Type-safe queries against Supabase PostgreSQL |
 
 ```
@@ -65,7 +65,7 @@ FyndMate uses a **Supabase + Fastify Hybrid** architecture designed for rapid MV
 │  ┌─────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
 │  │   Auth      │  │    Business     │  │      Socket.io          │  │
 │  │ Middleware  │  │     Logic       │  │     (Real-time)         │  │
-│  │  (Verify    │  │  (Swiping,      │  │  (Chat messages,        │  │
+│  │  (Verify    │  │  (Swiping,      │  │  (Message stream,        │  │
 │  │   Supabase  │  │   Matching,     │  │   typing indicators)    │  │
 │  │   tokens)   │  │   Feed)         │  │                         │  │
 │  └─────────────┘  └─────────────────┘  └─────────────────────────┘  │
@@ -359,7 +359,7 @@ FyndMate/
 │   │   │   ├── messages.tsx       # Messages/conversations list
 │   │   │   ├── profile.tsx        # User's own profile
 │   │   │   └── _layout.tsx        # Bottom tab navigator
-│   │   ├── chat/[id].tsx          # Individual chat screen
+│   │   ├── messages/[id].tsx          # Individual message screen
 │   │   └── profile/[id].tsx       # View other user's profile
 │   ├── src/
 │   │   ├── components/
@@ -370,13 +370,13 @@ FyndMate/
 │   │   │   ├── ProjectsSection.tsx
 │   │   │   ├── GitHubActivityGraph.tsx
 │   │   │   ├── SwipeButtons.tsx   # Like/pass buttons
-│   │   │   ├── MessageList.tsx    # Chat message list
-│   │   │   └── MessageInput.tsx   # Chat input component
+│   │   │   ├── MessageList.tsx    # Message list
+│   │   │   └── MessageInput.tsx   # Message input component
 │   │   ├── hooks/
 │   │   │   ├── useAuth.ts         # Supabase auth hook wrapper
 │   │   │   ├── useMatches.ts      # Fetch matches
 │   │   │   ├── useDevelopers.ts   # Fetch developer cards
-│   │   │   ├── useMessages.ts     # Chat messages hook
+│   │   │   ├── useMessages.ts     # Message stream hook
 │   │   │   ├── useSocket.ts       # Socket.io connection
 │   │   │   └── useGitHubActivity.ts # GitHub API hook
 │   │   ├── lib/
@@ -515,7 +515,7 @@ FyndMate/
 ### Phase 4: Messaging
 1. Socket.io server setup (on Fastify)
 2. Real-time messaging implementation
-3. Chat UI components
+3. Message UI components
 4. Message persistence
 5. Read receipts
 

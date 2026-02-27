@@ -15,8 +15,11 @@ import { locationRoutes } from './routes/location.js';
 import authRoutes from './routes/auth.js';
 import feedRoutes from './routes/feed.routes.js';
 import matchingRoutes from './routes/matching.routes.js';
+import messageRoutes from './routes/message.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import notificationRoutes from './routes/notifications.routes.js';
+
+const PERF_DEBUG_ENABLED = process.env.DEBUG_PERF_LOGS === '1';
 
 export async function buildApp() {
   const app = Fastify({
@@ -48,6 +51,28 @@ export async function buildApp() {
    */
   app.addHook('onSend', sanitizeLocationResponse);
 
+  if (PERF_DEBUG_ENABLED) {
+    app.addHook('onRequest', async (request) => {
+      (request as any).__perfStartedAt = Date.now();
+    });
+
+    app.addHook('onResponse', async (request, reply) => {
+      const startedAt = (request as any).__perfStartedAt as number | undefined;
+      if (!startedAt) return;
+      const durationMs = Date.now() - startedAt;
+      app.log.info(
+        {
+          method: request.method,
+          url: request.url,
+          route: request.routeOptions?.url,
+          statusCode: reply.statusCode,
+          durationMs,
+        },
+        'Route timing'
+      );
+    });
+  }
+
   app.addHook('onClose', async () => {
     await prisma.$disconnect();
     await redis.quit();
@@ -59,31 +84,19 @@ export async function buildApp() {
   });
 
   // Redis health check endpoint
-  // TODO [1K Users]: Protect this endpoint with authentication
-  // TODO [2K Users]: Add detailed metrics (memory usage, connection pool, etc.)
+  // Redacted response: exposes only status, no internal details (failure counts, errors, store sizes)
   app.get('/health/redis', async (req, reply) => {
     try {
       const { rateLimiter } = await import('./rate-limiting/index.js');
       const healthStatus = (rateLimiter as any).getHealthStatus();
-      
+
       return {
         status: healthStatus.redis.healthy ? 'healthy' : 'degraded',
-        redis: {
-          healthy: healthStatus.redis.healthy,
-          consecutiveFailures: healthStatus.redis.consecutiveFailures,
-          lastChecked: healthStatus.redis.lastChecked,
-          lastError: healthStatus.redis.lastError,
-        },
-        fallback: {
-          active: !healthStatus.redis.healthy,
-          inMemoryStoreSize: healthStatus.inMemoryStoreSize,
-        },
         timestamp: new Date().toISOString(),
       };
     } catch (err) {
       return reply.status(503).send({
         status: 'error',
-        error: err instanceof Error ? err.message : 'Unknown error',
         timestamp: new Date().toISOString(),
       });
     }
@@ -94,6 +107,7 @@ export async function buildApp() {
   await app.register(authRoutes, { prefix: '/auth' });
   await app.register(feedRoutes, { prefix: '/api/feed' });
   await app.register(matchingRoutes, { prefix: '/api' });
+  await app.register(messageRoutes, { prefix: '/api' });
   await app.register(locationRoutes, { prefix: '/api' });
   await app.register(profileRoutes, { prefix: '/api' });
   await app.register(notificationRoutes, { prefix: '/api' });

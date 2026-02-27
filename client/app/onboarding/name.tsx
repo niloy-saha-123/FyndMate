@@ -49,7 +49,7 @@ export default function OnboardingName() {
 
     if (user) {
       updateProfile(user.authId, {
-        fullName: trimmed,
+        name: trimmed,
         onboardingCompleted: false,
       })
         .then((next) => setProfileLocally(next))

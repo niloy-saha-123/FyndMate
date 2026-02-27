@@ -36,13 +36,17 @@ export function NeoChip({
 }: NeoChipProps) {
     const colors = chipColors[variant];
     const isSmall = size === 'small';
+    const selectedColors =
+        variant === 'looking'
+            ? { bg: COLORS.accent, text: COLORS.surface }
+            : { bg: COLORS.primary, text: COLORS.surface };
 
     const chipStyle = [
         styles.chip,
         {
-            backgroundColor: selected ? COLORS.primary : colors.bg,
-            paddingVertical: isSmall ? 4 : 6,
-            paddingHorizontal: isSmall ? 8 : 12,
+            backgroundColor: selected ? selectedColors.bg : colors.bg,
+            paddingVertical: isSmall ? 5 : 7,
+            paddingHorizontal: isSmall ? 9 : 14,
         },
         style,
     ];
@@ -50,8 +54,8 @@ export function NeoChip({
     const textStyle = [
         styles.text,
         {
-            color: selected ? COLORS.surface : colors.text,
-            fontSize: isSmall ? 11 : 12,
+            color: selected ? selectedColors.text : colors.text,
+            fontSize: isSmall ? 12 : 13,
         },
     ];
 
@@ -94,5 +98,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 8,
+        alignItems: 'flex-start',
     },
 });

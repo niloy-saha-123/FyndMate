@@ -20,7 +20,7 @@ import {
     Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocation } from '@/src/hooks/useLocation';
+import { useLocationContext } from '@/src/location/LocationProvider';
 
 // Dark theme colors (consistent with app)
 const COLORS = {
@@ -61,7 +61,7 @@ export const LocationSettingsScreen = () => {
         updateLocationNow,
         changePreference,
         initialized,
-    } = useLocation();
+    } = useLocationContext();
 
     const isEnabled = preference === 'on';
 

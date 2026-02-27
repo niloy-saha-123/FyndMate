@@ -6,7 +6,7 @@
  * 1. Discovery Feed: Fetching profiles to swipe on.
  * 2. Interaction: Sending Likes (with messages) or Passes.
  * 3. Inbox Management: Fetching/Accepting/Declining incoming likes.
- * 4. Chat Management: Fetching active matches and unmatching.
+ * 4. Message Management: Fetching active matches and unmatching.
  * 5. Safety: Blocking users.
  * 
  * BACKEND ENDPOINTS MAPPED:
@@ -16,29 +16,37 @@
  * - POST /api/likes/:id/accept
  * - POST /api/matches
  * - POST /api/users/block
+ * - POST /api/users/report
  * 
  * NOTE: All functions use the centralized apiClient which automatically
  * attaches the Authorization header from the auth context.
  */
 
 import { apiClient } from '../lib/apiClient';
+import {
+    LIKES_RATE_LIMIT,
+    LIKES_RATE_LIMIT_WINDOW_HOURS,
+} from '../constants/validation';
+import type { UserProfile } from '../types/profile';
 
-export interface UserProfile {
-    id: string;
-    name: string;
-    profilePicture: string | null;
-    bio: string | null;
-    skills: string[];
-    interests?: string[];
-    experience?: string | null;
-    commitment?: string | null;
-    city?: string | null;
-    country?: string | null;
-    locationSharing?: string | null;
-    // UI-specific field (may not be returned by all endpoints)
-    age?: number | null;
-    lookingFor?: string[];
-    githubUsername?: string | null;
+// Re-export for convenience
+export { LIKES_RATE_LIMIT, LIKES_RATE_LIMIT_WINDOW_HOURS };
+export type { UserProfile };
+
+/**
+ * Custom error class for rate limit exceeded
+ */
+export class LikesRateLimitError extends Error {
+  public retryAfter: number;
+  public retryAfterHours: number;
+
+  constructor(retryAfterSeconds: number, message?: string) {
+    const hours = Math.ceil(retryAfterSeconds / 3600);
+    super(message || `You've reached your daily limit of sending requests (${LIKES_RATE_LIMIT} per day). Try again in ${hours} hour${hours !== 1 ? 's' : ''}.`);
+    this.name = 'LikesRateLimitError';
+    this.retryAfter = retryAfterSeconds;
+    this.retryAfterHours = hours;
+  }
 }
 
 export interface Like {
@@ -73,9 +81,25 @@ export async function getDiscoveryFeed(limit = 20, cursor?: string): Promise<Use
  * @param likedId ID of user to like/pass
  * @param liked true = LIKE, false = PASS
  * @param message Optional Intro Message (Required if liked=true)
+ * @throws LikesRateLimitError when rate limit (30/day) is exceeded
  */
 export async function sendLike(likedId: string, liked: boolean, message?: string) {
-    return apiClient.post('/api/likes', { likedId, liked, message });
+    try {
+        return await apiClient.post('/api/likes', { likedId, liked, message });
+    } catch (error: any) {
+        // Check if error message indicates rate limiting
+        const errorMessage = error?.message?.toLowerCase() || '';
+        if (
+            errorMessage.includes('too many requests') ||
+            errorMessage.includes('rate limit') ||
+            errorMessage.includes('429')
+        ) {
+            // Extract retry time from error message if available, default to 24 hours
+            const retryAfter = 24 * 60 * 60; // Default 24 hours in seconds
+            throw new LikesRateLimitError(retryAfter);
+        }
+        throw error;
+    }
 }
 
 /**
@@ -104,7 +128,7 @@ export async function declineLike(likeId: string) {
 }
 
 /**
- * GET ACTIVE MATCHES (CHATS)
+ * GET ACTIVE MATCHES (MESSAGES)
  */
 export async function getMatches(limit = 20, cursor?: string): Promise<{ data: Match[]; nextCursor: string | null }> {
     const params = new URLSearchParams({ limit: limit.toString() });
@@ -127,4 +151,13 @@ export async function unmatchUser(matchId: string) {
  */
 export async function blockUser(userId: string) {
     return apiClient.post('/api/users/block', { userId });
+}
+
+/**
+ * REPORT A USER (auto-block + hide forever)
+ * @param userId ID of user to report
+ * @param reason Human-readable report reason
+ */
+export async function reportUser(userId: string, reason: string) {
+    return apiClient.post('/api/users/report', { userId, reason });
 }

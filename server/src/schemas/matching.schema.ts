@@ -7,6 +7,14 @@
  */
 
 import { z } from 'zod';
+import {
+    INTRO_MESSAGE_MIN_LENGTH,
+    INTRO_MESSAGE_MAX_LENGTH,
+    REPLY_MESSAGE_MIN_LENGTH,
+    REPLY_MESSAGE_MAX_LENGTH,
+    REPORT_REASON_MIN_LENGTH,
+    REPORT_REASON_MAX_LENGTH,
+} from './validation-constants.js';
 
 // ============================================
 // LIKES SCHEMAS
@@ -22,8 +30,8 @@ export const createLikeSchema = z.object({
         message: 'liked must be a boolean',
     }),
     message: z.string()
-        .min(10, 'Message must be at least 10 characters')
-        .max(500, 'Message cannot exceed 500 characters')
+        .min(INTRO_MESSAGE_MIN_LENGTH, `Intro message must be at least ${INTRO_MESSAGE_MIN_LENGTH} characters`)
+        .max(INTRO_MESSAGE_MAX_LENGTH, `Intro message cannot exceed ${INTRO_MESSAGE_MAX_LENGTH} characters`)
         .optional(),
 }).refine((data) => {
     // If liked is true, message is required
@@ -42,8 +50,8 @@ export const createLikeSchema = z.object({
  */
 export const acceptLikeSchema = z.object({
     replyMessage: z.string()
-        .min(1, 'Reply message cannot be empty')
-        .max(500, 'Reply message cannot exceed 500 characters')
+        .min(REPLY_MESSAGE_MIN_LENGTH, `Reply message must be at least ${REPLY_MESSAGE_MIN_LENGTH} character`)
+        .max(REPLY_MESSAGE_MAX_LENGTH, `Reply message cannot exceed ${REPLY_MESSAGE_MAX_LENGTH} characters`)
         .optional(),
 });
 
@@ -97,6 +105,17 @@ export const blockUserSchema = z.object({
     userId: z.string().uuid('Invalid user ID format'),
 });
 
+/**
+ * Schema for reporting a user.
+ * Used in: POST /api/users/report
+ */
+export const reportUserSchema = z.object({
+    userId: z.string().uuid('Invalid user ID format'),
+    reason: z.string()
+        .min(REPORT_REASON_MIN_LENGTH, `Report reason must be at least ${REPORT_REASON_MIN_LENGTH} characters`)
+        .max(REPORT_REASON_MAX_LENGTH, `Report reason cannot exceed ${REPORT_REASON_MAX_LENGTH} characters`),
+});
+
 // ============================================
 // TYPE EXPORTS
 // ============================================
@@ -105,3 +124,4 @@ export type CreateLikeInput = z.infer<typeof createLikeSchema>;
 export type AcceptLikeInput = z.infer<typeof acceptLikeSchema>;
 export type FeedQueryInput = z.infer<typeof feedQuerySchema>;
 export type BlockUserInput = z.infer<typeof blockUserSchema>;
+export type ReportUserInput = z.infer<typeof reportUserSchema>;

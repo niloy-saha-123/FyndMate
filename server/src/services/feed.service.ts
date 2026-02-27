@@ -6,20 +6,11 @@
 
 import { prisma } from '../lib/prisma.js';
 import { redis } from '../lib/redis.js';
+import { createHash } from 'crypto';
 import { filterLocationArrayByPrivacy } from '../utils/locationPrivacy.js';
 import { publicUserFeedSelect, type PublicFeedUser } from '../utils/publicUser.js';
 import { signProfilePicture } from '../utils/profilePicture.js';
-
-function computeAge(birthDate: Date | null): number | null {
-    if (!birthDate) return null;
-    const now = new Date();
-    let age = now.getUTCFullYear() - birthDate.getUTCFullYear();
-    const m = now.getUTCMonth() - birthDate.getUTCMonth();
-    if (m < 0 || (m === 0 && now.getUTCDate() < birthDate.getUTCDate())) {
-        age--;
-    }
-    return age;
-}
+import { computeAge } from '../utils/computeAge.js';
 
 // TODO [100K Users]: Add CDN-level caching for feed results (CloudFront, Fastly) with geographic distribution
 // TODO [100K Users]: Implement cache stampede protection (locking) to prevent thundering herd on cache misses
@@ -88,6 +79,8 @@ function computeAge(birthDate: Date | null): number | null {
 // PRIVACY: Actual user location still hidden, only search center changes
 
 type FeedUserWithAge = PublicFeedUser & { age: number | null };
+const FEED_CACHE_TTL_SECONDS = 45;
+const FEED_DYNAMIC_ZONE_MIN_RESULTS = 3;
 
 export class FeedService {
     /**
@@ -95,24 +88,23 @@ export class FeedService {
      * Aggregates all exclusions to return fresh profiles.
      */
     async getFeed(userId: string, limit = 20, cursor?: string): Promise<FeedUserWithAge[]> {
-        // Validation: UUID format check (Supabase/Prisma uses UUIDs)
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(userId)) {
-            throw new Error("Invalid user ID format.");
-        }
+        const TAKE_LIMIT = Math.min(limit, 50);
+        const pageToken = cursor ? `cursor:${cursor}` : 'page:0';
+        const filtersHash = createHash('sha1')
+            .update(`limit:${TAKE_LIMIT}`)
+            .digest('hex')
+            .slice(0, 8);
+        const cacheKey = `feed:${userId}:${pageToken}:${filtersHash}`;
 
-        // Cache Hit: Return cached feed if this is an initial load (no cursor)
-        const cacheKey = `feed:${userId}`;
-        if (!cursor) {
-            try {
-                const cached = await redis.get(cacheKey);
-                if (cached) {
-                    return JSON.parse(cached);
-                }
-            } catch (redisError) {
-                // Redis unavailable - continue without cache
-                console.warn('Redis cache miss (error):', redisError);
+        // Cache Hit: read-through cache for feed pages.
+        try {
+            const cached = await redis.get(cacheKey);
+            if (cached) {
+                return JSON.parse(cached);
             }
+        } catch (redisError) {
+            // Redis unavailable - continue without cache
+            console.warn('Redis cache miss (error):', redisError);
         }
 
         const userExists = await prisma.user.findUnique({
@@ -122,8 +114,6 @@ export class FeedService {
         if (!userExists) {
             return [];
         }
-
-        const TAKE_LIMIT = Math.min(limit, 50);
 
         // Build Exclusion List
         // We exclude:
@@ -139,19 +129,20 @@ export class FeedService {
             // Outgoing LIKES only (not passes) - users I liked should not reappear
             // Passed users (liked=false) CAN reappear in the feed for second chances
             prisma.like.findMany({
-                where: { likerId: userId, liked: true },
+                where: { likerId: userId, liked: true, status: 'active' },
                 select: { likedId: true },
             }),
 
             // Incoming likes (they liked me) should appear in "Likes You", not Feed.
             prisma.like.findMany({
-                where: { likedId: userId, liked: true },
+                where: { likedId: userId, liked: true, status: 'active' },
                 select: { likerId: true },
             }),
 
             prisma.match.findMany({
                 where: {
                     OR: [{ user1Id: userId }, { user2Id: userId }],
+                    status: 'active',
                 },
                 select: { user1Id: true, user2Id: true },
             }),
@@ -188,9 +179,7 @@ export class FeedService {
             where: {
                 id: { notIn: Array.from(excludedIds) },
                 banned: false,
-                // In development, show all users for testing
-                // In production, only show users who have completed onboarding
-                ...(process.env.NODE_ENV === 'production' 
+                ...(process.env.NODE_ENV === 'production'
                     ? { onboardingCompleted: true }
                     : {}),
             },
@@ -210,24 +199,38 @@ export class FeedService {
 
         const priv = filterLocationArrayByPrivacy(withAge).map((u: any) => {
             delete u.birthDate;
+            delete u.locationSharing;
             return u;
         });
 
-// TODO [POST-MVP]: Add cache stampede protection (lock key) around feed generation.
-// TODO [POST-MVP]: Batch exclusions with a single query/CTE if feed load grows.
-// TODO [POST-MVP]: Move feed limits/TTL to config (e.g., limits.ts with env overrides) to avoid scattered magic numbers.
-// TODO [POST-MVP]: Make onboarding filter a config flag (no dev/prod divergence).
+        // TODO [POST-MVP]: Add cache stampede protection (lock key) around feed generation.
+        // TODO [POST-MVP]: Batch exclusions with a single query/CTE if feed load grows.
+        // TODO [POST-MVP]: Move feed limits/TTL to config (e.g., limits.ts with env overrides) to avoid scattered magic numbers.
+        // TODO [POST-MVP]: Make onboarding filter a config flag (no dev/prod divergence).
         const result = await Promise.all(
             priv.map(async (u: any) => ({
                 ...u,
                 profilePicture: await signProfilePicture(u.profilePicture),
+                projects: (u.projects ?? []).map((p: any) => ({
+                    id: p.id,
+                    name: p.title,
+                    description: p.description,
+                })),
+                experiences: (u.experiences ?? []).map((e: any) => ({
+                    id: e.id,
+                    company: e.company,
+                    position: e.position,
+                    description: e.description,
+                    startDate: e.startDate,
+                    endDate: e.endDate,
+                })),
             }))
         );
 
-        // Cache Miss: Store result for 5 minutes if this was an initial load
-        if (!cursor && result.length > 0) {
+        // Cache Miss: store only when results are outside dynamic low-remaining zone.
+        if (result.length >= FEED_DYNAMIC_ZONE_MIN_RESULTS) {
             try {
-                await redis.setex(cacheKey, 300, JSON.stringify(result));
+                await redis.setex(cacheKey, FEED_CACHE_TTL_SECONDS, JSON.stringify(result));
             } catch (redisError) {
                 // Redis unavailable - continue without caching
                 console.warn('Redis cache write failed:', redisError);

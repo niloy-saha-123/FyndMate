@@ -5,13 +5,18 @@
 
 import { Prisma, Like, Match } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
-import { redis } from '../lib/redis.js';
 import { blockService } from './block.service.js';
 import { matchService } from './match.service.js';
 import { publicUserLikeSelect } from '../utils/publicUser.js';
 import { filterLocationByPrivacy } from '../utils/locationPrivacy.js';
 import { signProfilePicture } from '../utils/profilePicture.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
+import { computeAge } from '../utils/computeAge.js';
+import {
+    INTRO_MESSAGE_MIN_LENGTH,
+    INTRO_MESSAGE_MAX_LENGTH,
+} from '../schemas/validation-constants.js';
+import { invalidateFeedCacheForUsers } from '../utils/cacheInvalidation.js';
 
 type ReceivedLike = Prisma.LikeGetPayload<{
     include: {
@@ -20,17 +25,6 @@ type ReceivedLike = Prisma.LikeGetPayload<{
         }
     }
 }>;
-
-function computeAge(birthDate: Date | null): number | null {
-    if (!birthDate) return null;
-    const now = new Date();
-    let age = now.getUTCFullYear() - birthDate.getUTCFullYear();
-    const m = now.getUTCMonth() - birthDate.getUTCMonth();
-    if (m < 0 || (m === 0 && now.getUTCDate() < birthDate.getUTCDate())) {
-        age--;
-    }
-    return age;
-}
 
 export class LikeService {
     /**
@@ -43,11 +37,11 @@ export class LikeService {
 
         if (liked) {
             const sanitizedMessage = message ? sanitizeText(message) : '';
-            if (!sanitizedMessage || sanitizedMessage.length < 10) {
-                throw new Error("Intro message must be at least 10 characters.");
+            if (!sanitizedMessage || sanitizedMessage.length < INTRO_MESSAGE_MIN_LENGTH) {
+                throw new Error(`Intro message must be at least ${INTRO_MESSAGE_MIN_LENGTH} characters.`);
             }
-            if (sanitizedMessage.length > 500) {
-                throw new Error("Intro message cannot exceed 500 characters.");
+            if (sanitizedMessage.length > INTRO_MESSAGE_MAX_LENGTH) {
+                throw new Error(`Intro message cannot exceed ${INTRO_MESSAGE_MAX_LENGTH} characters.`);
             }
             message = sanitizedMessage;
         }
@@ -107,6 +101,13 @@ export class LikeService {
             }
 
             if (existing.liked && liked) {
+                // Allow re-like after archived interactions (e.g. unmatch/report cleanup)
+                if (existing.status !== 'active') {
+                    return await prisma.like.update({
+                        where: { id: existing.id },
+                        data: { message, status: 'active', createdAt: new Date() },
+                    });
+                }
                 throw new Error("You have already liked this user.");
             }
 
@@ -129,7 +130,7 @@ export class LikeService {
             throw new Error("You are already matched with this user.");
         }
 
-            const result = await prisma.like.create({
+        const result = await prisma.like.create({
             data: {
                 likerId,
                 likedId,
@@ -141,10 +142,7 @@ export class LikeService {
 
         // Invalidate Feed Cache for both users
         // Non-critical: If Redis is down, caches will just stay stale for 5 minutes
-        await Promise.all([
-            redis.del(`feed:${likerId}`),
-            redis.del(`feed:${likedId}`)
-        ]).catch(err => {
+        await invalidateFeedCacheForUsers([likerId, likedId]).catch(err => {
             console.warn('Cache invalidation failed (non-critical):', err.message);
             // Not throwing - like was created successfully, cache will expire naturally
         });
@@ -199,7 +197,7 @@ export class LikeService {
                 .map(async like => {
                     const age = computeAge(like.likerUser.birthDate as any);
                     const sanitizedUser = filterLocationByPrivacy(like.likerUser as any);
-                    const { birthDate, city, country, ...restUser } = sanitizedUser;
+                    const { birthDate, locationSharing, city, country, ...restUser } = sanitizedUser;
                     return {
                         ...like,
                         likerUser: {

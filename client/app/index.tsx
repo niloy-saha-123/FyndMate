@@ -61,7 +61,7 @@ export default function Welcome() {
   if (user && profile) {
     const destination = profile.onboardingCompleted
       ? "/(tabs)"
-      : !profile.fullName
+      : !profile.name
       ? "/onboarding/name"
       : !profile.birthDate
       ? "/onboarding/birthdate"

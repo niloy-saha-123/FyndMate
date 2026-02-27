@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '../lib/prisma.js';
+import { redis } from '../lib/redis.js';
 
 export class BlockService {
     /**
@@ -31,9 +32,18 @@ export class BlockService {
             throw new Error("Cannot block yourself.");
         }
 
+        const existing = await prisma.block.findUnique({
+            where: {
+                blockerId_blockedId: { blockerId, blockedId },
+            },
+        });
+
+        if (existing) return existing;
+
         // Ensure an interaction exists (Match or Incoming Like)
         const matchExists = await prisma.match.findFirst({
             where: {
+                status: 'active',
                 OR: [
                     { user1Id: blockerId, user2Id: blockedId },
                     { user1Id: blockedId, user2Id: blockerId },
@@ -44,7 +54,9 @@ export class BlockService {
         const incomingLike = await prisma.like.findFirst({
             where: {
                 likerId: blockedId,
-                likedId: blockerId
+                likedId: blockerId,
+                liked: true,
+                status: 'active',
             }
         });
 
@@ -52,27 +64,23 @@ export class BlockService {
             throw new Error("You can only block users who have liked you or matched with you.");
         }
 
-        const existing = await prisma.block.findUnique({
-            where: {
-                blockerId_blockedId: { blockerId, blockedId },
-            },
-        });
-
-        if (existing) return existing;
-
         try {
-            return await prisma.$transaction(async (tx) => {
+            const block = await prisma.$transaction(async (tx) => {
                 const block = await tx.block.create({
                     data: { blockerId, blockedId },
                 });
 
-                // Remove existing matches
-                await tx.match.deleteMany({
+                // Keep match/messages in DB, but mark conversation as blocked.
+                await tx.match.updateMany({
                     where: {
                         OR: [
                             { user1Id: blockerId, user2Id: blockedId },
                             { user1Id: blockedId, user2Id: blockerId },
                         ],
+                    },
+                    data: {
+                        status: 'blocked',
+                        blockedBy: blockerId,
                     },
                 });
 
@@ -89,6 +97,13 @@ export class BlockService {
 
                 return block;
             });
+
+            await Promise.all([
+                redis.del(`feed:${blockerId}`),
+                redis.del(`feed:${blockedId}`),
+            ]).catch(() => {});
+
+            return block;
         } catch (error: any) {
             // Handle race condition for duplicate block creation
             if (error.code === 'P2002') {

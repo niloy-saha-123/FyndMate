@@ -33,7 +33,7 @@ export default function OnboardingGender() {
   }, [user, profile]);
 
   const readyToSubmit = useMemo(() => {
-    const hasName = data.fullName.trim().length >= 2 && data.fullName.trim().length <= 40;
+    const hasName = data.fullName?.trim().length >= 2 && data.fullName?.trim().length <= 40;
     const hasBirthdate = Boolean(data.birthDate);
     const hasGender = Boolean(selected);
     return hasName && hasBirthdate && hasGender;
@@ -55,7 +55,7 @@ export default function OnboardingGender() {
 
     try {
       const nextProfile = await updateProfile(user.authId, {
-        fullName: data.fullName.trim(),
+        name: data.fullName.trim(),
         birthDate: data.birthDate,
         gender: selected,
         onboardingCompleted: true,

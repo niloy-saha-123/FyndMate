@@ -50,7 +50,7 @@ export default function AppGate() {
 }
 
 function resolveDestination(profile: UserProfile) {
-  if (!profile.fullName || profile.fullName.trim().length < 2) {
+  if (!profile.name || profile.name.trim().length < 2) {
     return "/onboarding/name";
   }
 

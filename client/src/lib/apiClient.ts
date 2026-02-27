@@ -91,6 +91,23 @@ type UnauthorizedHandler = () => void;
 
 let getAccessToken: TokenGetter = () => null;
 let handleUnauthorized: UnauthorizedHandler = () => {};
+const API_METRICS_ENABLED = process.env.EXPO_PUBLIC_DEBUG_API_METRICS === '1';
+const apiRequestCounters = new Map<string, number>();
+
+function logApiMetric(
+  method: string,
+  endpoint: string,
+  status: string | number,
+  durationMs: number
+) {
+  if (!API_METRICS_ENABLED) return;
+  const key = `${method} ${endpoint}`;
+  const count = (apiRequestCounters.get(key) ?? 0) + 1;
+  apiRequestCounters.set(key, count);
+  console.log(
+    `[api-metric] #${count} ${method} ${endpoint} status=${status} durationMs=${durationMs}`
+  );
+}
 
 /**
  * Initialize the API client with auth functions.
@@ -111,10 +128,10 @@ export function initApiClient(
  * Build headers with Authorization if token exists.
  * Throws if token is missing (dev guard).
  */
-function buildHeaders(requireAuth = true): HeadersInit {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
+function buildHeaders(requireAuth = true, includeJsonContentType = false): HeadersInit {
+  const headers: HeadersInit = includeJsonContentType
+    ? { 'Content-Type': 'application/json' }
+    : {};
 
   const token = getAccessToken();
 
@@ -136,24 +153,39 @@ function buildHeaders(requireAuth = true): HeadersInit {
 }
 
 /**
+ * Structured API error for validation and other server errors.
+ * Includes optional field for highlighting invalid form inputs.
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode?: number,
+    public readonly field?: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+/**
  * Handle response, checking for 401 unauthorized.
+ * Throws ApiError (with field when present) for 4xx/5xx so callers can highlight form inputs.
  */
 async function handleResponse<T>(response: Response): Promise<T> {
   if (response.status === 401) {
-    // Token expired or invalid - trigger logout flow
     handleUnauthorized();
     throw new Error('Session expired. Please login again.');
   }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || error.message || `HTTP ${response.status}`);
+    const body = await response.json().catch(() => ({ error: 'Request failed' }));
+    const message = body.error || body.message || `HTTP ${response.status}`;
+    const field = body.field;
+    throw new ApiError(message, response.status, field);
   }
 
-  // Handle empty responses (204 No Content, etc.)
   const text = await response.text();
   if (!text) return {} as T;
-  
   return JSON.parse(text) as T;
 }
 
@@ -167,12 +199,19 @@ export const apiClient = {
    * @param requireAuth Whether to require authentication (default: true)
    */
   async get<T = any>(endpoint: string, requireAuth = true): Promise<T> {
+    const startedAt = Date.now();
     const url = `${API_BASE_URL}${endpoint}`;
+    let status: string | number = 'ERR';
     const response = await fetch(url, {
       method: 'GET',
-      headers: buildHeaders(requireAuth),
+      headers: buildHeaders(requireAuth, false),
     });
-    return handleResponse<T>(response);
+    status = response.status;
+    try {
+      return await handleResponse<T>(response);
+    } finally {
+      logApiMetric('GET', endpoint, status, Date.now() - startedAt);
+    }
   },
 
   /**
@@ -182,13 +221,45 @@ export const apiClient = {
    * @param requireAuth Whether to require authentication (default: true)
    */
   async post<T = any>(endpoint: string, body?: any, requireAuth = true): Promise<T> {
+    const startedAt = Date.now();
     const url = `${API_BASE_URL}${endpoint}`;
+    const hasBody = body !== undefined;
+    let status: string | number = 'ERR';
     const response = await fetch(url, {
       method: 'POST',
-      headers: buildHeaders(requireAuth),
-      body: body ? JSON.stringify(body) : undefined,
+      headers: buildHeaders(requireAuth, hasBody),
+      body: hasBody ? JSON.stringify(body) : undefined,
     });
-    return handleResponse<T>(response);
+    status = response.status;
+    try {
+      return await handleResponse<T>(response);
+    } finally {
+      logApiMetric('POST', endpoint, status, Date.now() - startedAt);
+    }
+  },
+
+  /**
+   * PUT request
+   * @param endpoint API endpoint
+   * @param body Request body (will be JSON stringified)
+   * @param requireAuth Whether to require authentication (default: true)
+   */
+  async put<T = any>(endpoint: string, body?: any, requireAuth = true): Promise<T> {
+    const startedAt = Date.now();
+    const url = `${API_BASE_URL}${endpoint}`;
+    const hasBody = body !== undefined;
+    let status: string | number = 'ERR';
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: buildHeaders(requireAuth, hasBody),
+      body: hasBody ? JSON.stringify(body) : undefined,
+    });
+    status = response.status;
+    try {
+      return await handleResponse<T>(response);
+    } finally {
+      logApiMetric('PUT', endpoint, status, Date.now() - startedAt);
+    }
   },
 
   /**
@@ -198,13 +269,21 @@ export const apiClient = {
    * @param requireAuth Whether to require authentication (default: true)
    */
   async patch<T = any>(endpoint: string, body?: any, requireAuth = true): Promise<T> {
+    const startedAt = Date.now();
     const url = `${API_BASE_URL}${endpoint}`;
+    const hasBody = body !== undefined;
+    let status: string | number = 'ERR';
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: buildHeaders(requireAuth),
-      body: body ? JSON.stringify(body) : undefined,
+      headers: buildHeaders(requireAuth, hasBody),
+      body: hasBody ? JSON.stringify(body) : undefined,
     });
-    return handleResponse<T>(response);
+    status = response.status;
+    try {
+      return await handleResponse<T>(response);
+    } finally {
+      logApiMetric('PATCH', endpoint, status, Date.now() - startedAt);
+    }
   },
 
   /**
@@ -213,12 +292,19 @@ export const apiClient = {
    * @param requireAuth Whether to require authentication (default: true)
    */
   async delete<T = any>(endpoint: string, requireAuth = true): Promise<T> {
+    const startedAt = Date.now();
     const url = `${API_BASE_URL}${endpoint}`;
+    let status: string | number = 'ERR';
     const response = await fetch(url, {
       method: 'DELETE',
-      headers: buildHeaders(requireAuth),
+      headers: buildHeaders(requireAuth, false),
     });
-    return handleResponse<T>(response);
+    status = response.status;
+    try {
+      return await handleResponse<T>(response);
+    } finally {
+      logApiMetric('DELETE', endpoint, status, Date.now() - startedAt);
+    }
   },
 };
 

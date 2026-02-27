@@ -9,13 +9,23 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { likeService } from '../services/like.service.js';
 import { matchService } from '../services/match.service.js';
 import { blockService } from '../services/block.service.js';
+import { sendMatchPush, sendRequestPush } from '../services/push.service.js';
+import { reportService } from '../services/report.service.js';
 import {
     createLikeSchema,
     acceptLikeSchema,
     likeIdParamSchema,
     matchIdParamSchema,
     blockUserSchema,
+    reportUserSchema,
 } from '../schemas/matching.schema.js';
+import {
+    LIKES_RATE_LIMIT,
+    LIKES_RATE_LIMIT_WINDOW_SECONDS,
+} from '../schemas/validation-constants.js';
+
+const SWIPE_DEBUG_ENABLED = process.env.DEBUG_SWIPE_LOGS === '1';
+const lastSwipeAtByUser = new Map<string, number>();
 
 export default async function matchingRoutes(app: FastifyInstance) {
     app.addHook('preHandler', authMiddleware);
@@ -23,7 +33,7 @@ export default async function matchingRoutes(app: FastifyInstance) {
     // Likes
     app.post('/likes', {
         preHandler: [
-            rateLimit({ limit: 100, windowSec: 12 * 60 * 60, keyPrefix: 'swipe' })
+            rateLimit({ limit: LIKES_RATE_LIMIT, windowSec: LIKES_RATE_LIMIT_WINDOW_SECONDS, keyPrefix: 'swipe' })
         ]
     }, async (request, reply) => {
         const user = request.user!;
@@ -40,9 +50,38 @@ export default async function matchingRoutes(app: FastifyInstance) {
 
         const { likedId, liked, message } = parseResult.data;
 
+        if (SWIPE_DEBUG_ENABLED) {
+            const now = Date.now();
+            const lastAt = lastSwipeAtByUser.get(user.id);
+            const deltaMs = typeof lastAt === 'number' ? now - lastAt : null;
+            lastSwipeAtByUser.set(user.id, now);
+            request.log.info(
+                {
+                    userId: user.id,
+                    likedId,
+                    liked,
+                    messageLength: message?.length ?? 0,
+                    deltaMs,
+                },
+                'Swipe request trace'
+            );
+        }
+
         try {
             const result = await likeService.createLike(user.id, likedId, liked, message);
             const matched = (result as any).user1Id !== undefined && (result as any).user2Id !== undefined;
+            if (!matched && liked) {
+                // Fire-and-forget request notification
+                sendRequestPush({ receiverId: likedId, senderId: user.id, message }).catch((err) =>
+                    request.log.warn({ err, likedId }, 'Request push failed')
+                );
+            } else if (matched) {
+                const matchRecord: any = result;
+                const receiverId = matchRecord.user1Id === user.id ? matchRecord.user2Id : matchRecord.user1Id;
+                sendMatchPush({ matchId: matchRecord.id, receiverId, otherUserId: user.id }).catch((err) =>
+                    request.log.warn({ err, matchId: matchRecord.id }, 'Match push failed')
+                );
+            }
             return reply.send({
                 matched,
                 match: matched ? result : null,
@@ -104,6 +143,11 @@ export default async function matchingRoutes(app: FastifyInstance) {
             if (like.likedId !== user.id) return reply.status(403).send({ error: 'Not authorized' });
 
             const match = await matchService.acceptLike(likeId, replyMessage);
+            // Notify the other user of the new match
+            const receiverId = match.user1Id === user.id ? match.user2Id : match.user1Id;
+            sendMatchPush({ matchId: match.id, receiverId, otherUserId: user.id }).catch((err) =>
+                request.log.warn({ err, matchId: match.id }, 'Match push failed')
+            );
             return reply.send(match);
         } catch (error: any) {
             request.log.error(error);
@@ -194,6 +238,31 @@ export default async function matchingRoutes(app: FastifyInstance) {
 
         try {
             await blockService.blockUser(user.id, blockedId);
+            return reply.send({ success: true });
+        } catch (error: any) {
+            request.log.error(error);
+            return reply.status(400).send({ error: error.message });
+        }
+    });
+
+    // Reporting (auto-block + remove visibility)
+    app.post('/users/report', async (request, reply) => {
+        const user = request.user!;
+
+        const parseResult = reportUserSchema.safeParse(request.body);
+        if (!parseResult.success) {
+            const firstIssue = parseResult.error.issues[0];
+            return reply.status(400).send({
+                error: 'Validation failed',
+                message: firstIssue?.message || 'Invalid request',
+                field: firstIssue?.path.join('.') || 'unknown',
+            });
+        }
+
+        const { userId: reportedId, reason } = parseResult.data;
+
+        try {
+            await reportService.reportUser(user.id, reportedId, reason);
             return reply.send({ success: true });
         } catch (error: any) {
             request.log.error(error);

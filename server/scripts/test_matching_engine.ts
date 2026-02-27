@@ -133,7 +133,8 @@ async function main() {
     ASSERT(!!match && 'user1Id' in match, "Match object returned on instant match");
 
     // Verify Match in DB
-    const matchesA = await matchService.getMatches(A.id);
+    const matchesAResult = await matchService.getMatches(A.id);
+    const matchesA = matchesAResult.data;
     ASSERT(matchesA.length === 1, "Alice has 1 match");
     ASSERT(matchesA[0].user1.name === "Alice" || matchesA[0].user2.name === "Alice", "Match contains Alice");
 
@@ -173,13 +174,14 @@ async function main() {
     ASSERT(!(await feedService.getFeed(A.id)).some(u => u.name === "Eve"), "Eve removed after Alice passes");
 
     // Eve likes Alice
-    await likeService.createLike(E.id, A.id, true, "I like you Alice! You have a great profile and I would love to chat.");
+    await likeService.createLike(E.id, A.id, true, "I like you Alice! You have a great profile and I would love to message.");
 
     // Alice likes Eve (Second Chance)
     const secondChanceMatch = await likeService.createLike(A.id, E.id, true, "Actually, I like you too! Your profile is amazing.");
     ASSERT(!!secondChanceMatch && 'user1Id' in secondChanceMatch, "Instant match on Second Chance");
 
-    const matchesFinalA = await matchService.getMatches(A.id);
+    const matchesFinalAResult = await matchService.getMatches(A.id);
+    const matchesFinalA = matchesFinalAResult.data;
     ASSERT(matchesFinalA.length === 2, "Alice now has 2 matches (Bob and Eve)");
 
     // ==========================================
@@ -193,7 +195,8 @@ async function main() {
 
     await matchService.unmatch(matchAB!.id, A.id);
 
-    const matchesPostUnmatchA = await matchService.getMatches(A.id);
+    const matchesPostUnmatchAResult = await matchService.getMatches(A.id);
+    const matchesPostUnmatchA = matchesPostUnmatchAResult.data;
     ASSERT(matchesPostUnmatchA.length === 1, "Alice has 1 match left after unmatching Bob");
     ASSERT(!matchesPostUnmatchA.some(m => m.user1.name === "Bob" || m.user2.name === "Bob"), "Bob is gone from matches");
 

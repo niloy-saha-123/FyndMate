@@ -41,7 +41,7 @@ export default function Login() {
   if (user && profile) {
     const destination = profile.onboardingCompleted
       ? "/(tabs)"
-      : !profile.fullName
+      : !profile.name
       ? "/onboarding/name"
       : !profile.birthDate
       ? "/onboarding/birthdate"

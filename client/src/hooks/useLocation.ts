@@ -10,20 +10,29 @@
  * - Debouncing updates to save battery and API quota
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
-import { Alert } from 'react-native';
+import { Alert, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiClient } from '../lib/apiClient';
+import { apiClient, getApiBaseUrl } from '../lib/apiClient';
 import { useAuth } from '../auth/AuthProvider';
+import { supabase } from '../auth/supabaseClient';
 import CryptoJS from 'crypto-js';
 
 // ─────────────────────────────────────────────────────────────────────
 // SECURE STORAGE KEYS
 // ─────────────────────────────────────────────────────────────────────
 const LOCATION_SECRET_KEY = 'fyndmate_location_secret';
+const LOCATION_SHARING_KEY = 'locationSharing';
+const LOCATION_PERMISSION_KEY = 'locationPermission';
+const LOCATION_PERMISSION_PROMPTED_KEY = 'locationPermissionPrompted';
+const LOCATION_LAST_UPDATE_KEY = 'lastLocation';
+const LOCATION_LAST_LABEL_KEY = 'locationLastLabel';
+const LOCATION_UPDATE_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 hours
+const LOCATION_BACKGROUND_TASK = 'fyndmate-background-location';
 
 // ─────────────────────────────────────────────────────────────────────
 // HMAC-SHA256 Implementation using crypto-js
@@ -65,6 +74,23 @@ async function getLocationSecret(): Promise<string | null> {
         console.error('❌ Failed to get location secret:', error);
         return null;
     }
+}
+
+async function generateLocationSignature(payload: {
+    userId: string;
+    latitude: number;
+    longitude: number;
+    timestamp: string;
+    nonce: string;
+}): Promise<string> {
+    const secret = await getLocationSecret();
+    if (!secret) {
+        throw new Error('Location secret not available. Please re-authenticate.');
+    }
+
+    const { userId, latitude, longitude, timestamp, nonce } = payload;
+    const data = `${userId}|${latitude}|${longitude}|${timestamp}|${nonce}`;
+    return computeHmacSha256(data, secret);
 }
 
 /**
@@ -131,6 +157,187 @@ interface LastLocation {
     timestamp: number;
 }
 
+function toRad(degrees: number): number {
+    return degrees * (Math.PI / 180);
+}
+
+function calculateDistance(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number
+): number {
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+async function shouldUpdateLocationByCoords(
+    latitude: number,
+    longitude: number
+): Promise<boolean> {
+    try {
+        const lastLocationStr = await AsyncStorage.getItem(LOCATION_LAST_UPDATE_KEY);
+        if (!lastLocationStr) return true;
+
+        const lastLocation: LastLocation = JSON.parse(lastLocationStr);
+        const now = Date.now();
+        const hoursSinceUpdate = (now - lastLocation.timestamp) / (1000 * 60 * 60);
+
+        if (hoursSinceUpdate < 1) return false;
+        if (hoursSinceUpdate > 24) return true;
+
+        const distance = calculateDistance(
+            lastLocation.latitude,
+            lastLocation.longitude,
+            latitude,
+            longitude
+        );
+        return distance > 50;
+    } catch (error) {
+        console.error('Error checking location update debounce:', error);
+        return true;
+    }
+}
+
+async function postSignedLocationUpdate(payload: {
+    userId: string;
+    latitude: number;
+    longitude: number;
+    locationSharing: LocationSharing;
+    locationPermission: LocationPermission;
+    authToken: string;
+}): Promise<{ city?: string; country?: string } | null> {
+    const timestamp = new Date().toISOString();
+    const nonce = Crypto.randomUUID();
+    const signature = await generateLocationSignature({
+        userId: payload.userId,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+        timestamp,
+        nonce,
+    });
+
+    const response = await fetch(`${getApiBaseUrl()}/api/users/me/location`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${payload.authToken}`,
+        },
+        body: JSON.stringify({
+            latitude: payload.latitude,
+            longitude: payload.longitude,
+            timestamp,
+            nonce,
+            signature,
+            locationSharing: payload.locationSharing,
+            locationPermission: payload.locationPermission,
+        }),
+    });
+
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(text || `Location update failed with status ${response.status}`);
+    }
+
+    const json = (await response.json().catch(() => null)) as
+        | { city?: string; country?: string }
+        | null;
+    return json;
+}
+
+async function syncLocationFromCoordinates(payload: {
+    latitude: number;
+    longitude: number;
+    locationSharing: LocationSharing;
+    locationPermission: LocationPermission;
+    allowDebounce: boolean;
+    throwOnError?: boolean;
+}): Promise<{ city?: string; country?: string } | null> {
+    const pref = payload.locationSharing;
+    if (pref !== 'on') return null;
+
+    if (payload.allowDebounce) {
+        const shouldUpdate = await shouldUpdateLocationByCoords(payload.latitude, payload.longitude);
+        if (!shouldUpdate) return null;
+    }
+
+    const sessionRes = await supabase.auth.getSession();
+    const accessToken = sessionRes.data.session?.access_token;
+    const userId = sessionRes.data.session?.user?.id;
+
+    if (!accessToken || !userId) {
+        if (payload.throwOnError) {
+            throw new Error('Missing auth session for location update.');
+        }
+        return null;
+    }
+
+    const response = await postSignedLocationUpdate({
+        userId,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+        locationSharing: pref,
+        locationPermission: payload.locationPermission,
+        authToken: accessToken,
+    });
+
+    await AsyncStorage.setItem(
+        LOCATION_LAST_UPDATE_KEY,
+        JSON.stringify({
+            latitude: payload.latitude,
+            longitude: payload.longitude,
+            timestamp: Date.now(),
+        })
+    );
+
+    const label = response?.city && response?.country ? `${response.city}, ${response.country}` : '';
+    if (label) {
+        await AsyncStorage.setItem(LOCATION_LAST_LABEL_KEY, label);
+    }
+    return response;
+}
+
+if (!TaskManager.isTaskDefined(LOCATION_BACKGROUND_TASK)) {
+    TaskManager.defineTask(LOCATION_BACKGROUND_TASK, async ({ data, error }: { data?: unknown; error?: unknown }) => {
+        if (error) {
+            console.error('Background location task error:', error);
+            return;
+        }
+
+        const preference = (await AsyncStorage.getItem(LOCATION_SHARING_KEY)) as LocationSharing | null;
+        if (preference !== 'on') {
+            return;
+        }
+
+        const { locations } = (data as { locations?: Location.LocationObject[] }) ?? {};
+        const latest = locations?.[locations.length - 1];
+        if (!latest) {
+            return;
+        }
+
+        try {
+            await syncLocationFromCoordinates({
+                latitude: latest.coords.latitude,
+                longitude: latest.coords.longitude,
+                locationSharing: 'on',
+                locationPermission: 'always',
+                allowDebounce: true,
+            });
+        } catch (taskError) {
+            console.error('Background location sync failed:', taskError);
+        }
+    });
+}
+
 export function useLocation() {
     const [preference, setPreference] = useState<LocationSharing>('off');
     const [permission, setPermission] = useState<LocationPermission | null>(null);
@@ -139,97 +346,45 @@ export function useLocation() {
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     // Get current user from auth context
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
 
     // Note: preference/permission loading is handled in the initialization effect at the bottom
 
     // ─────────────────────────────────────────────────────────────────────
-    // Check if we should update location (debouncing logic)
-    // ─────────────────────────────────────────────────────────────────────
-    async function shouldUpdateLocation(
-        currentPosition: Location.LocationObject  // Accept position 
-    ): Promise<boolean> {
-        try {
-            const lastLocationStr = await AsyncStorage.getItem('lastLocation');
-            if (!lastLocationStr) return true; // First time, always update
-
-            const lastLocation: LastLocation = JSON.parse(lastLocationStr);
-            const now = Date.now();
-            const hoursSinceUpdate = (now - lastLocation.timestamp) / (1000 * 60 * 60);
-
-            // RULE 1: Don't update if last update was < 1 hour ago
-            if (hoursSinceUpdate < 1) {
-                console.log('Skipping update: last update was < 1 hour ago');
-                return false;
-            }
-
-            // RULE 2: Always update if last update was > 24 hours ago
-            if (hoursSinceUpdate > 24) {
-                console.log('Forcing update: last update was > 24 hours ago');
-                return true;
-            }
-
-            // RULE 3: Update if user moved > 50km
-            // Use the position we already have (no second GPS call!)
-            const distance = calculateDistance(
-                lastLocation.latitude,
-                lastLocation.longitude,
-                currentPosition.coords.latitude,
-                currentPosition.coords.longitude
-            );
-
-            if (distance > 50) {
-                console.log(`Update triggered: moved ${distance.toFixed(2)}km`);
-                return true;
-            }
-
-            console.log('Skipping update: no significant change');
-            return false;
-        } catch (error) {
-            console.error('Error checking if should update:', error);
-            return true; // On error, allow update
-        }
-    }
-
-    // ─────────────────────────────────────────────────────────────────────
-    // Calculate distance between two GPS points (Haversine formula)
-    // ─────────────────────────────────────────────────────────────────────
-    function calculateDistance(
-        lat1: number,
-        lon1: number,
-        lat2: number,
-        lon2: number
-    ): number {
-        const R = 6371; // Earth's radius in km
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(toRad(lat1)) *
-            Math.cos(toRad(lat2)) *
-            Math.sin(dLon / 2) *
-            Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    function toRad(degrees: number): number {
-        return degrees * (Math.PI / 180);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────
     // Request OS location permission
     // ─────────────────────────────────────────────────────────────────────
+    async function getPermissionLevel(): Promise<LocationPermission> {
+        const foreground = await Location.getForegroundPermissionsAsync();
+        if (!foreground.granted) return 'denied';
+
+        const background = await Location.getBackgroundPermissionsAsync();
+        return background.granted ? 'always' : 'whileUsing';
+    }
+
+    function getPromptedKey(userId: string): string {
+        return `${LOCATION_PERMISSION_PROMPTED_KEY}:${userId}`;
+    }
+
     async function requestPermission(): Promise<boolean> {
         try {
+            const existing = await Location.getForegroundPermissionsAsync();
+            if (existing.granted) {
+                const level = await getPermissionLevel();
+                setPermission(level);
+                await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, level);
+                return true;
+            }
+
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
-                Alert.alert(
-                    'Permission Denied',
-                    'We need location access to show your city on your profile.'
-                );
+                setPermission('denied');
+                await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
                 return false;
             }
+
+            const level = await getPermissionLevel();
+            setPermission(level);
+            await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, level);
             return true;
         } catch (error) {
             console.error('Error requesting permission:', error);
@@ -237,35 +392,47 @@ export function useLocation() {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────
-    // Generate HMAC signature for location payload
-    // ─────────────────────────────────────────────────────────────────────
-    async function generateSignature(payload: {
-        userId: string;
-        latitude: number;
-        longitude: number;
-        timestamp: string;
-        nonce: string;
-    }): Promise<string> {
-        // Get the location secret from secure storage
-        const secret = await getLocationSecret();
-        if (!secret) {
-            throw new Error('Location secret not available. Please re-authenticate.');
+    async function registerBackgroundUpdates() {
+        const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_BACKGROUND_TASK);
+        if (alreadyStarted) return;
+
+        await Location.startLocationUpdatesAsync(LOCATION_BACKGROUND_TASK, {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: LOCATION_UPDATE_INTERVAL_MS,
+            distanceInterval: 1000,
+            showsBackgroundLocationIndicator: true,
+            pausesUpdatesAutomatically: true,
+            foregroundService: {
+                notificationTitle: 'FyndMate location',
+                notificationBody: 'Updating your city and country in the background',
+            },
+        });
+    }
+
+    async function unregisterBackgroundUpdates() {
+        const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_BACKGROUND_TASK);
+        if (!started) return;
+        await Location.stopLocationUpdatesAsync(LOCATION_BACKGROUND_TASK);
+    }
+
+    async function syncBackgroundUpdatesForState(
+        pref: LocationSharing,
+        permissionLevel: LocationPermission | null
+    ) {
+        if (pref === 'on' && permissionLevel === 'always') {
+            try {
+                await registerBackgroundUpdates();
+            } catch (error) {
+                console.error('Failed to register background location updates:', error);
+            }
+            return;
         }
 
-        // Build the data string in EXACT format required by server
-        // CRITICAL: Order matters! Server expects: userId|lat|lon|timestamp|nonce
-        const { userId, latitude, longitude, timestamp, nonce } = payload;
-        const data = `${userId}|${latitude}|${longitude}|${timestamp}|${nonce}`;
-
-        console.log('📍 Generating signature for data:', data);
-        console.log('📍 Using secret (first 10 chars):', secret.substring(0, 10) + '...');
-
-        // Compute HMAC-SHA256 signature using crypto-js
-        // Server uses: crypto.createHmac('sha256', secret).update(data).digest('hex')
-        const signature = computeHmacSha256(data, secret);
-
-        return signature;
+        try {
+            await unregisterBackgroundUpdates();
+        } catch (error) {
+            console.error('Failed to stop background location updates:', error);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -281,108 +448,46 @@ export function useLocation() {
         }
 
         setLoading(true);
-        console.log('📍 Starting location update...');
-        
         try {
-            // 1. Request permission
-            console.log('📍 Step 1: Requesting permission...');
             const hasPermission = await requestPermission();
             if (!hasPermission) {
-                console.log('📍 Permission denied');
                 setLoading(false);
                 return;
             }
 
-            // 2. Get GPS coordinates ONCE (battery optimization)
-            console.log('📍 Step 2: Getting GPS coordinates...');
             const location = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced,
             });
-            console.log('📍 GPS coordinates:', location.coords.latitude, location.coords.longitude);
-
-            // 3. Check if we should update (using the position we just got)
-            const shouldUpdate = await shouldUpdateLocation(location);
-            if (!shouldUpdate) {
-                console.log('📍 Location update skipped (debounced)');
-                setLoading(false);
-                return;
-            }
 
             const { latitude, longitude } = location.coords;
 
-            // 4. Detect OS permission level
-            console.log('📍 Step 4: Checking OS permission level...');
             const backgroundPerm = await Location.getBackgroundPermissionsAsync();
             const osPermission: LocationPermission = backgroundPerm.granted
                 ? 'always'
                 : 'whileUsing';
-            console.log('📍 OS permission:', osPermission);
 
-            // Save permission locally
-            await AsyncStorage.setItem('locationPermission', osPermission);
+            await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, osPermission);
             setPermission(osPermission);
 
-            // 5. Check if user is authenticated
-            if (!user?.id) {
+            if (!user?.id || preference !== 'on') {
                 throw new Error('User not authenticated. Please log in again.');
             }
-            console.log('📍 Step 5: User ID:', user.id);
 
-            // 6. Build signed payload with HMAC signature
-            console.log('📍 Step 6: Generating HMAC signature...');
-            const timestamp = new Date().toISOString();
-            const nonce = Crypto.randomUUID();
-            const signature = await generateSignature({
-                userId: user.id,
+            const response = await syncLocationFromCoordinates({
                 latitude,
                 longitude,
-                timestamp,
-                nonce,
-            });
-            console.log('📍 Signature generated:', signature.substring(0, 20) + '...');
-
-            // 7. Send to server (GPS coordinates only - server does reverse geocoding)
-            console.log('📍 Step 7: Sending to server...');
-            const response = await apiClient.patch<{
-                success: boolean;
-                city: string;
-                country: string;
-                locationSharing: string;
-            }>('/api/users/me/location', {
-                latitude,
-                longitude,
-                timestamp,
-                nonce,
-                signature,
-                locationSharing: preference,  // 'on' or 'off'
-                locationPermission: osPermission,  // 'always' or 'whileUsing'
+                locationSharing: preference,
+                locationPermission: osPermission,
+                allowDebounce: true,
+                throwOnError: true,
             });
 
-            console.log('📍 Server response:', response);
-
-            // 8. Save last location locally (for debouncing)
-            await AsyncStorage.setItem(
-                'lastLocation',
-                JSON.stringify({
-                    latitude,
-                    longitude,
-                    timestamp: Date.now(),
-                })
-            );
-
-            // 9. Update UI state with server response
-            if (response.city && response.country) {
+            if (response?.city && response.country) {
                 setCurrentLocation(`${response.city}, ${response.country}`);
-                console.log('📍 Location set to:', response.city, response.country);
-            } else {
-                console.log('📍 No city/country in response');
             }
             setLastUpdated(new Date());
-
-            console.log('✅ Location updated successfully!');
         } catch (error: any) {
-            console.error('❌ Error updating location:', error);
-            console.error('❌ Error details:', error.message, error.stack);
+            console.error('Error updating location:', error);
             Alert.alert('Error', error.message || 'Failed to update location. Please try again.');
         } finally {
             setLoading(false);
@@ -393,20 +498,41 @@ export function useLocation() {
     // Change location sharing preference
     // ─────────────────────────────────────────────────────────────────────
     async function changePreference(newPref: LocationSharing) {
-        // 1. Save to local storage
-        await AsyncStorage.setItem('locationSharing', newPref);
+        await AsyncStorage.setItem(LOCATION_SHARING_KEY, newPref);
         setPreference(newPref);
 
-        // 2. If user just enabled location, update immediately
         if (newPref === 'on') {
-            // This will detect OS permission and update location
+            const hasPermission = await requestPermission();
+            if (!hasPermission) {
+                await AsyncStorage.setItem(LOCATION_SHARING_KEY, 'off');
+                setPreference('off');
+                await syncBackgroundUpdatesForState('off', permission);
+                return;
+            }
+
+            let effectivePermission = await getPermissionLevel();
+
+            try {
+                const bg = await Location.getBackgroundPermissionsAsync();
+                if (!bg.granted) {
+                    const req = await Location.requestBackgroundPermissionsAsync();
+                    if (req.granted) {
+                        effectivePermission = 'always';
+                    }
+                }
+            } catch (error) {
+                console.log('Background permission request skipped:', error);
+            }
+
+            setPermission(effectivePermission);
+            await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, effectivePermission);
+            await syncBackgroundUpdatesForState('on', effectivePermission);
             await updateLocationNow();
         } else {
-            // User disabled location - clear current location display
             setCurrentLocation(null);
             setLastUpdated(null);
+            await syncBackgroundUpdatesForState('off', permission);
 
-            // Notify server that location sharing is off
             try {
                 await apiClient.patch('/api/users/me/location-settings', {
                     locationSharing: 'off',
@@ -415,12 +541,6 @@ export function useLocation() {
                 console.error('Failed to update location sharing preference:', error);
             }
         }
-        // TODO: If user chose "always", register background task
-        // if (newPref === 'always') {
-        //     await registerBackgroundLocationTask();
-        // } else {
-        //     await unregisterBackgroundLocationTask();
-        // }
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -441,24 +561,125 @@ export function useLocation() {
     // 
     const [initialized, setInitialized] = useState(false);
     
-    // Load saved preference first, then auto-update if enabled
+    // Keep display in sync with profile cache
+    useEffect(() => {
+        if (profile?.city && profile?.country && profile.locationSharing === 'on') {
+            setCurrentLocation(`${profile.city}, ${profile.country}`);
+        } else if (profile?.locationSharing === 'off') {
+            setCurrentLocation(null);
+        }
+    }, [profile?.city, profile?.country, profile?.locationSharing]);
+
+    // Load saved preference first, prompt once, then auto-update if enabled
     useEffect(() => {
         async function initLocation() {
+            if (!user?.id) {
+                await unregisterBackgroundUpdates().catch(() => {});
+                setInitialized(true);
+                return;
+            }
+
             // Load saved preference from storage
-            const savedPref = await AsyncStorage.getItem('locationSharing');
-            const savedPerm = await AsyncStorage.getItem('locationPermission');
+            const savedPref = await AsyncStorage.getItem(LOCATION_SHARING_KEY);
+            const savedPerm = await AsyncStorage.getItem(LOCATION_PERMISSION_KEY);
+            const promptedKey = getPromptedKey(user.id);
+            const hasPrompted = await AsyncStorage.getItem(promptedKey);
             
-            if (savedPref) {
-                setPreference(savedPref as LocationSharing);
-            }
+            const serverPref = profile?.locationSharing === 'on' || profile?.locationSharing === 'off'
+                ? (profile.locationSharing as LocationSharing)
+                : null;
+            const serverPerm = profile?.locationPermission === 'always'
+                || profile?.locationPermission === 'whileUsing'
+                || profile?.locationPermission === 'denied'
+                ? (profile.locationPermission as LocationPermission)
+                : null;
+            let effectivePref = (savedPref as LocationSharing | null) ?? serverPref ?? 'off';
+            setPreference(effectivePref);
+            await AsyncStorage.setItem(LOCATION_SHARING_KEY, effectivePref);
+
+            let effectivePermission: LocationPermission;
             if (savedPerm) {
-                setPermission(savedPerm as LocationPermission);
+                effectivePermission = savedPerm as LocationPermission;
+            } else if (serverPerm) {
+                effectivePermission = serverPerm;
+                await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, serverPerm);
+            } else {
+                const detected = await getPermissionLevel();
+                effectivePermission = detected;
+                await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, detected);
             }
-            
+            setPermission(effectivePermission);
+
+            const lastLabel = await AsyncStorage.getItem(LOCATION_LAST_LABEL_KEY);
+            if (effectivePref === 'on' && lastLabel) {
+                setCurrentLocation(lastLabel);
+            }
+            const lastLocationStr = await AsyncStorage.getItem(LOCATION_LAST_UPDATE_KEY);
+            if (lastLocationStr) {
+                try {
+                    const parsed = JSON.parse(lastLocationStr) as LastLocation;
+                    if (parsed?.timestamp) {
+                        setLastUpdated(new Date(parsed.timestamp));
+                    }
+                } catch {
+                    // no-op
+                }
+            }
+
+            // Ask once on first app start for this user (when they're in the app).
+            if (!hasPrompted) {
+                const foreground = await Location.getForegroundPermissionsAsync();
+                if (foreground.status === 'undetermined') {
+                    // In-app prompt first so the user knows why we're asking
+                    const userWantsToAllow = await new Promise<boolean>((resolve) => {
+                        Alert.alert(
+                            'Use your location?',
+                            'FyndMate uses your location to show your city and country on your profile. You can change this anytime in Settings.',
+                            [
+                                { text: 'Not Now', onPress: () => resolve(false), style: 'cancel' },
+                                { text: 'Allow', onPress: () => resolve(true) },
+                            ]
+                        );
+                    });
+                    if (userWantsToAllow) {
+                        const requested = await Location.requestForegroundPermissionsAsync();
+                        if (requested.granted) {
+                            const level = await getPermissionLevel();
+                            effectivePermission = level;
+                            setPermission(level);
+                            await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, level);
+                        } else {
+                            effectivePermission = 'denied';
+                            setPermission('denied');
+                            await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
+                        }
+                    } else {
+                        effectivePermission = 'denied';
+                        setPermission('denied');
+                        await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
+                    }
+                }
+                await AsyncStorage.setItem(promptedKey, '1');
+            }
+
+            if (effectivePermission === 'denied' && effectivePref === 'on') {
+                effectivePref = 'off';
+                setPreference('off');
+                await AsyncStorage.setItem(LOCATION_SHARING_KEY, 'off');
+                setCurrentLocation(null);
+                setLastUpdated(null);
+                apiClient.patch('/api/users/me/location-settings', {
+                    locationSharing: 'off',
+                }).catch((error) => {
+                    console.error('Failed to sync denied permission state to server:', error);
+                });
+            }
+
+            await syncBackgroundUpdatesForState(effectivePref, effectivePermission);
             setInitialized(true);
             
             // Auto-update on app launch if preference is 'on'
-            if (savedPref === 'on') {
+            if (effectivePref === 'on') {
                 console.log('📍 Auto-updating location on app launch...');
                 // Small delay to ensure everything is ready
                 setTimeout(() => {
@@ -468,7 +689,37 @@ export function useLocation() {
         }
         
         initLocation();
-    }, []); // Run once on mount
+    }, [profile?.locationSharing, profile?.locationPermission, user?.id]); // Re-run on auth/profile availability
+
+    useEffect(() => {
+        if (!initialized) return;
+        syncBackgroundUpdatesForState(preference, permission).catch((error) => {
+            console.error('Failed to synchronize background location state:', error);
+        });
+    }, [initialized, preference, permission]);
+
+    // Foreground periodic update when sharing is ON.
+    useEffect(() => {
+        if (!initialized || !user?.id || preference !== 'on') return;
+        const intervalId = setInterval(() => {
+            updateLocationNow().catch((error) => {
+                console.error('Periodic location update failed:', error);
+            });
+        }, LOCATION_UPDATE_INTERVAL_MS);
+
+        const appStateSub = AppState.addEventListener('change', (state) => {
+            if (state === 'active') {
+                updateLocationNow().catch((error) => {
+                    console.error('Foreground resume location update failed:', error);
+                });
+            }
+        });
+
+        return () => {
+            clearInterval(intervalId);
+            appStateSub.remove();
+        };
+    }, [initialized, preference, user?.id]);
 
     return {
         preference,

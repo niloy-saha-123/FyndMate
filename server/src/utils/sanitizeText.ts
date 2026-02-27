@@ -7,7 +7,8 @@
  * HTML sanitization and output encoding.
  */
 
-const CONTROL_CHARS = /[\u0000-\u001F\u007F]/g;
+// Allow newlines and tabs; strip other control chars.
+const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 const HTML_TAGS = /<[^>]*>/g;
 
 export function sanitizeText(input: string): string {

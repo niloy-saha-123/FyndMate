@@ -39,7 +39,7 @@ npm start
 
 ## 🛠 Features
 - **Swipe Deck**: Tender-style card swiping for discovering project partners.
-- **Real-time Chat**: Direct messaging with your matches.
+- **Real-time Messages**: Direct messaging with your matches.
 - **GitHub Integration**: View developer activity and projects directly on their profiles.
 
 ## 📁 Project Structure
