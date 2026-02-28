@@ -285,25 +285,30 @@ export default function MessageScreen() {
         setMatchStatus(status);
         setMessages(msgs);
 
-        let resolvedOtherUser = resolveOtherUserFromMessages(msgs);
+        // Quick interim header from message sender data (instant, may lack signed pic)
+        const interimUser = resolveOtherUserFromMessages(msgs);
+        if (interimUser && !otherUser) {
+          setOtherUser(interimUser);
+          applyHeaderForOtherUser(interimUser, normalizedMatchId);
+        }
 
-        if (!resolvedOtherUser && status.otherUserId) {
+        // Always fetch the authoritative profile — it has a signed picture
+        // and a guaranteed id for navigation
+        if (status.otherUserId) {
           try {
             const profile = await getUserProfileById(status.otherUserId);
-            resolvedOtherUser = {
+            if (!mounted) return;
+            const authoritative: MatchUserInfo = {
               id: profile.id,
               name: profile.name || "User",
               profilePicture: profile.profilePicture ?? null,
             };
+            setOtherUser(authoritative);
+            applyHeaderForOtherUser(authoritative, normalizedMatchId);
           } catch (error) {
             console.error("Failed to resolve other user profile for header", error);
+            // If profile fetch failed but we have interim data, keep it
           }
-        }
-
-        if (!mounted) return;
-        if (resolvedOtherUser) {
-          setOtherUser(resolvedOtherUser);
-          applyHeaderForOtherUser(resolvedOtherUser, normalizedMatchId);
         }
       } catch (error) {
         console.error(error);
@@ -619,11 +624,13 @@ export default function MessageScreen() {
         try {
           const created = await sendMessage(normalizedMatchId, content);
           replaceLocalMessage(localPending.id, {
-            ...localPending,
             ...created,
             status: "sent",
             clientError: null,
-            sender: localPending.sender,
+            tempId: localPending.tempId,
+            // Use server sender data (includes signed profilePicture)
+            // Fall back to local sender only if server omits it
+            sender: created.sender ?? localPending.sender,
           });
         } catch (err) {
           markLocalFailed(localPending.id);

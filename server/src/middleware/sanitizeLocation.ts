@@ -83,6 +83,12 @@ export async function sanitizeLocationResponse(
     reply: FastifyReply,
     payload: any
 ): Promise<any> {
+    // The location-secret endpoint intentionally returns the locationSecret
+    // field as its payload — exempting it from the global sanitizer.
+    if (request.url === '/api/users/me/location-secret') {
+        return payload;
+    }
+
     // Only sanitize JSON responses
     const contentType = reply.getHeader('content-type');
     if (typeof contentType === 'string' && contentType.includes('application/json')) {

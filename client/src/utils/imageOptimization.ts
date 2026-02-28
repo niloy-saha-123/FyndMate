@@ -31,6 +31,13 @@ export const getOptimizedImageUrl = (
   quality = 85
 ): string => {
   if (!url) return ''; // Return empty string if no URL
+
+  // Signed URLs contain a token parameter — appending extra query params
+  // will break the signature or cause a 4xx if Image Transformations
+  // are not enabled on the Supabase project. Return as-is.
+  if (url.includes('token=')) {
+    return url;
+  }
   
   // Check if URL already has query parameters
   const separator = url.includes('?') ? '&' : '?';

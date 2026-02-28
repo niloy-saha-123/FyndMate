@@ -19,7 +19,7 @@ export async function locationRoutes(app: FastifyInstance) {
     app.get('/users/me/location-secret', {
         preValidation: [authMiddleware],
         preHandler: [
-            rateLimit({ limit: 5, windowSec: 3600, keyPrefix: 'loc_secret' })
+            rateLimit({ limit: 15, windowSec: 3600, keyPrefix: 'loc_secret' })
         ]
     }, async (req: FastifyRequest, reply: FastifyReply) => {
         // TODO [POST-MVP]: Define AuthenticatedRequest type to avoid (req as any).user casts.
