@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo, useRef } from "react";
 import { supabase } from "./supabaseClient";
 import { Session } from "@supabase/supabase-js";
-import { getOrCreateProfile, UserProfile } from "../services/profileService";
+import { getOrCreateProfile, fetchMyProfileWithToken, UserProfile } from "../services/profileService";
 
 export type AppUser = {
   id: string;
@@ -49,10 +49,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfileError(null);
 
       try {
-        const fetchedProfile = await getOrCreateProfile(currentSession.user.id, {
-          name: currentSession.user.user_metadata?.full_name ?? "",
-          onboardingCompleted: false,
-        });
+        let fetchedProfile: UserProfile | null = null;
+
+        // Prefer server API so profilePicture is signed and privacy filters apply.
+        if (currentSession.access_token) {
+          try {
+            fetchedProfile = await fetchMyProfileWithToken(currentSession.access_token);
+          } catch (apiErr) {
+            console.warn("Profile API fetch failed, falling back to Supabase client", apiErr);
+          }
+        }
+
+        if (!fetchedProfile) {
+          fetchedProfile = await getOrCreateProfile(currentSession.user.id, {
+            name: currentSession.user.user_metadata?.full_name ?? "",
+            onboardingCompleted: false,
+          });
+        }
+
         setProfile(fetchedProfile);
       } catch (err: any) {
         console.error("Failed to load profile", err);
