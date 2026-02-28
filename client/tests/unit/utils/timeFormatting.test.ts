@@ -37,7 +37,8 @@ describe('timeFormatting utils', () => {
   it('formatDateSection returns Today/Yesterday/date', () => {
     expect(formatDateSection(new Date('2026-02-12T08:00:00.000Z'))).toBe('Today');
     expect(formatDateSection(new Date('2026-02-11T08:00:00.000Z'))).toBe('Yesterday');
-    expect(formatDateSection(new Date('2026-01-15T00:00:00.000Z'))).toBe('January 15, 2026');
+    const localeDate = new Date('2026-01-15T00:00:00.000Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    expect(formatDateSection(new Date('2026-01-15T00:00:00.000Z'))).toBe(localeDate);
   });
 
   it('isLastInBurst identifies burst boundaries correctly', () => {
