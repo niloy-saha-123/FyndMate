@@ -6,6 +6,7 @@
 
 import { prisma } from '../lib/prisma.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
+import { signProfilePicture } from '../utils/profilePicture.js';
 
 const MAX_MESSAGE_LENGTH = 2000;
 const EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes (matches RLS policy)
@@ -72,8 +73,32 @@ export class MessageService {
       },
     });
 
+    // Sign all unique sender profile pictures in parallel (deduplicated)
+    const senderMap = new Map<string, string | null>();
+    for (const msg of messages) {
+      if (msg.sender?.profilePicture && !senderMap.has(msg.senderId)) {
+        senderMap.set(msg.senderId, msg.sender.profilePicture);
+      }
+    }
+
+    const signedPictures = new Map<string, string | null>();
+    await Promise.all(
+      Array.from(senderMap.entries()).map(async ([senderId, rawPicture]) => {
+        signedPictures.set(senderId, await signProfilePicture(rawPicture));
+      })
+    );
+
     return messages.map((message) => {
-      if (!message.isDeleted) return message;
+      const signedPic = signedPictures.get(message.senderId) ?? null;
+      const signedMessage = {
+        ...message,
+        sender: {
+          ...message.sender,
+          profilePicture: signedPic,
+        },
+      };
+
+      if (!message.isDeleted) return signedMessage;
 
       const deletedLabel =
         message.senderId === userId
@@ -81,7 +106,7 @@ export class MessageService {
           : `${message.sender.name} deleted a message`;
 
       return {
-        ...message,
+        ...signedMessage,
         content: deletedLabel,
       };
     });
@@ -105,13 +130,42 @@ export class MessageService {
       throw new Error(`Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`);
     }
 
-    return prisma.message.create({
+    const created = await prisma.message.create({
       data: {
         matchId,
         senderId,
         content: sanitized,
       },
+      select: {
+        id: true,
+        matchId: true,
+        senderId: true,
+        content: true,
+        createdAt: true,
+        readAt: true,
+        editedAt: true,
+        isDeleted: true,
+        deletedBy: true,
+        deletedAt: true,
+        sender: {
+          select: {
+            id: true,
+            name: true,
+            profilePicture: true,
+          },
+        },
+      },
     });
+
+    const signedPicture = await signProfilePicture(created.sender.profilePicture);
+
+    return {
+      ...created,
+      sender: {
+        ...created.sender,
+        profilePicture: signedPicture,
+      },
+    };
   }
 
   /**

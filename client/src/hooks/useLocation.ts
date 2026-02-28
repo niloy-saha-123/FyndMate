@@ -58,9 +58,23 @@ async function getLocationSecret(): Promise<string | null> {
         
         if (!secret) {
             console.log('📍 Fetching location secret from server...');
-            // Fetch from server (endpoint returns user's locationSecret)
-            const response = await apiClient.get<{ locationSecret: string }>('/api/users/me/location-secret');
-            secret = response.locationSecret;
+            try {
+                // Fetch from server (endpoint returns user's locationSecret)
+                const response = await apiClient.get<{ locationSecret: string }>('/api/users/me/location-secret');
+                secret = response.locationSecret;
+                if (!secret) {
+                    console.error('📍 Server returned empty locationSecret — check server sanitizer configuration');
+                    return null;
+                }
+            } catch (apiError: any) {
+                // Surface rate-limit errors clearly instead of a generic re-auth message
+                if (apiError?.status === 429 || apiError?.message?.includes('429')) {
+                    console.warn('📍 Location secret rate-limited. Will retry later.');
+                    return null;
+                }
+                console.error('📍 Failed to fetch location secret from API:', apiError?.message || apiError);
+                return null;
+            }
             
             if (secret) {
                 // Store securely for future use
@@ -85,12 +99,14 @@ async function generateLocationSignature(payload: {
 }): Promise<string> {
     const secret = await getLocationSecret();
     if (!secret) {
-        throw new Error('Location secret not available. Please re-authenticate.');
+        throw new Error('Location update temporarily unavailable. Please try again in a few minutes.');
     }
 
     const { userId, latitude, longitude, timestamp, nonce } = payload;
     const data = `${userId}|${latitude}|${longitude}|${timestamp}|${nonce}`;
-    return computeHmacSha256(data, secret);
+    const signature = computeHmacSha256(data, secret);
+
+    return signature;
 }
 
 /**

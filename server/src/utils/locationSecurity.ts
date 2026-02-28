@@ -75,15 +75,16 @@ async function getUserSecret(userId: string): Promise<Buffer> {
  */
 export async function verifySignature(payload: {
     userId: string;
+    supabaseId: string; // Used by the client to generate the HMAC
     latitude: number;
     longitude: number;
     timestamp: string;
     nonce: string;
     signature: string;
 }): Promise<boolean> {
-    const { userId, latitude, longitude, timestamp, nonce, signature } = payload;
+    const { userId, supabaseId, latitude, longitude, timestamp, nonce, signature } = payload;
     const secret = await getUserSecret(userId);
-    const data = `${userId}|${latitude}|${longitude}|${timestamp}|${nonce}`;
+    const data = `${supabaseId}|${latitude}|${longitude}|${timestamp}|${nonce}`;
     const expected = crypto.createHmac('sha256', secret).update(data).digest('hex');
 
     if (expected.length !== signature.length) {

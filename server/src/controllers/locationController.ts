@@ -38,6 +38,7 @@ import { invalidateAllFeedCache, invalidateProfileViewCacheForProfile } from '..
  */
 export async function updateLocationHandler(req: FastifyRequest, reply: FastifyReply) {
     const userId = (req as any).user.id; // set by auth middleware
+    const supabaseId = (req as any).user.supabaseId;
     const {
         latitude,
         longitude,
@@ -107,6 +108,7 @@ export async function updateLocationHandler(req: FastifyRequest, reply: FastifyR
     // Note: Signature now covers lat/lon only (not city/country, since server generates those)
     const isValid = await verifySignature({
         userId,
+        supabaseId,
         latitude,
         longitude,
         timestamp,
