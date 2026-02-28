@@ -1,5 +1,5 @@
 import { supabase } from "../auth/supabaseClient";
-import { apiClient } from "../lib/apiClient";
+import { apiClient, getApiBaseUrl } from "../lib/apiClient";
 import {
   PROFILE_BIO_MAX_LENGTH,
   PROFILE_MAX_SKILLS,
@@ -131,6 +131,29 @@ export async function getOrCreateProfile(
     location: null,
     onboardingCompleted: false,
   };
+}
+
+/**
+ * Fetch the authenticated user's profile via the API so server-side signing
+ * (profilePicture) and privacy filtering are applied. Accepts a raw access
+ * token to avoid apiClient dependency during auth bootstrap.
+ */
+export async function fetchMyProfileWithToken(accessToken: string): Promise<UserProfile> {
+  const url = `${getApiBaseUrl()}/api/profile/me`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => 'Failed to fetch profile');
+    throw new Error(message);
+  }
+
+  const body = await response.json();
+  return normalizeProfile(body);
 }
 
 /**
