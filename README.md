@@ -33,37 +33,14 @@ Mobile app for finding project collaborators, built with an Expo (React Native) 
 ### Server (local)
 1) `cd server && npm install`  
 2) Start local Supabase Postgres: `npx supabase start` (or point env vars at an existing Supabase project).  
-3) Copy `.env.example` to `.env.local` and set:
-   - `DATABASE_URL`, `DIRECT_URL` (Postgres)
-   - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-   - `REDIS_URL`
-   - Optional: `ACCOUNT_DELETION_RETENTION_DAYS`
+3) Copy `.env.example` to `.env.local` and fill in the required server environment variables.
 4) Generate client & seed test data: `npm run db:local:setup` (creates `.env.test`, pushes schema, generates Prisma client).  
 5) Run the API: `npm run dev` (loads `.env.local`).
 
 ### Client (local)
 1) `cd client && npm install`  
-2) Create `.env` (or `.env.local`) with:
-   - `EXPO_PUBLIC_SUPABASE_URL`
-   - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-   - `EXPO_PUBLIC_API_URL` (e.g., `http://<your-ip>:3000`)
-   - Optional debug flags: `EXPO_PUBLIC_DEBUG_API_METRICS=1`, `EXPO_PUBLIC_DEBUG_SWIPE=1`
+2) Create `.env` (or `.env.local`) and fill in the required client environment variables.
 3) Start Expo: `npx expo start` (use a physical device for push notifications).
-
-## Environment Variables
-- **Client**
-  - `EXPO_PUBLIC_SUPABASE_URL`
-  - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-  - `EXPO_PUBLIC_API_URL`
-  - `EXPO_PUBLIC_DEBUG_API_METRICS` (optional)
-  - `EXPO_PUBLIC_DEBUG_SWIPE` (optional)
-- **Server**
-  - `DATABASE_URL`, `DIRECT_URL`
-  - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
-  - `REDIS_URL`
-  - `PORT` (default 3000)
-  - `ACCOUNT_DELETION_RETENTION_DAYS`
-  - Optional: `CONTACT_EMAIL` for Nominatim geocoding
 
 ## Features
 - Supabase authentication (email/password, Google OAuth).
