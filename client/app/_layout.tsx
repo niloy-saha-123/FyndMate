@@ -39,13 +39,63 @@ export default function RootLayout() {
               <SafeAreaView style={styles.statusbar}>
                 <OfflineBanner />
                 <Stack>
-                  <Stack.Screen name="index" options={{ headerShown: false }} />
-                  <Stack.Screen name="login" options={{ headerShown: false }} />
-                  <Stack.Screen name="auth" options={{ headerShown: false }} />
-                  <Stack.Screen name="app-gate" options={{ headerShown: false }} />
-                  <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen name="messages/profile/[userId]" options={{ headerShown: false }} />
+                  {/* Landing / welcome */}
+                  <Stack.Screen
+                    name="index"
+                    options={{ headerShown: false }}
+                  />
+
+                  {/* Auth screens */}
+                  <Stack.Screen
+                    name="login"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="auth"
+                    options={{ headerShown: false }}
+                  />
+
+                  {/* App gating / onboarding / main app */}
+                  <Stack.Screen
+                    name="app-gate"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="onboarding"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="(tabs)"
+                    options={{ headerShown: false }}
+                  />
+
+                  {/* Message profile detail */}
+                  <Stack.Screen
+                    name="messages/profile/[userId]"
+                    options={{ headerShown: false }}
+                  />
+
+                  {/* Legal */}
+                  <Stack.Screen
+                    name="terms"
+                    options={{
+                      headerShown: false,
+                      presentation: 'transparentModal',
+                      animation: 'slide_from_bottom',
+                      contentStyle: { backgroundColor: 'transparent' },
+                      gestureEnabled: true,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="privacy"
+                    options={{
+                      headerShown: false,
+                      presentation: 'transparentModal',
+                      animation: 'slide_from_bottom',
+                      contentStyle: { backgroundColor: 'transparent' },
+                      gestureEnabled: true,
+                    }}
+                  />
                 </Stack>
               </SafeAreaView>
             </ApiClientInitializer>

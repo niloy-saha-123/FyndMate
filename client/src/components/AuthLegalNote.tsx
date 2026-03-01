@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text } from "react-native";
+import { Link } from "expo-router";
 import { COLORS } from "../theme/colors";
 
 /**
@@ -9,8 +10,15 @@ import { COLORS } from "../theme/colors";
 export function AuthLegalNote() {
   return (
     <Text style={styles.text}>
-      By continuing, you agree to our <Text style={styles.link}>Terms</Text> and{" "}
-      <Text style={styles.link}>Privacy Policy</Text>.
+      By continuing, you agree to our{" "}
+      <Link href="/terms" asChild>
+        <Text style={styles.link}>Terms</Text>
+      </Link>{" "}
+      and{" "}
+      <Link href="/privacy" asChild>
+        <Text style={styles.link}>Privacy Policy</Text>
+      </Link>
+      .
     </Text>
   );
 }

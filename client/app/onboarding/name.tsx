@@ -64,9 +64,18 @@ export default function OnboardingName() {
       title="Let’s start with your name"
       subtitle="Tell people what to call you"
       onBack={async () => {
-        // User wants to cancel onboarding/sign-up and go back to auth hub
-        await supabase.auth.signOut();
-        router.replace("/login");
+        // User wants to cancel onboarding/sign-up and go back to the previous screen.
+        // Sign out the Supabase session, then navigate back in the stack so the
+        // animation direction correctly reflects a "back" action (left-to-right).
+        try {
+          await supabase.auth.signOut();
+        } catch (err) {
+          console.warn("Failed to sign out during onboarding back navigation:", err);
+        }
+
+        // Prefer a stack back navigation for proper back animation.
+        // In typical flows this returns to the welcome screen.
+        router.back();
       }}
     >
       <View style={styles.formSection}>
