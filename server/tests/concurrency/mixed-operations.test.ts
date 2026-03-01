@@ -24,7 +24,7 @@ describe('Mixed Operations Concurrency', () => {
         await likeService.createLike(user2.id, user1.id, true, 'Hello there!');
 
         const results = await Promise.allSettled([
-            likeService.createLike(user1.id, user2.id, true, 'Hi back!'),
+            likeService.createLike(user1.id, user2.id, true, 'Hi back there!'),
             blockService.blockUser(user1.id, user2.id),
         ]);
 

@@ -1,6 +1,7 @@
 /**
  * @file tests/integration/routes/notification-routes.test.ts
  * @description Integration tests for notification routes
+ * TODO: Add single-delivery assertions once push pipeline is finalized (server-only vs edge trigger).
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -265,7 +266,7 @@ describe('GET /api/notifications/preferences/:matchId', () => {
         const token = await getAuthToken('test-user', 'test@example.com');
         const me = await prisma.user.findFirst({ orderBy: { createdAt: 'desc' } });
         const other = await createDummyUser('Other');
-        const like = await likeService.createLike(other.id, me!.id, true, 'Hi');
+        const like = await likeService.createLike(other.id, me!.id, true, 'Hi there!!');
         const match = await matchService.acceptLike(like.id);
 
         const response = await app.inject({
@@ -284,7 +285,7 @@ describe('GET /api/notifications/preferences/:matchId', () => {
         const token = await getAuthToken('test-user', 'test@example.com');
         const user1 = await createDummyUser('User1');
         const user2 = await createDummyUser('User2');
-        const like = await likeService.createLike(user1.id, user2.id, true, 'Hi');
+        const like = await likeService.createLike(user1.id, user2.id, true, 'Hi there!!');
         const match = await matchService.acceptLike(like.id);
 
         const response = await app.inject({
@@ -317,7 +318,7 @@ describe('PUT /api/notifications/preferences/:matchId', () => {
         const token = await getAuthToken('test-user', 'test@example.com');
         const me = await prisma.user.findFirst({ orderBy: { createdAt: 'desc' } });
         const other = await createDummyUser('Other');
-        const like = await likeService.createLike(other.id, me!.id, true, 'Hi');
+        const like = await likeService.createLike(other.id, me!.id, true, 'Hi there!!');
         const match = await matchService.acceptLike(like.id);
 
         const response = await app.inject({
@@ -348,7 +349,7 @@ describe('PUT /api/notifications/preferences/:matchId', () => {
         const token = await getAuthToken('test-user', 'test@example.com');
         const user1 = await createDummyUser('User1');
         const user2 = await createDummyUser('User2');
-        const like = await likeService.createLike(user1.id, user2.id, true, 'Hi');
+        const like = await likeService.createLike(user1.id, user2.id, true, 'Hi there!!');
         const match = await matchService.acceptLike(like.id);
 
         const response = await app.inject({

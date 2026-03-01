@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/utils/timeFormatting.test.ts
+ * @description Unit tests for time formatting helpers.
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   convertToLocalTime,

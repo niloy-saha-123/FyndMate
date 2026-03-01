@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/utils/imageOptimization.test.ts
+ * @description Unit tests for Supabase image URL optimization helpers.
+ */
 import { describe, it, expect } from 'vitest';
 import {
   getOptimizedImageUrl,

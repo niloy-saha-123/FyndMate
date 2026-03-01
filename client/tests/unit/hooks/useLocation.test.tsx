@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/hooks/useLocation.test.tsx
+ * @description Unit tests for the location hook (permissions, updates, failure paths).
+ */
 import React from 'react';
 import { Alert } from 'react-native';
 import renderer, { act } from 'react-test-renderer';

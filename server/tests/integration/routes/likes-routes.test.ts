@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../src/app.js';
-import { getAuthToken, clearDatabase, createDummyUser } from '../../helpers.js';
+import { createAuthedUser, getAuthToken, clearDatabase, createDummyUser } from '../../helpers.js';
 import { likeService } from '../../../src/services/like.service.js';
 import { prisma } from '../../../src/lib/prisma.js';
 
@@ -165,11 +165,8 @@ describe('Likes Routes', () => {
      * Should return matched: true for instant match
      */
     it('returns { matched: true } for instant match', async () => {
-        const user1 = await createDummyUser('User1');
-        const token1 = await getAuthToken(user1.supabaseId, user1.email);
-
-        const user2 = await createDummyUser('User2');
-        const token2 = await getAuthToken(user2.supabaseId, user2.email);
+        const { token: token1, user: user1 } = await createAuthedUser('User1');
+        const { token: token2, user: user2 } = await createAuthedUser('User2');
 
         // User1 likes User2
         await app.inject({
@@ -311,7 +308,8 @@ describe('Likes Routes', () => {
 
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.body);
-        expect(body).toHaveProperty('match');
+        expect(body).toHaveProperty('id');
+        expect(body).toHaveProperty('status', 'active');
     });
 
     /**

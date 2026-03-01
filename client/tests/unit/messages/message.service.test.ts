@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/messages/message.service.test.ts
+ * @description Unit tests for message service API calls.
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGet, mockPost, mockPatch } = vi.hoisted(() => {

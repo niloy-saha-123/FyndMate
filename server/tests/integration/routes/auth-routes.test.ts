@@ -7,7 +7,6 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../src/app.js';
 import { getAuthToken, clearDatabase } from '../../helpers.js';
-import { prisma } from '../../../src/lib/prisma.js';
 
 describe('Auth Routes', () => {
     let app: FastifyInstance;
@@ -40,7 +39,7 @@ describe('Auth Routes', () => {
 
         expect(response.statusCode).toBe(400);
         const body = JSON.parse(response.body);
-        expect(body.message).toContain('Missing fields');
+        expect(body.error).toContain('Missing fields');
     });
 
     /**
@@ -58,7 +57,7 @@ describe('Auth Routes', () => {
 
         expect(response.statusCode).toBe(400);
         const body = JSON.parse(response.body);
-        expect(body.message).toContain('Missing fields');
+        expect(body.error).toContain('Missing fields');
     });
 
     /**
@@ -76,7 +75,7 @@ describe('Auth Routes', () => {
 
         expect(response.statusCode).toBe(400);
         const body = JSON.parse(response.body);
-        expect(body.message).toContain('Missing fields');
+        expect(body.error).toContain('Missing fields');
     });
 
     /**
@@ -95,7 +94,7 @@ describe('Auth Routes', () => {
 
         expect(response.statusCode).toBe(400);
         const body = JSON.parse(response.body);
-        expect(body.message).toContain('Invalid or reserved name');
+        expect(body.error).toContain('Invalid or reserved name');
     });
 
     /**
@@ -114,7 +113,7 @@ describe('Auth Routes', () => {
 
         expect(response.statusCode).toBe(400);
         const body = JSON.parse(response.body);
-        expect(body.message).toContain('Invalid or reserved name');
+        expect(body.error).toContain('Invalid or reserved name');
     });
 
     /**
@@ -133,7 +132,7 @@ describe('Auth Routes', () => {
 
         expect(response.statusCode).toBe(400);
         const body = JSON.parse(response.body);
-        expect(body.message).toContain('Invalid or reserved name');
+        expect(body.error).toContain('Invalid or reserved name');
     });
 
     /**
@@ -152,8 +151,10 @@ describe('Auth Routes', () => {
 
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.body);
-        expect(body).toHaveProperty('id');
-        expect(body).toHaveProperty('email');
+        expect(body).toHaveProperty('success', true);
+        expect(body).toHaveProperty('user');
+        expect(body.user).toHaveProperty('appUserId');
+        expect(body.user).toHaveProperty('email');
     });
 
     /**

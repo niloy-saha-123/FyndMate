@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/hooks/useFeed.test.tsx
+ * @description Unit tests for the happy-path behaviors of useFeed.
+ */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

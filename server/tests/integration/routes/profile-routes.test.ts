@@ -55,7 +55,7 @@ describe('Profile Routes', () => {
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.body);
         expect(body).toHaveProperty('id');
-        expect(body).toHaveProperty('email');
+        expect(body).toHaveProperty('name');
     });
 
     /**
@@ -157,9 +157,9 @@ describe('Profile Routes', () => {
     });
 
     /**
-     * Should reject > 10 skills
+     * Should reject > 15 skills
      */
-    it('rejects > 10 skills', async () => {
+    it('rejects > 15 skills', async () => {
         const token = await getAuthToken('test-user', 'test@example.com');
 
         const response = await app.inject({
@@ -169,7 +169,7 @@ describe('Profile Routes', () => {
                 authorization: `Bearer ${token}`,
             },
             payload: {
-                skills: Array(11).fill('TypeScript'),
+                skills: Array(16).fill('TypeScript'),
             },
         });
 

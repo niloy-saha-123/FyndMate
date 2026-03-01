@@ -1,3 +1,7 @@
+/**
+ * @file tests/components/NeoChip.test.tsx
+ * @description Unit tests for the NeoChip UI component.
+ */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { StyleSheet, TouchableOpacity } from 'react-native';

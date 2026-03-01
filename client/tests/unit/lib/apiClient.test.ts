@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/lib/apiClient.test.ts
+ * @description Unit tests for the centralized API client wrapper.
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const makeFetchResponse = (status: number, body: any, ok?: boolean) => {

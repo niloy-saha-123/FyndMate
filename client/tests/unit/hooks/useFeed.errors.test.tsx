@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/hooks/useFeed.errors.test.tsx
+ * @description Unit tests covering failure and retry paths in useFeed.
+ */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

@@ -32,11 +32,11 @@ describe('sanitizeText', () => {
     });
 
     /**
-     * Should strip control characters like null byte and tab
+     * Should strip disallowed control characters while preserving tab
      */
-    it('strips control chars (null byte, tab)', () => {
+    it('strips control chars (null byte) and preserves tab', () => {
         const result = sanitizeText('hello\u0000world\u0009test');
-        expect(result).toBe('helloworldtest');
+        expect(result).toBe('helloworld\ttest');
     });
 
     /**

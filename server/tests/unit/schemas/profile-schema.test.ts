@@ -5,6 +5,21 @@
 
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
+import {
+  PROFILE_BIO_MAX_LENGTH,
+  PROFILE_MAX_SKILLS,
+  PROFILE_MAX_INTERESTS,
+  PROFILE_TAG_MAX_LENGTH,
+  PROFILE_NAME_MAX_LENGTH,
+  PROFILE_GITHUB_MAX_LENGTH,
+  PROFILE_MAX_PROJECTS,
+  PROFILE_MAX_EXPERIENCES,
+  PROFILE_PROJECT_NAME_MAX_LENGTH,
+  PROFILE_PROJECT_DESCRIPTION_MAX_LENGTH,
+  PROFILE_EXPERIENCE_COMPANY_MAX_LENGTH,
+  PROFILE_EXPERIENCE_POSITION_MAX_LENGTH,
+  PROFILE_EXPERIENCE_DESCRIPTION_MAX_LENGTH,
+} from '../../../src/schemas/validation-constants.js';
 
 const optionalDateSchema = z.preprocess((value) => {
   if (value === '' || value === null || value === undefined) {
@@ -14,14 +29,14 @@ const optionalDateSchema = z.preprocess((value) => {
 }, z.coerce.date().optional());
 
 const projectInputSchema = z.object({
-  name: z.string().min(1).max(100),
-  description: z.string().min(1).max(500),
+  name: z.string().min(1).max(PROFILE_PROJECT_NAME_MAX_LENGTH),
+  description: z.string().min(1).max(PROFILE_PROJECT_DESCRIPTION_MAX_LENGTH),
 });
 
 const experienceInputSchema = z.object({
-  company: z.string().min(1).max(100),
-  position: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
+  company: z.string().min(1).max(PROFILE_EXPERIENCE_COMPANY_MAX_LENGTH),
+  position: z.string().min(1).max(PROFILE_EXPERIENCE_POSITION_MAX_LENGTH),
+  description: z.string().max(PROFILE_EXPERIENCE_DESCRIPTION_MAX_LENGTH).optional(),
   startDate: optionalDateSchema,
   endDate: optionalDateSchema,
 }).refine((val) => {
@@ -34,16 +49,16 @@ const experienceInputSchema = z.object({
 
 // Recreate the schema from profile.routes.ts since it's not exported.
 const updateProfileSchema = z.object({
-  fullName: z.string().min(1).max(100).optional(),
+  fullName: z.string().min(1).max(PROFILE_NAME_MAX_LENGTH).optional(),
   birthDate: z.coerce.date().optional(),
-  bio: z.string().max(300).optional(),
-  skills: z.array(z.string().max(30)).max(10).optional(),
-  interests: z.array(z.string().max(30)).max(10).optional(),
-  githubUsername: z.string().max(100).optional(),
+  bio: z.string().max(PROFILE_BIO_MAX_LENGTH).optional(),
+  skills: z.array(z.string().max(PROFILE_TAG_MAX_LENGTH)).max(PROFILE_MAX_SKILLS).optional(),
+  interests: z.array(z.string().max(PROFILE_TAG_MAX_LENGTH)).max(PROFILE_MAX_INTERESTS).optional(),
+  githubUsername: z.string().max(PROFILE_GITHUB_MAX_LENGTH).optional(),
   locationSharing: z.string().max(20).optional(),
   onboardingCompleted: z.boolean().optional(),
-  projects: z.array(projectInputSchema).max(5).optional(),
-  experiences: z.array(experienceInputSchema).max(5).optional(),
+  projects: z.array(projectInputSchema).max(PROFILE_MAX_PROJECTS).optional(),
+  experiences: z.array(experienceInputSchema).max(PROFILE_MAX_EXPERIENCES).optional(),
 });
 
 describe('updateProfileSchema', () => {
@@ -68,9 +83,9 @@ describe('updateProfileSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects > 10 skills', () => {
+  it(`rejects > ${PROFILE_MAX_SKILLS} skills`, () => {
     const result = updateProfileSchema.safeParse({
-      skills: Array(11).fill('TypeScript'),
+      skills: Array(PROFILE_MAX_SKILLS + 1).fill('TypeScript'),
     });
     expect(result.success).toBe(false);
   });
@@ -146,4 +161,3 @@ describe('updateProfileSchema', () => {
     expect(result.success).toBe(false);
   });
 });
-

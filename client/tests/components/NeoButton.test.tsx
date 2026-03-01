@@ -1,3 +1,7 @@
+/**
+ * @file tests/components/NeoButton.test.tsx
+ * @description Unit tests for the NeoButton UI component.
+ */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { StyleSheet, TouchableOpacity } from 'react-native';

@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.js';
-import { getAuthToken, clearDatabase, createDummyUser } from '../helpers.js';
+import { getAuthToken, clearDatabase, createDummyUser, createAuthedUser } from '../helpers.js';
 import { prisma } from '../../src/lib/prisma.js';
 
 describe('Input Sanitization Security', () => {
@@ -68,7 +68,7 @@ describe('Input Sanitization Security', () => {
      * Should sanitize XSS in message field
      */
     it('handles XSS in message field (sanitized or rejected)', async () => {
-        const token = await getAuthToken('test-user', 'test@example.com');
+        const { token, user } = await createAuthedUser('InputSanitizationUser');
         const other = await createDummyUser('Other');
 
         const response = await app.inject({
@@ -86,10 +86,10 @@ describe('Input Sanitization Security', () => {
 
         // Should either reject or sanitize
         if (response.statusCode === 200) {
-            const me = await prisma.user.findFirst({ orderBy: { createdAt: 'desc' } });
             const like = await prisma.like.findFirst({
-                where: { likerId: me!.id },
+                where: { likerId: user.id, likedId: other.id },
             });
+            expect(like).not.toBeNull();
             expect(like?.message).not.toContain('<script>');
         }
     });

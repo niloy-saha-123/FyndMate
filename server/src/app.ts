@@ -75,7 +75,12 @@ export async function buildApp() {
 
   app.addHook('onClose', async () => {
     await prisma.$disconnect();
-    await redis.quit();
+    try {
+      await redis.quit();
+    } catch (err) {
+      // Redis may already be disconnected or unavailable in local/test environments.
+      app.log.warn({ err }, 'Redis quit failed during shutdown');
+    }
   });
 
   // Health check

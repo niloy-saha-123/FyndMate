@@ -5,9 +5,39 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { FastifyInstance } from 'fastify';
+import { createClient } from '@supabase/supabase-js';
 import { buildApp } from '../../../src/app.js';
-import { getAuthToken, clearDatabase, createDummyUser } from '../../helpers.js';
+import { getAuthToken, clearDatabase } from '../../helpers.js';
 import { prisma } from '../../../src/lib/prisma.js';
+
+async function createAuthOnlyToken() {
+    const localSupabase = createClient(
+        'http://127.0.0.1:54321',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
+    );
+
+    const email = `middleware_${Date.now()}_${Math.random().toString(36).slice(2)}@test.com`;
+    const password = 'testpass123';
+
+    const { error: createError } = await localSupabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+    });
+    if (createError) {
+        throw new Error(`Failed to create auth-only test user: ${createError.message}`);
+    }
+
+    const { data: signInData, error: signInError } = await localSupabase.auth.signInWithPassword({
+        email,
+        password,
+    });
+    if (!signInData.session) {
+        throw new Error(`Failed to sign in auth-only test user: ${signInError?.message}`);
+    }
+
+    return signInData.session.access_token;
+}
 
 describe('Auth Middleware', () => {
     let app: FastifyInstance;
@@ -137,9 +167,8 @@ describe('Auth Middleware', () => {
      * Should auto-create user on first request
      */
     it('auto-creates user on first request', async () => {
-        const token = await getAuthToken('new-user', 'new@example.com');
-
         const usersBefore = await prisma.user.count();
+        const token = await createAuthOnlyToken();
 
         const response = await app.inject({
             method: 'GET',
@@ -152,15 +181,19 @@ describe('Auth Middleware', () => {
         expect(response.statusCode).toBe(200);
 
         const usersAfter = await prisma.user.count();
-        expect(usersAfter).toBeGreaterThan(usersBefore);
+        expect(usersAfter).toBe(usersBefore + 1);
     });
 
     /**
      * Should return 403 for banned users
      */
     it('returns 403 for banned users', async () => {
-        const banned = await createDummyUser('Banned', { banned: true });
-        const token = await getAuthToken(banned.supabaseId, banned.email);
+        const token = await getAuthToken('test-user', 'test@example.com');
+        const me = await prisma.user.findFirst({ orderBy: { createdAt: 'desc' } });
+        await prisma.user.update({
+            where: { id: me!.id },
+            data: { banned: true },
+        });
 
         const response = await app.inject({
             method: 'GET',
@@ -196,15 +229,18 @@ describe('Auth Middleware', () => {
 
         const response = await app.inject({
             method: 'GET',
-            url: '/api/profile/me',
+            url: '/auth/me',
             headers: {
                 authorization: `Bearer ${token}`,
             },
         });
 
         const body = JSON.parse(response.body);
-        expect(body).toHaveProperty('id');
-        expect(body).toHaveProperty('email');
-        expect(body).toHaveProperty('supabaseId');
+        expect(response.statusCode).toBe(200);
+        expect(body).toHaveProperty('success', true);
+        expect(body).toHaveProperty('user');
+        expect(body.user).toHaveProperty('appUserId');
+        expect(body.user).toHaveProperty('email');
+        expect(body.user).toHaveProperty('supabaseId');
     });
 });

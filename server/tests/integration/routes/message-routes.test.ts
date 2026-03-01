@@ -102,10 +102,11 @@ describe('Message Routes', () => {
             });
 
             expect(response.statusCode).toBe(200);
-            const messages = JSON.parse(response.body);
-            expect(Array.isArray(messages)).toBe(true);
+            const body = JSON.parse(response.body);
+            expect(body).toHaveProperty('data');
+            expect(Array.isArray(body.data)).toBe(true);
             // Intro message from liker was created on accept
-            expect(messages.length).toBeGreaterThanOrEqual(1);
+            expect(body.data.length).toBeGreaterThanOrEqual(1);
         });
 
         it('rejects non-participant', async () => {
@@ -155,7 +156,8 @@ describe('Message Routes', () => {
             });
 
             expect(response.statusCode).toBe(200);
-            const messages = JSON.parse(response.body);
+            const body = JSON.parse(response.body);
+            const messages = body.data;
             const messageIds = messages.map((m: any) => m.id);
             expect(messageIds).not.toContain(oldMessage.id);
 

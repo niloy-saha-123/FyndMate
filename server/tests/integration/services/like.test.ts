@@ -95,7 +95,7 @@ describe('LikeService', () => {
             other.id,
             me.id,
             true,
-            'Hi back!'
+            'Hi back there!'
         );
 
         expect(result).toHaveProperty('user1Id');

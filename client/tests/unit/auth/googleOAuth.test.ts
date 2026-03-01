@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/auth/googleOAuth.test.ts
+ * @description Unit tests for Google OAuth flow handling in the client.
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const replaceMock = vi.fn();

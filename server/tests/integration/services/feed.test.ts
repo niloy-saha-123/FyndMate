@@ -65,7 +65,7 @@ describe('FeedService', () => {
         const other = await createDummyUser('Other');
         const third = await createDummyUser('Third');
 
-        await likeService.createLike(other.id, me.id, true, 'Hey there!');
+        await likeService.createLike(other.id, me.id, true, 'Hey there!!');
 
         const feed = await feedService.getFeed(me.id, 20);
         expect(feed).toHaveLength(1);
@@ -130,7 +130,7 @@ describe('FeedService', () => {
 
         // Create match
         await likeService.createLike(me.id, other.id, true, 'Hello there!');
-        await likeService.createLike(other.id, me.id, true, 'Hi back!');
+        await likeService.createLike(other.id, me.id, true, 'Hi back there!');
 
         const feed = await feedService.getFeed(me.id, 20);
         expect(feed).toHaveLength(1);
@@ -202,8 +202,10 @@ describe('FeedService', () => {
      */
     it('handles cursor-based pagination', async () => {
         const me = await createDummyUser('Me');
-        const user1 = await createDummyUser('User1');
-        const user2 = await createDummyUser('User2');
+        await createDummyUser('User1');
+        // Ensure deterministic createdAt ordering for cursor-based pagination assertions.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        await createDummyUser('User2');
 
         const page1 = await feedService.getFeed(me.id, 1);
         expect(page1).toHaveLength(1);

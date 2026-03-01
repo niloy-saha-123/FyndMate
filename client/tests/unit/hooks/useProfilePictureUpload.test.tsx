@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/hooks/useProfilePictureUpload.test.tsx
+ * @description Unit tests for the profile picture upload hook.
+ */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
