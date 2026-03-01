@@ -18,6 +18,10 @@ export async function signInWithGoogle() {
       options: {
         redirectTo: redirectUrl,
         skipBrowserRedirect: true,
+        // Always show Google account chooser, even if a session exists
+        queryParams: {
+          prompt: "select_account",
+        },
       },
     });
 

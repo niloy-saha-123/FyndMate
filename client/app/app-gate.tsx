@@ -43,26 +43,20 @@ export default function AppGate() {
 
   return (
     <LoadingGate
-      message={user ? "Fetching your profile" : "Checking session"}
+      message={user ? "Preparing your account" : "Checking session"}
       subtext="Sit tight while we decide where to take you."
     />
   );
 }
 
 function resolveDestination(profile: UserProfile) {
-  if (!profile.name || profile.name.trim().length < 2) {
+  // If onboarding is not completed, always start at Step 1.
+  // Individual steps will be prefilled from profile/onboarding state.
+  if (!profile.onboardingCompleted) {
     return "/onboarding/name";
   }
 
-  if (!profile.birthDate) {
-    return "/onboarding/birthdate";
-  }
-
-  if (!profile.gender) {
-    return "/onboarding/gender";
-  }
-
-  return profile.onboardingCompleted ? "/(tabs)" : "/onboarding/gender";
+  return "/(tabs)";
 }
 
 const styles = StyleSheet.create({

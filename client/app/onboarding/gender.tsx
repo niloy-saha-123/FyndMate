@@ -6,8 +6,7 @@ import { AnimatedCTA } from "../../src/components/AnimatedCTA";
 import { useOnboardingForm } from "../../src/hooks/useOnboardingForm";
 import { updateProfile } from "../../src/services/profileService";
 import { useAuth } from "../../src/auth/AuthProvider";
-
-const PRIMARY = "#6058AE";
+import { COLORS } from "../../src/theme/colors";
 
 const options = [
   "Female",
@@ -77,6 +76,7 @@ export default function OnboardingGender() {
       step={3}
       title="Choose your gender"
       subtitle="Pick the option that fits you"
+      onBack={() => router.back()}
     >
       <View style={styles.optionsGrid}>
         {options.map((option) => {
@@ -110,7 +110,7 @@ export default function OnboardingGender() {
         />
         {submitting ? (
           <View style={styles.loaderRow}>
-            <ActivityIndicator color={PRIMARY} style={{ marginTop: 12 }} />
+            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 12 }} />
             <Text style={styles.loaderText}>Setting up your account...</Text>
           </View>
         ) : null}
@@ -128,31 +128,26 @@ const styles = StyleSheet.create({
   optionCard: {
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
     flexBasis: "47%",
   },
   optionActive: {
-    borderColor: PRIMARY,
-    backgroundColor: "#FFF7ED",
-    shadowColor: PRIMARY,
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+    borderColor: COLORS.textPrimary,
+    backgroundColor: COLORS.gray100,
   },
   optionText: {
-    color: "#111827",
+    color: COLORS.textPrimary,
     fontWeight: "600",
   },
   optionTextActive: {
-    color: PRIMARY,
+    color: COLORS.textPrimary,
   },
   error: {
     marginTop: 8,
-    color: "#DC2626",
+    color: COLORS.danger,
     fontSize: 13,
   },
   loaderRow: {
@@ -162,6 +157,6 @@ const styles = StyleSheet.create({
   },
   loaderText: {
     marginTop: 10,
-    color: "#4B5563",
+    color: COLORS.textSecondary,
   },
 });

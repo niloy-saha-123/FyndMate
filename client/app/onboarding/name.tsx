@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { TextInput, Text, View, StyleSheet, LayoutAnimation, Platform, UIManager } from "react-native";
 import { router } from "expo-router";
-import LottieView from "lottie-react-native";
 import { OnboardingScaffold } from "../../src/components/OnboardingScaffold";
 import { AnimatedCTA } from "../../src/components/AnimatedCTA";
 import { useOnboardingForm } from "../../src/hooks/useOnboardingForm";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { updateProfile } from "../../src/services/profileService";
-
-const PRIMARY = "#6058AE";
+import { supabase } from "../../src/auth/supabaseClient";
+import { COLORS } from "../../src/theme/colors";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -17,7 +16,7 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 export default function OnboardingName() {
   const { data, update } = useOnboardingForm();
   const { user, profile, setProfileLocally } = useAuth();
-  const [fullName, setFullName] = useState(data.fullName ?? "");
+  const [fullName, setFullName] = useState(data.fullName ?? profile?.name ?? "");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,16 +63,12 @@ export default function OnboardingName() {
       step={1}
       title="Let’s start with your name"
       subtitle="Tell people what to call you"
+      onBack={async () => {
+        // User wants to cancel onboarding/sign-up and go back to auth hub
+        await supabase.auth.signOut();
+        router.replace("/login");
+      }}
     >
-      <View style={styles.animationContainer}>
-        <LottieView
-          source={require("../../assets/animation.json")}
-          autoPlay
-          loop
-          style={styles.animation}
-        />
-      </View>
-
       <View style={styles.formSection}>
         <Text style={styles.label}>Full name</Text>
         <TextInput
@@ -103,35 +98,26 @@ export default function OnboardingName() {
 }
 
 const styles = StyleSheet.create({
-  animationContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  animation: {
-    height: 140,
-    width: 140,
-  },
   formSection: {
     gap: 8,
-    marginTop: 4,
+    marginTop: 32,
   },
   label: {
-    color: "#374151",
+    color: COLORS.textSecondary,
     fontSize: 14,
     fontWeight: "600",
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    borderRadius: 16,
     padding: 14,
     fontSize: 16,
-    backgroundColor: "#FFF",
-    color: "#111827",
+    backgroundColor: COLORS.surface,
+    color: COLORS.textPrimary,
   },
   error: {
-    color: "#DC2626",
+    color: COLORS.danger,
     fontSize: 13,
     marginTop: 4,
   },
