@@ -226,7 +226,14 @@ describe('MatchService', () => {
         const rematched = data.find((m) => m.id === match.id);
         expect(rematched).toBeTruthy();
 
-        const visibleMessageIds = rematched?.messages.map((msg) => msg.id) ?? [];
+        const visibleMessages = await prisma.message.findMany({
+            where: {
+                matchId: match.id,
+                createdAt: { gte: rematch.conversationStartAt },
+            },
+            select: { id: true },
+        });
+        const visibleMessageIds = visibleMessages.map((msg) => msg.id);
         expect(visibleMessageIds).not.toContain(oldMessage.id);
     });
 

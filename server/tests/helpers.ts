@@ -47,6 +47,85 @@ export async function createDummyUser(name: string, overrides: any = {}) {
     });
 }
 
+const LOCAL_SUPABASE_URL = 'http://127.0.0.1:54321';
+const LOCAL_SUPABASE_SERVICE_ROLE_KEY =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+
+function createLocalSupabaseAdminClient() {
+    return createClient(LOCAL_SUPABASE_URL, LOCAL_SUPABASE_SERVICE_ROLE_KEY);
+}
+
+function assertLocalTestEnvironment() {
+    const dbUrl = process.env.DATABASE_URL || '';
+    const supabaseUrl = process.env.SUPABASE_URL || '';
+
+    if (!dbUrl.includes('127.0.0.1') && !dbUrl.includes('localhost')) {
+        throw new Error(
+            '🚨 SECURITY: Tests can only run against local database. ' +
+                'DATABASE_URL must contain 127.0.0.1 or localhost. ' +
+                `Current: ${dbUrl.substring(0, 30)}...`,
+        );
+    }
+
+    if (!supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('localhost')) {
+        throw new Error(
+            '🚨 SECURITY: Tests can only run against local Supabase. ' +
+                'SUPABASE_URL must contain 127.0.0.1 or localhost. ' +
+                `Current: ${supabaseUrl}`,
+        );
+    }
+}
+
+/**
+ * Creates a deterministic authenticated test identity and returns both token and app user row.
+ * Use this helper when tests need token-user identity to match seeded data.
+ */
+export async function createAuthedUser(name = 'Test User') {
+    assertLocalTestEnvironment();
+
+    const localSupabase = createLocalSupabaseAdminClient();
+    const testEmail = `test_${Date.now()}_${Math.random().toString(36).slice(2)}@test.com`;
+    const testPassword = 'testpass123';
+
+    const { data: userData, error: createError } = await localSupabase.auth.admin.createUser({
+        email: testEmail,
+        password: testPassword,
+        email_confirm: true,
+    });
+
+    if (createError || !userData.user) {
+        throw new Error(`Failed to create test user: ${createError?.message}`);
+    }
+
+    const user = await prisma.user.create({
+        data: {
+            supabaseId: userData.user.id,
+            email: testEmail,
+            name,
+            profilePicture: 'https://avatar.iran.liara.run/public/42',
+            bio: 'Test user for validation tests',
+            location: 'Test City',
+            timezone: 'UTC',
+        },
+    });
+
+    const { data: signInData, error: signInError } = await localSupabase.auth.signInWithPassword({
+        email: testEmail,
+        password: testPassword,
+    });
+
+    if (!signInData.session) {
+        throw new Error(`Failed to sign in test user: ${signInError?.message}`);
+    }
+
+    return {
+        token: signInData.session.access_token,
+        user,
+        supabaseUserId: userData.user.id,
+        email: testEmail,
+    };
+}
+
 /**
  * Deletes all data from the database.
  * MUST be called in `beforeEach` to guarantee a clean slate for every test.
@@ -119,71 +198,6 @@ export async function clearDatabase() {
  * @returns JWT access token for the Authorization header
  */
 export async function getAuthToken(supabaseId: string, email: string): Promise<string> {
-    // SAFETY: Prevent running tests against production database
-    const dbUrl = process.env.DATABASE_URL || '';
-    const supabaseUrl = process.env.SUPABASE_URL || '';
-
-    if (!dbUrl.includes('127.0.0.1') && !dbUrl.includes('localhost')) {
-        throw new Error(
-            '🚨 SECURITY: Tests can only run against local database. ' +
-                'DATABASE_URL must contain 127.0.0.1 or localhost. ' +
-                `Current: ${dbUrl.substring(0, 30)}...`,
-        );
-    }
-
-    if (!supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('localhost')) {
-        throw new Error(
-            '🚨 SECURITY: Tests can only run against local Supabase. ' +
-                'SUPABASE_URL must contain 127.0.0.1 or localhost. ' +
-                `Current: ${supabaseUrl}`,
-        );
-    }
-
-    // Use local Supabase (same as get_test_token.ts)
-    const localSupabase = createClient(
-        'http://127.0.0.1:54321',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
-    );
-
-    // Create unique test user
-    const testEmail = `test_${Date.now()}_${Math.random().toString(36).slice(2)}@test.com`;
-    const testPassword = 'testpass123';
-
-    // Create user in Supabase Auth
-    const { data: userData, error: createError } = await localSupabase.auth.admin.createUser({
-        email: testEmail,
-        password: testPassword,
-        email_confirm: true,
-    });
-
-    if (createError || !userData.user) {
-        throw new Error(`Failed to create test user: ${createError?.message}`);
-    }
-
-    const supabaseUserId = userData.user.id;
-
-    // Create user in database (CRITICAL - auth middleware checks this!)
-    await prisma.user.create({
-        data: {
-            supabaseId: supabaseUserId,
-            email: testEmail,
-            name: 'Test User',
-            profilePicture: 'https://avatar.iran.liara.run/public/42',
-            bio: 'Test user for validation tests',
-            location: 'Test City',
-            timezone: 'UTC',
-        },
-    });
-
-    // Sign in to get JWT token
-    const { data: signInData, error: signInError } = await localSupabase.auth.signInWithPassword({
-        email: testEmail,
-        password: testPassword,
-    });
-
-    if (!signInData.session) {
-        throw new Error(`Failed to sign in test user: ${signInError?.message}`);
-    }
-
-    return signInData.session.access_token;
+    const { token } = await createAuthedUser('Test User');
+    return token;
 }

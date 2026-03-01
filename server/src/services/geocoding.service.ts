@@ -102,7 +102,7 @@ export async function reverseGeocode(
                                     ? `FyndMate/1.0 (${process.env.CONTACT_EMAIL})`
                                     : 'FyndMate/1.0',
                             },
-                            timeout: 5000,
+                            timeout: 5000, // TODO: tighten to 3000–5000ms when background updates scale
                         }
                     );
 
@@ -153,5 +153,4 @@ export async function reverseGeocode(
 }
 
 // TODO: Upgrade to a paid service (Mapbox/Google) when scaling beyond free tier limits.
-
 

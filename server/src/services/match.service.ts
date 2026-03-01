@@ -259,21 +259,6 @@ export class MatchService {
             include: {
                 user1: { select: { ...publicUserMatchSelect, birthDate: true, city: true, country: true, locationSharing: true } },
                 user2: { select: { ...publicUserMatchSelect, birthDate: true, city: true, country: true, locationSharing: true } },
-                messages: {
-                    take: 1,
-                    orderBy: { createdAt: 'desc' },
-                    select: {
-                        id: true,
-                        content: true,
-                        senderId: true,
-                        createdAt: true,
-                        readAt: true,
-                        editedAt: true,
-                        isDeleted: true,
-                        deletedBy: true,
-                        deletedAt: true,
-                    }, // TODO [POST-MVP]: Implement proper read receipts and unread counts server-side.
-                }
             },
             orderBy: {
                 createdAt: 'desc',
@@ -288,35 +273,69 @@ export class MatchService {
             const { birthDate: _b1, locationSharing: _ls1, city: _c1, country: _ct1, ...u1 } = sanitizedUser1 as any;
             const { birthDate: _b2, locationSharing: _ls2, city: _c2, country: _ct2, ...u2 } = sanitizedUser2 as any;
 
-            // Sign both profile pictures in parallel instead of sequentially
+            // Fetch last message scoped to current conversation window
+            const lastMessage = await prisma.message.findFirst({
+                where: {
+                    matchId: m.id,
+                    createdAt: { gte: m.conversationStartAt },
+                },
+                orderBy: { createdAt: 'desc' },
+                select: {
+                    id: true,
+                    content: true,
+                    senderId: true,
+                    createdAt: true,
+                    readAt: true,
+                    editedAt: true,
+                    isDeleted: true,
+                    deletedBy: true,
+                    deletedAt: true,
+                },
+            });
+
+            const unreadCount = await prisma.message.count({
+                where: {
+                    matchId: m.id,
+                    createdAt: { gte: m.conversationStartAt },
+                    readAt: null,
+                    senderId: { not: userId },
+                },
+            });
+
             const [pic1, pic2] = await Promise.all([
                 signProfilePicture(u1.profilePicture),
                 signProfilePicture(u2.profilePicture),
             ]);
 
-            const conversationStartMs = new Date(m.conversationStartAt).getTime();
-            const visibleMessages = (m.messages ?? []).filter((msg: any) => {
-                return new Date(msg.createdAt).getTime() >= conversationStartMs;
-            });
-
-            const normalizedMessages = visibleMessages.map((msg: any) => {
-                if (!msg?.isDeleted) return msg;
-                const senderName = msg.senderId === userId
+            let normalizedLastMessage = lastMessage;
+            if (lastMessage?.isDeleted) {
+                const senderName = lastMessage.senderId === userId
                     ? 'You'
-                    : (msg.senderId === m.user1Id ? u1.name : u2.name);
+                    : (lastMessage.senderId === m.user1Id ? u1.name : u2.name);
                 const content = senderName === 'You'
                     ? 'You deleted a message'
                     : `${senderName} deleted a message`;
-                return { ...msg, content };
-            });
+                normalizedLastMessage = { ...lastMessage, content };
+            }
+
+            const lastMessageAt = normalizedLastMessage?.createdAt ?? m.createdAt;
 
             return {
                 ...m,
                 user1: { ...u1, profilePicture: pic1, age: age1 },
                 user2: { ...u2, profilePicture: pic2, age: age2 },
-                messages: normalizedMessages,
+                lastMessage: normalizedLastMessage ?? null,
+                lastMessageAt,
+                unreadCount,
             };
         }));
+
+        // Sort by latest message time desc, fallback to match creation
+        transformed.sort((a, b) => {
+            const aTime = new Date(a.lastMessageAt ?? a.createdAt).getTime();
+            const bTime = new Date(b.lastMessageAt ?? b.createdAt).getTime();
+            return bTime - aTime;
+        });
 
         const nextCursor = matches.length === limit ? matches[matches.length - 1].id : null;
         return { data: transformed, nextCursor };

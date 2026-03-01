@@ -23,7 +23,7 @@ describe('Blocking Concurrency', () => {
 
         // Create prerequisite interactions
         await likeService.createLike(user1.id, user2.id, true, 'Hello there!');
-        await likeService.createLike(user2.id, user1.id, true, 'Hi back!');
+        await likeService.createLike(user2.id, user1.id, true, 'Hi back there!');
 
         const results = await Promise.allSettled([
             blockService.blockUser(user1.id, user2.id),

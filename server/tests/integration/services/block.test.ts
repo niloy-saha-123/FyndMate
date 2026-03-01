@@ -47,9 +47,9 @@ describe('BlockService', () => {
     });
 
     /**
-     * Should remove matches when blocking
+     * Should mark matches as blocked when blocking
      */
-    it('removes matches when blocking', async () => {
+    it('marks matches as blocked when blocking', async () => {
         const me = await createDummyUser('Me');
         const other = await createDummyUser('Other');
 
@@ -68,7 +68,9 @@ describe('BlockService', () => {
             where: { id: match.id },
         });
 
-        expect(matchAfterBlock).toBeNull();
+        expect(matchAfterBlock).not.toBeNull();
+        expect(matchAfterBlock?.status).toBe('blocked');
+        expect(matchAfterBlock?.blockedBy).toBe(me.id);
     });
 
     /**

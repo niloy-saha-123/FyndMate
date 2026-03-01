@@ -1,3 +1,7 @@
+/**
+ * @file tests/components/NeoCard.test.tsx
+ * @description Unit tests for the NeoCard UI component.
+ */
 import React from 'react';
 import renderer from 'react-test-renderer';
 import { StyleSheet, View } from 'react-native';

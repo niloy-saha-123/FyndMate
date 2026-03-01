@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/messages/message.service.test.ts
+ * @description Unit tests for message service API calls.
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGet, mockPost, mockPatch } = vi.hoisted(() => {
@@ -22,6 +26,7 @@ import {
   unmatchMatch,
   blockMatch,
   reportUser,
+  markMessagesRead,
 } from '../../../src/messages/message.service';
 
 describe('message.service', () => {
@@ -29,21 +34,18 @@ describe('message.service', () => {
     vi.clearAllMocks();
   });
 
-  it('getMyMatches computes lastMessage and unreadCount', async () => {
+  it('getMyMatches returns data from API untouched', async () => {
     mockGet.mockResolvedValue({
       data: [
         {
           id: 'm1',
-          messages: [
-            { id: 'msg3', senderId: 'other', readAt: null, content: 'latest' },
-            { id: 'msg2', senderId: 'other', readAt: null, content: 'older unread' },
-            { id: 'msg1', senderId: 'me', readAt: null, content: 'mine' },
-          ],
+          lastMessage: { id: 'msg3' },
+          unreadCount: 2,
         },
       ],
     });
 
-    const matches = await getMyMatches('me');
+    const matches = await getMyMatches();
 
     expect(mockGet).toHaveBeenCalledWith('/api/matches');
     expect(matches).toHaveLength(1);
@@ -79,5 +81,13 @@ describe('message.service', () => {
       userId: 'user-2',
       reason: 'Spam and harassment in messages',
     });
+  });
+
+  it('markMessagesRead patches read endpoint', async () => {
+    mockPatch.mockResolvedValue({ updated: 5 });
+
+    await markMessagesRead('match-9');
+
+    expect(mockPatch).toHaveBeenCalledWith('/api/matches/match-9/messages/read');
   });
 });

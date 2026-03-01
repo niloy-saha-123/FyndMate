@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/constants/validation.test.ts
+ * @description Unit tests for shared validation constants and helpers.
+ */
 import { describe, it, expect } from 'vitest';
 import {
   isMessageValid,

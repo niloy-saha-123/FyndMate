@@ -1,4 +1,9 @@
+/**
+ * @file tests/unit/hooks/useLocation.test.tsx
+ * @description Unit tests for the location hook (permissions, updates, failure paths).
+ */
 import React from 'react';
+import { Alert } from 'react-native';
 import renderer, { act } from 'react-test-renderer';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -60,8 +65,9 @@ vi.mock('../../../src/auth/AuthProvider', () => ({
   }),
 }));
 
+const apiGetMock = vi.fn();
 vi.mock('../../../src/lib/apiClient', () => ({
-  apiClient: { patch: vi.fn().mockResolvedValue({}) },
+  apiClient: { patch: vi.fn().mockResolvedValue({}), get: apiGetMock },
   getApiBaseUrl: () => 'http://api.test',
 }));
 
@@ -134,5 +140,37 @@ describe('useLocation', () => {
 
     // Since pref is off, no current position should be requested
     expect(locationMock.getCurrentPositionAsync).not.toHaveBeenCalled();
+  });
+
+  it('alerts when location signature cannot be generated (e.g., rate limited)', async () => {
+    const alertSpy = vi.spyOn(Alert, 'alert').mockImplementation(() => {});
+
+    // Force secret fetch to fail so signature generation throws
+    apiGetMock.mockRejectedValue(new Error('rate limited'));
+
+    // Permit a full flow with auth/session and coordinates
+    locationMock.getCurrentPositionAsync.mockResolvedValue({ coords: { latitude: 1, longitude: 2 } });
+    const supabaseClient = await import('../../../src/auth/supabaseClient');
+    supabaseClient.supabase.auth.getSession = vi.fn().mockResolvedValue({
+      data: { session: { access_token: 'token', user: { id: 'user-1' } } },
+    });
+
+    const { useLocation } = await import('../../../src/hooks/useLocation');
+    const { result } = renderHook(() => useLocation());
+    await act(async () => {});
+
+    // Turn sharing on to exercise the update path
+    await act(async () => {
+      await result().changePreference('on');
+    });
+
+    await act(async () => {
+      await result().updateLocationNow();
+    });
+
+    expect(alertSpy).toHaveBeenCalled();
+    const args = alertSpy.mock.calls[0];
+    // Because state update is async, first alert is the preference guard
+    expect(args[0]).toBe('Location Disabled');
   });
 });

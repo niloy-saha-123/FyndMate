@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/services/profileService.test.ts
+ * @description Unit tests for profile service client helpers.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../src/lib/apiClient', () => {

@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/notifications/NotificationProvider.test.tsx
+ * @description Unit tests for push notification provider behavior.
+ */
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { describe, it, expect, vi, beforeEach } from 'vitest';

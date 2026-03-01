@@ -1,3 +1,7 @@
+/**
+ * @file tests/unit/utils/errorMessages.test.ts
+ * @description Unit tests for user-friendly error message helpers.
+ */
 import { describe, it, expect } from 'vitest';
 import { getUserFriendlyErrorMessage } from '../../../src/utils/errorMessages';
 

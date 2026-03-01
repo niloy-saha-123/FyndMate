@@ -1,22 +1,8 @@
 import { apiClient } from "../lib/apiClient";
 
-export async function getMyMatches(userId: string) {
+export async function getMyMatches() {
   const response = await apiClient.get<{ data: any[] }>("/api/matches");
-
-  return response.data.map(match => {
-    const lastMessage = match.messages?.[0] ?? null;
-
-    const unreadCount =
-      match.messages?.filter(
-        (m: any) => m.readAt === null && m.senderId !== userId
-      ).length ?? 0;
-
-    return {
-      ...match,
-      lastMessage,
-      unreadCount
-    };
-  });
+  return response.data;
 }
 
 export async function getMatchStatus(
@@ -29,8 +15,27 @@ export async function unblockMatch(matchId: string) {
   return apiClient.post(`/api/matches/${matchId}/unblock`);
 }
 
+// Fetch messages with cursor-based pagination. Returns { data, nextCursor }.
+export async function getMessagesPage(matchId: string, cursor?: string, limit = 50) {
+  const params = new URLSearchParams();
+  if (cursor) params.set('cursor', cursor);
+  if (limit) params.set('limit', String(limit));
+  const query = params.toString();
+  const path = query
+    ? `/api/matches/${matchId}/messages?${query}`
+    : `/api/matches/${matchId}/messages`;
+
+  return apiClient.get<{ data: any[]; nextCursor: string | null }>(path);
+}
+
+// Backwards compatibility helper for legacy callers that expect an array.
 export async function getMessages(matchId: string) {
-  return apiClient.get<any[]>(`/api/matches/${matchId}/messages`);
+  const res = await getMessagesPage(matchId, undefined, 100);
+  return res.data;
+}
+
+export async function markMessagesRead(matchId: string) {
+  return apiClient.patch(`/api/matches/${matchId}/messages/read`);
 }
 
 export async function sendMessage(matchId: string, content: string) {
