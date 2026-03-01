@@ -18,7 +18,8 @@ describe('imageOptimization utils', () => {
 
   it('appends params using ampersand when URL already has query', () => {
     const url = getOptimizedImageUrl('https://cdn.example.com/avatar.jpg?token=abc', 200, 80);
-    expect(url).toBe('https://cdn.example.com/avatar.jpg?token=abc&width=200&quality=80');
+    // Signed URLs are returned as-is to avoid breaking the signature
+    expect(url).toBe('https://cdn.example.com/avatar.jpg?token=abc');
   });
 
   it('uses preset values through helper', () => {
