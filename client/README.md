@@ -22,9 +22,9 @@ If you are running on your phone, you need to tell the app your laptop's local I
 
 1. Create a `.env` file:
    ```env
-   EXPO_PUBLIC_API_URL=http://YOUR_LAPTOP_IP:3000/api
-   EXPO_PUBLIC_SUPABASE_URL=http://YOUR_LAPTOP_IP:54321
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+EXPO_PUBLIC_API_URL=http://YOUR_LAPTOP_IP:3000
+EXPO_PUBLIC_SUPABASE_URL=http://YOUR_LAPTOP_IP:54321
+EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
    ```
    *(You can find your laptop's IP by running `ifconfig` on Mac or `ipconfig` on Windows).*
 

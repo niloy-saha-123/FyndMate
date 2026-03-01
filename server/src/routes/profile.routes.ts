@@ -43,6 +43,7 @@ const ACCOUNT_DELETION_RETENTION_DAYS = Math.max(
 const PROFILE_VIEW_CACHE_TTL_SECONDS = 90;
 
 const projectInputSchema = z.object({
+  id: z.string().uuid().optional(),
   name: z.string().min(1).max(PROFILE_PROJECT_NAME_MAX_LENGTH),
   description: z.string().min(1).max(PROFILE_PROJECT_DESCRIPTION_MAX_LENGTH),
 });
@@ -65,6 +66,7 @@ const optionalExperienceDateInputSchema = z.preprocess((value) => {
 }, z.string().regex(EXPERIENCE_DATE_REGEX, 'Date must use YYYY-MM format').optional());
 
 const experienceInputSchema = z.object({
+  id: z.string().uuid().optional(),
   company: z.string().min(1).max(PROFILE_EXPERIENCE_COMPANY_MAX_LENGTH),
   position: z.string().min(1).max(PROFILE_EXPERIENCE_POSITION_MAX_LENGTH),
   description: z.string().max(PROFILE_EXPERIENCE_DESCRIPTION_MAX_LENGTH).optional(),
@@ -278,7 +280,7 @@ export default async function profileRoutes(app: FastifyInstance) {
           if (!name || !description) {
             throw new Error(`projects.${idx}: name and description are required`);
           }
-          return { title: name, description, techStack: [] as string[] };
+          return { id: project.id, title: name, description, techStack: [] as string[] };
         });
 
         const sanitizedExperiences = experiences?.map((experience, idx) => {
@@ -307,6 +309,7 @@ export default async function profileRoutes(app: FastifyInstance) {
           }
 
           return {
+            id: experience.id,
             company,
             position,
             description: description || null,
@@ -372,23 +375,85 @@ export default async function profileRoutes(app: FastifyInstance) {
         });
 
         if (sanitizedProjects) {
-          // TODO [10K Users]: Replace deleteMany/createMany with diff-based upserts to avoid write amplification.
-          await tx.project.deleteMany({ where: { userId } });
-          if (sanitizedProjects.length > 0) {
-            await tx.project.createMany({
-              data: sanitizedProjects.map((project) => ({ ...project, userId })),
-            });
-          }
+          const providedIds = sanitizedProjects.map((p) => p.id).filter(Boolean) as string[];
+
+          // Update existing projects
+          const updates = sanitizedProjects
+            .filter((p) => p.id)
+            .map((p) =>
+              tx.project.update({
+                where: { id: p.id as string, userId },
+                data: { title: p.title, description: p.description, techStack: p.techStack },
+              })
+            );
+
+          // Create new projects (no id)
+          const creates = sanitizedProjects
+            .filter((p) => !p.id)
+            .map((p) =>
+              tx.project.create({
+                data: { title: p.title, description: p.description, techStack: p.techStack, userId },
+              })
+            );
+
+          // Delete only those removed (when client sends at least one id)
+          const deletes =
+            providedIds.length > 0
+              ? tx.project.deleteMany({
+                  where: {
+                    userId,
+                    id: { notIn: providedIds },
+                  },
+                })
+              : Promise.resolve();
+
+          await Promise.all([...updates, ...creates, deletes].filter(Boolean) as any[]);
         }
 
         if (sanitizedExperiences) {
-          // TODO [10K Users]: Replace deleteMany/createMany with diff-based upserts to avoid write amplification.
-          await tx.experience.deleteMany({ where: { userId } });
-          if (sanitizedExperiences.length > 0) {
-            await tx.experience.createMany({
-              data: sanitizedExperiences.map((experience) => ({ ...experience, userId })),
-            });
-          }
+          const providedIds = sanitizedExperiences.map((e) => e.id).filter(Boolean) as string[];
+
+          const updates = sanitizedExperiences
+            .filter((e) => e.id)
+            .map((e) =>
+              tx.experience.update({
+                where: { id: e.id as string, userId },
+                data: {
+                  company: e.company,
+                  position: e.position,
+                  description: e.description,
+                  startDate: e.startDate,
+                  endDate: e.endDate,
+                },
+              })
+            );
+
+          const creates = sanitizedExperiences
+            .filter((e) => !e.id)
+            .map((e) =>
+              tx.experience.create({
+                data: {
+                  company: e.company,
+                  position: e.position,
+                  description: e.description,
+                  startDate: e.startDate,
+                  endDate: e.endDate,
+                  userId,
+                },
+              })
+            );
+
+          const deletes =
+            providedIds.length > 0
+              ? tx.experience.deleteMany({
+                  where: {
+                    userId,
+                    id: { notIn: providedIds },
+                  },
+                })
+              : Promise.resolve();
+
+          await Promise.all([...updates, ...creates, deletes].filter(Boolean) as any[]);
         }
 
         return tx.user.findUnique({

@@ -52,7 +52,7 @@ export default async function messageRoutes(app: FastifyInstance) {
 
     // --- Messages ---
 
-    // GET /api/matches/:matchId/messages
+    // GET /api/matches/:matchId/messages (paginated)
     app.get(
         '/matches/:matchId/messages',
         {
@@ -70,17 +70,52 @@ export default async function messageRoutes(app: FastifyInstance) {
                     message: first?.message || 'Invalid match ID',
                 });
             }
+            const { limit: rawLimit, cursor } = request.query as { limit?: string; cursor?: string };
+            const limit = Math.max(1, Math.min(Number(rawLimit) || 50, 100));
             const { matchId } = paramsResult.data;
 
             try {
-                const messages = await messageService.getMessages(matchId, user.id);
-                return reply.send(messages);
+                const result = await messageService.getMessagesPaginated(matchId, user.id, limit, cursor);
+                return reply.send(result);
             } catch (err: any) {
                 if (err.message === 'Match not found' || err.message === 'Not authorized') {
                     return reply.status(403).send({ error: err.message });
                 }
                 request.log.error(err);
                 return reply.status(500).send({ error: 'Failed to fetch messages' });
+            }
+        }
+    );
+
+    // PATCH /api/matches/:matchId/messages/read - mark all messages from other user as read
+    app.patch(
+        '/matches/:matchId/messages/read',
+        {
+            preHandler: [
+                rateLimit({ limit: 30, windowSec: 60, keyPrefix: 'message_read' }),
+            ],
+        },
+        async (request, reply) => {
+            const user = request.user!;
+            const paramsResult = matchIdParamSchema.safeParse(request.params);
+            if (!paramsResult.success) {
+                const first = paramsResult.error.issues[0];
+                return reply.status(400).send({
+                    error: 'Validation failed',
+                    message: first?.message || 'Invalid match ID',
+                });
+            }
+            const { matchId } = paramsResult.data;
+
+            try {
+                const result = await messageService.markMessagesRead(matchId, user.id);
+                return reply.send(result);
+            } catch (err: any) {
+                if (err.message === 'Match not found' || err.message === 'Not authorized') {
+                    return reply.status(403).send({ error: err.message });
+                }
+                request.log.error(err);
+                return reply.status(500).send({ error: 'Failed to mark messages read' });
             }
         }
     );

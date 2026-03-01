@@ -40,10 +40,21 @@ export class MessageService {
   }
 
   /**
-   * Get messages for a match. User must be a participant.
+   * Get messages for a match with pagination. User must be a participant.
    * Includes sender profile data for UI display.
    */
   async getMessages(matchId: string, userId: string) {
+    // Backward compatibility for any legacy callers: return the first page of newest messages
+    return this.getMessagesPaginated(matchId, userId, 100).then((r) => r.data);
+  }
+
+  /**
+   * Paginated message retrieval ordered from newest -> oldest on the wire,
+   * normalized to chronological order for UI rendering. Uses cursor-based
+   * pagination by message id to avoid offset scans on large threads.
+   */
+  async getMessagesPaginated(matchId: string, userId: string, limit: number, cursor?: string) {
+    const safeLimit = Math.max(1, Math.min(limit, 200));
     const match = await this.ensureMatchParticipant(matchId, userId);
 
     const messages = await prisma.message.findMany({
@@ -51,7 +62,10 @@ export class MessageService {
         matchId,
         createdAt: { gte: match.conversationStartAt },
       },
-      orderBy: { createdAt: 'asc' }, // Oldest first - UI will reverse for display
+      orderBy: [
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
       select: {
         id: true,
         matchId: true,
@@ -71,6 +85,8 @@ export class MessageService {
           }
         }
       },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      take: safeLimit + 1, // fetch one extra to detect nextCursor
     });
 
     // Sign all unique sender profile pictures in parallel (deduplicated)
@@ -88,7 +104,13 @@ export class MessageService {
       })
     );
 
-    return messages.map((message) => {
+    const hasMore = messages.length > safeLimit;
+    const sliced = hasMore ? messages.slice(0, safeLimit) : messages;
+
+    // Reverse to chronological order for UI (oldest -> newest)
+    const chronological = [...sliced].reverse();
+
+    const normalized = chronological.map((message) => {
       const signedPic = signedPictures.get(message.senderId) ?? null;
       const signedMessage = {
         ...message,
@@ -110,6 +132,11 @@ export class MessageService {
         content: deletedLabel,
       };
     });
+
+    return {
+      data: normalized,
+      nextCursor: hasMore ? sliced[sliced.length - 1].id : null,
+    };
   }
 
   /**
@@ -302,6 +329,28 @@ export class MessageService {
       ...updated,
       content: deletedLabel,
     };
+  }
+
+  /**
+   * Mark all messages in a match as read for the current user.
+   * Only marks messages sent by the other participant and within the active conversation window.
+   */
+  async markMessagesRead(matchId: string, userId: string) {
+    const match = await this.ensureMatchParticipant(matchId, userId);
+
+    const result = await prisma.message.updateMany({
+      where: {
+        matchId,
+        senderId: { not: userId },
+        readAt: null,
+        createdAt: { gte: match.conversationStartAt },
+      },
+      data: {
+        readAt: new Date(),
+      },
+    });
+
+    return { updated: result.count };
   }
 }
 

@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/auth/AuthProvider';
@@ -75,7 +76,7 @@ export default function MessagesTab() {
       if (!user || refetchInFlightRef.current) return;
       refetchInFlightRef.current = true;
       try {
-        const fresh = await getMyMatches(user.id);
+        const fresh = await getMyMatches();
         setMatches(fresh);
         persistMessagesCache(user.id, fresh);
       } catch (error) {
@@ -85,6 +86,14 @@ export default function MessagesTab() {
       }
     }, 300);
   }, [user]);
+
+  // Refetch on tab focus to ensure previews/order are current
+  useFocusEffect(
+    useCallback(() => {
+      scheduleRefetchMatches();
+      return () => {};
+    }, [scheduleRefetchMatches])
+  );
 
   useEffect(() => {
     if (!user || loading) return;
@@ -101,7 +110,7 @@ export default function MessagesTab() {
       }
 
       try {
-        const fresh = await getMyMatches(user.id);
+        const fresh = await getMyMatches();
         if (!mounted) return;
         setMatches(fresh);
         persistMessagesCache(user.id, fresh);
@@ -195,6 +204,7 @@ export default function MessagesTab() {
                 ...match,
                 lastMessage: msg,
                 unreadCount: match.unreadCount + unreadIncrement,
+                lastMessageAt: msg.createdAt,
               };
             });
             if (!touched) return prev;
@@ -260,7 +270,7 @@ export default function MessagesTab() {
     setOptionsActionLoading('block');
     try {
       await blockMatch(selectedMatch.id);
-      const fresh = await getMyMatches(user.id);
+      const fresh = await getMyMatches();
       setMatches(fresh);
       persistMessagesCache(user.id, fresh);
       setOptionsModalVisible(false);
@@ -392,7 +402,7 @@ export default function MessagesTab() {
             if (!user) return;
             setLoadingMessages(true);
             try {
-              const fresh = await getMyMatches(user.id);
+          const fresh = await getMyMatches();
               setMatches(fresh);
               persistMessagesCache(user.id, fresh);
             } finally {

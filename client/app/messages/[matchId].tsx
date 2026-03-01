@@ -17,7 +17,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, router, useNavigation } from "expo-router";
 import { useAuth } from "../../src/auth/AuthProvider";
 import {
-  getMessages,
+  getMessagesPage,
   sendMessage,
   editMessage,
   deleteMessage,
@@ -25,6 +25,7 @@ import {
   unmatchMatch,
   blockMatch,
   reportUser,
+  markMessagesRead,
 } from "../../src/messages/message.service";
 import { subscribeToMessages } from "../../src/messages/message.realtime";
 import { useMessageNotificationGuard } from "../../src/notifications/useMessageNotificationGuard";
@@ -146,6 +147,7 @@ export default function MessageScreen() {
   }
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [processedMessages, setProcessedMessages] = useState<MessageWithMetadata[]>([]);
   const [visibleTimestamps, setVisibleTimestamps] = useState<Set<string>>(new Set()); // Track which timestamps should be visible
   const [text, setText] = useState("");
@@ -276,17 +278,20 @@ export default function MessageScreen() {
 
     const fetchThreadFromNetwork = async () => {
       try {
-        const [status, msgs] = await Promise.all([
+        const [status, page] = await Promise.all([
           getMatchStatus(normalizedMatchId),
-          getMessages(normalizedMatchId)
+          getMessagesPage(normalizedMatchId, undefined, 50)
         ]);
         if (!mounted) return;
 
         setMatchStatus(status);
-        setMessages(msgs);
+        setMessages(page.data);
+        setNextCursor(page.nextCursor ?? null);
+        // Mark all as read once we have the latest page
+        markMessagesRead(normalizedMatchId).catch(() => {});
 
         // Quick interim header from message sender data (instant, may lack signed pic)
-        const interimUser = resolveOtherUserFromMessages(msgs);
+        const interimUser = resolveOtherUserFromMessages(page.data);
         if (interimUser && !otherUser) {
           setOtherUser(interimUser);
           applyHeaderForOtherUser(interimUser, normalizedMatchId);
@@ -322,10 +327,10 @@ export default function MessageScreen() {
     (async () => {
       const cached = await loadThreadCache(cacheKey);
       if (mounted && cached) {
-        setMessages(cached.messages);
-        setMatchStatus(cached.matchStatus);
-        if (cached.otherUser) {
-          setOtherUser(cached.otherUser);
+          setMessages(cached.messages);
+          setMatchStatus(cached.matchStatus);
+          if (cached.otherUser) {
+            setOtherUser(cached.otherUser);
           applyHeaderForOtherUser(cached.otherUser, normalizedMatchId);
         }
         setLoadingThread(false);
@@ -382,6 +387,10 @@ export default function MessageScreen() {
 
           return [...prev, payload];
         });
+        // If we just received a message from the other user while viewing, mark it read
+        if (payload.senderId !== user.id) {
+          markMessagesRead(normalizedMatchId).catch(() => {});
+        }
       }
     );
 
@@ -689,6 +698,17 @@ export default function MessageScreen() {
           ref={flatListRef}
           data={processedMessages}
           keyExtractor={item => item.id || item.tempId || Math.random().toString()}
+          onEndReachedThreshold={0.2}
+          onEndReached={async () => {
+            if (!nextCursor || !normalizedMatchId || loadingThread) return;
+            try {
+              const page = await getMessagesPage(normalizedMatchId, nextCursor, 50);
+              setMessages((prev) => [...prev, ...page.data]);
+              setNextCursor(page.nextCursor ?? null);
+            } catch (err) {
+              console.error('Failed to load more messages', err);
+            }
+          }}
           contentContainerStyle={styles.messageList}
           renderItem={({ item, index }) => {
             const isMyMessage = item.senderId === user.id;
