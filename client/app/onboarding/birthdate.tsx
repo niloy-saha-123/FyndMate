@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -16,11 +17,10 @@ import { AnimatedCTA } from "../../src/components/AnimatedCTA";
 import { useOnboardingForm } from "../../src/hooks/useOnboardingForm";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { updateProfile } from "../../src/services/profileService";
-import { COLORS } from "../../src/theme/colors";
+import { COLORS, SHADOWS, BORDERS, RADIUS } from "../../src/theme/colors";
 
 const MIN_AGE = 13;
 const MIN_DATE = new Date(1900, 0, 1); // Jan 1, 1900
-const MAX_DATE = new Date(2030, 11, 31); // Dec 31, 2030
 
 function getToday(): Date {
   const t = new Date();
@@ -47,6 +47,7 @@ function formatDisplay(date: Date | null): string {
 export default function OnboardingBirthdate() {
   const { data, update } = useOnboardingForm();
   const { user, profile, setProfileLocally } = useAuth();
+  const insets = useSafeAreaInsets();
   const today = getToday();
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(() =>
@@ -126,8 +127,10 @@ export default function OnboardingBirthdate() {
       mode="date"
       display="spinner"
       minimumDate={MIN_DATE}
-      maximumDate={MAX_DATE}
+      maximumDate={today}
       onChange={handlePickerChange}
+      accentColor={COLORS.primary}
+      themeVariant="light"
     />
   );
 
@@ -176,7 +179,7 @@ export default function OnboardingBirthdate() {
             activeOpacity={1}
             onPress={hidePicker}
           />
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { paddingBottom: Math.max(34, insets.bottom + 16) }]}>
             <View style={styles.modalHeader}>
               <TouchableOpacity
                 onPress={hidePicker}
@@ -196,8 +199,10 @@ export default function OnboardingBirthdate() {
               mode="date"
               display="spinner"
               minimumDate={MIN_DATE}
-              maximumDate={MAX_DATE}
+              maximumDate={today}
               onChange={(_, date) => date && setPickerValue(date)}
+              accentColor={COLORS.primary}
+              themeVariant="light"
             />
           </View>
         </Modal>
@@ -217,26 +222,28 @@ export default function OnboardingBirthdate() {
 const styles = StyleSheet.create({
   formSection: {
     gap: 8,
+    marginTop: 32,
   },
   label: {
-    color: COLORS.textSecondary,
+    color: COLORS.textPrimary,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "800",
   },
   inputBox: {
-    borderWidth: 2,
+    borderWidth: BORDERS.medium,
     borderColor: COLORS.border,
-    borderRadius: 16,
-    paddingVertical: 16,
+    borderRadius: RADIUS.large,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     backgroundColor: COLORS.surface,
     minHeight: 52,
     justifyContent: "center",
+    ...SHADOWS.small,
   },
   inputText: {
     fontSize: 16,
     color: COLORS.textPrimary,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   inputPlaceholder: {
     color: COLORS.textLight,
@@ -245,32 +252,42 @@ const styles = StyleSheet.create({
   error: {
     color: COLORS.danger,
     fontSize: 13,
+    fontWeight: "600",
     marginTop: 4,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalCard: {
     backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: RADIUS.large,
+    borderTopRightRadius: RADIUS.large,
+    borderTopWidth: BORDERS.medium,
+    borderLeftWidth: BORDERS.medium,
+    borderRightWidth: BORDERS.medium,
+    borderColor: COLORS.border,
     paddingBottom: 34,
     paddingHorizontal: 16,
+    ...SHADOWS.large,
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 14,
+    borderBottomWidth: BORDERS.medium,
+    borderBottomColor: COLORS.border,
+    marginBottom: 8,
   },
   modalCancel: {
     fontSize: 17,
-    color: COLORS.textSecondary,
+    fontWeight: "700",
+    color: COLORS.textPrimary,
   },
   modalDone: {
     fontSize: 17,
-    fontWeight: "600",
+    fontWeight: "800",
     color: COLORS.primary,
   },
 });

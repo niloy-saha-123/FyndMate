@@ -7,7 +7,7 @@ import { useOnboardingForm } from "../../src/hooks/useOnboardingForm";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { updateProfile } from "../../src/services/profileService";
 import { supabase } from "../../src/auth/supabaseClient";
-import { COLORS } from "../../src/theme/colors";
+import { COLORS, BORDERS, RADIUS, SHADOWS } from "../../src/theme/colors";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -87,7 +87,7 @@ export default function OnboardingName() {
             if (error) setError(null);
           }}
           placeholder="Type your name"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={COLORS.textLight}
           style={styles.input}
           returnKeyType="next"
           autoCapitalize="words"
@@ -112,22 +112,25 @@ const styles = StyleSheet.create({
     marginTop: 32,
   },
   label: {
-    color: COLORS.textSecondary,
+    color: COLORS.textPrimary,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "800",
   },
   input: {
-    borderWidth: 2,
+    borderWidth: BORDERS.medium,
     borderColor: COLORS.border,
-    borderRadius: 16,
+    borderRadius: RADIUS.large,
     padding: 14,
     fontSize: 16,
+    fontWeight: "600",
     backgroundColor: COLORS.surface,
     color: COLORS.textPrimary,
+    ...SHADOWS.small,
   },
   error: {
     color: COLORS.danger,
     fontSize: 13,
+    fontWeight: "600",
     marginTop: 4,
   },
 });

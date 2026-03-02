@@ -6,7 +6,7 @@ import { AnimatedCTA } from "../../src/components/AnimatedCTA";
 import { useOnboardingForm } from "../../src/hooks/useOnboardingForm";
 import { updateProfile } from "../../src/services/profileService";
 import { useAuth } from "../../src/auth/AuthProvider";
-import { COLORS } from "../../src/theme/colors";
+import { COLORS, BORDERS, RADIUS, SHADOWS } from "../../src/theme/colors";
 
 const options = [
   "Female",
@@ -124,31 +124,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+    marginTop: 32,
   },
   optionCard: {
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 2,
+    borderRadius: RADIUS.large,
+    borderWidth: BORDERS.medium,
     borderColor: COLORS.border,
     backgroundColor: COLORS.surface,
     flexBasis: "47%",
+    ...SHADOWS.small,
   },
   optionActive: {
-    borderColor: COLORS.textPrimary,
-    backgroundColor: COLORS.gray100,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.primary,
+    ...SHADOWS.medium,
   },
   optionText: {
     color: COLORS.textPrimary,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   optionTextActive: {
-    color: COLORS.textPrimary,
+    color: COLORS.surface,
+    fontWeight: "800",
   },
   error: {
     marginTop: 8,
     color: COLORS.danger,
     fontSize: 13,
+    fontWeight: "600",
   },
   loaderRow: {
     flexDirection: "row",

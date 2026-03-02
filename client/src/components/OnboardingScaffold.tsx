@@ -1,9 +1,8 @@
 import { ReactNode, useEffect, useMemo, useRef } from "react";
 import { Animated, StyleSheet, Text, View, TouchableOpacity } from "react-native";
-import { COLORS } from "../theme/colors";
+import { COLORS, BORDERS, SHADOWS, RADIUS } from "../theme/colors";
 
 const PRIMARY = COLORS.primary;
-const ACCENT = COLORS.primaryGradient;
 
 export function OnboardingScaffold({
   step,
@@ -77,15 +76,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   progressBarBackground: {
-    height: 8,
+    height: 10,
     width: "100%",
-    borderRadius: 8,
-    backgroundColor: COLORS.gray100,
+    borderRadius: RADIUS.small,
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDERS.medium,
+    borderColor: COLORS.border,
     overflow: "hidden",
+    ...SHADOWS.small,
   },
   progressFill: {
     height: "100%",
-    borderRadius: 8,
+    borderRadius: 4,
     backgroundColor: PRIMARY,
   },
   header: {
@@ -99,21 +101,26 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.full,
+    borderWidth: BORDERS.medium,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 8,
+    ...SHADOWS.small,
   },
   backButtonPlaceholder: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     marginRight: 8,
   },
   backLabel: {
-    fontSize: 22,
-    color: COLORS.textSecondary,
+    fontSize: 24,
+    fontWeight: "800",
+    color: COLORS.textPrimary,
   },
   stepText: {
     color: COLORS.textMuted,
@@ -122,11 +129,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
-    fontWeight: "700",
+    fontWeight: "800",
     color: COLORS.textPrimary,
   },
   subtitle: {
     fontSize: 16,
+    fontWeight: "600",
     color: COLORS.textSecondary,
   },
   body: {
