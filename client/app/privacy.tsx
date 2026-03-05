@@ -68,14 +68,17 @@ export default function PrivacyScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={true}
         >
-        <Text style={styles.lastUpdated}>Last Updated: [Date]</Text>
+        <Text style={styles.lastUpdated}>Last Updated: March 5, 2025</Text>
 
         <Text style={styles.sectionTitle}>1. Introduction</Text>
         <Text style={styles.paragraph}>
-          [Company Name] (“Company,” “we,” “our,” or “us”) operates the FyndMate mobile application and related services (the “Service”). This Privacy Policy describes how we collect, use, disclose, and retain information about you when you use the Service. By using the Service, you agree to the practices described in this policy.
+          Troupe (“Company,” “we,” “our,” or “us”) operates the FyndMate mobile application and related services (the “Service”). This Privacy Policy describes how we collect, use, disclose, and retain information about you when you use the Service. By using the Service, you agree to the practices described in this policy.
         </Text>
         <Text style={styles.paragraph}>
           If you do not agree with this Privacy Policy, you must not use the Service. We may update this policy from time to time; the “Last Updated” date above indicates when it was last revised.
+        </Text>
+        <Text style={styles.paragraph}>
+          This Privacy Policy applies when you use FyndMate on iOS (via the App Store), Android (via Google Play), or other platforms. We are not affiliated with, endorsed by, or acting on behalf of Apple Inc. or Google LLC.
         </Text>
 
         <Text style={styles.sectionTitle}>2. Information We Collect</Text>
@@ -133,7 +136,7 @@ export default function PrivacyScreen() {
           6.2 Service providers. We use third-party service providers to operate the Service, including hosting, databases, authentication (e.g., Supabase), third-party sign-in (e.g., Google OAuth), geocoding (e.g., OpenStreetMap/Nominatim), push notifications (e.g., Expo Push), and caching/infrastructure (e.g., Redis). These providers process data on our behalf and are contractually or otherwise required to protect your information and use it only as we instruct.
         </Text>
         <Text style={styles.paragraph}>
-          6.3 Google OAuth. If you sign in with Google, Google shares with us the data you consent to (e.g., email, name, profile photo). Use of Google’s services is also subject to Google’s privacy policy.
+          6.3 Google OAuth. If you sign in with Google, Google shares with us the data you consent to (e.g., email, name, profile photo). Use of Google Sign-In is subject to Google Privacy Policy (https://policies.google.com/privacy) and Google Terms of Service. We do not sell or share data obtained through Google Sign-In with advertising platforms, data brokers, or information resellers.
         </Text>
         <Text style={styles.paragraph}>
           6.4 Geocoding. Precise coordinates may be sent to our geocoding provider(s) (e.g., OpenStreetMap-based services) to obtain city and country or other approximate location. Please refer to those providers’ privacy policies for their practices.
@@ -151,6 +154,9 @@ export default function PrivacyScreen() {
         <Text style={styles.sectionTitle}>7. Security</Text>
         <Text style={styles.paragraph}>
           We use industry-standard measures to protect your information, including encryption in transit and at rest where applicable, secure authentication (e.g., hashed passwords, token-based sessions), and access controls. No method of transmission or storage is completely secure; we cannot guarantee absolute security of your data.
+        </Text>
+        <Text style={styles.paragraph}>
+          Data breach notification. In the event of a data breach in which your user data collected from the Service is compromised (e.g., unintentional disclosure or misuse), we will notify you in accordance with applicable law, which may include sending an email or in-app notification.
         </Text>
 
         <Text style={styles.sectionTitle}>8. International Transfers</Text>
