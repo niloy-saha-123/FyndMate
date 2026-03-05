@@ -45,8 +45,16 @@ export async function sendMessage(matchId: string, content: string) {
     senderId: string;
     content: string;
     createdAt: string;
-    readAt: null;
-    editedAt: null;
+    readAt: string | null;
+    editedAt: string | null;
+    isDeleted: boolean;
+    deletedBy: string | null;
+    deletedAt: string | null;
+    sender: {
+      id: string;
+      name: string;
+      profilePicture: string | null;
+    };
   }>(`/api/matches/${matchId}/messages`, { content });
   return message;
 }

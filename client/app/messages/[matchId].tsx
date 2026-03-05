@@ -385,7 +385,12 @@ export default function MessageScreen() {
             return next.filter((msg, idx) => msg.id !== payload.id || idx === pendingIndex);
           }
 
-          return [...prev, payload];
+          return [...prev, {
+            ...payload,
+            sender: payload.sender ?? (otherUser && payload.senderId !== user.id
+              ? { id: otherUser.id, name: otherUser.name, profilePicture: otherUser.profilePicture }
+              : { id: user.id, name: "You", profilePicture: null }),
+          }];
         });
         // If we just received a message from the other user while viewing, mark it read
         if (payload.senderId !== user.id) {
