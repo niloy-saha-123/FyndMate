@@ -19,6 +19,12 @@ import { LoadingGate } from "../src/components/LoadingGate";
 import { COLORS } from "../src/theme/colors";
 import { AuthLegalNote } from "../src/components/AuthLegalNote";
 
+const googleSignInImage = Platform.select({
+  ios: require("../assets/iOS/png@4x/neutral/ios_neutral_rd_SI@4x.png"),
+  android: require("../assets/Android/png@4x/neutral/android_neutral_rd_SI@4x.png"),
+  default: require("../assets/Web (mobile + desktop)/png@4x/neutral/web_neutral_rd_SI@4x.png"),
+});
+
 export default function Login() {
   const router = useRouter();
   // Restore old behavior: show social/email choice first, not email form directly
@@ -133,9 +139,17 @@ export default function Login() {
                 <Text style={styles.appleBtnText}>Sign in with Apple (coming soon)</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.googleBtn} onPress={signInWithGoogle}>
-              <Ionicons name="logo-google" size={20} color="#1F1F1F" style={styles.googleIcon} />
-              <Text style={styles.googleBtnText}>Sign in with Google</Text>
+            <TouchableOpacity
+              style={styles.googleBtn}
+              onPress={signInWithGoogle}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in with Google"
+            >
+              <Image
+                source={googleSignInImage}
+                style={styles.googleBtnImage}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
 
             <View style={styles.dividerRow}>
@@ -363,26 +377,15 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   googleBtn: {
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 999,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderWidth: 1.5,
-    borderColor: "#747775",
     marginBottom: 12,
     width: "100%",
     minHeight: 48,
   },
-  googleIcon: {
-    marginRight: 10,
-  },
-  googleBtnText: {
-    fontWeight: "600",
-    fontSize: 16,
-    color: "#1F1F1F",
+  googleBtnImage: {
+    width: "100%",
+    height: 48,
   },
   dividerRow: {
     flexDirection: "row",
