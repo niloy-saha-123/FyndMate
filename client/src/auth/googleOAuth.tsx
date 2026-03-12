@@ -18,6 +18,10 @@ export async function signInWithGoogle() {
       options: {
         redirectTo: redirectUrl,
         skipBrowserRedirect: true,
+        // Always show Google account chooser, even if a session exists
+        queryParams: {
+          prompt: "select_account",
+        },
       },
     });
 
@@ -38,7 +42,7 @@ export async function signInWithGoogle() {
     console.log("=== BROWSER RESULT ===");
     console.log("Type:", result.type);
     
-    if (result.type === 'success') {
+    if (result.type === 'success' && result.url) {
       console.log("Full URL:", result.url);
       
       // Parse the URL
@@ -86,6 +90,8 @@ export async function signInWithGoogle() {
     }
 
     // Fallback: Check if session exists (deep link may have handled it)
+    // This covers flows where the browser is dismissed but a deep link
+    // handler (e.g. AuthRedirect screen) has already created a session.
     console.log("Checking for existing session...");
     await new Promise(r => setTimeout(r, 1500));
     
@@ -96,13 +102,18 @@ export async function signInWithGoogle() {
       return;
     }
 
-    if (result.type === 'cancel') {
-      console.log("User cancelled");
+    // If the user explicitly cancelled or dismissed the browser, treat it as
+    // a normal user action, not an error. This avoids noisy alerts when a
+    // user decides not to pick an account.
+    if (result.type === 'cancel' || result.type === 'dismiss') {
+      console.log("User cancelled Google sign-in flow (type:", result.type, ")");
       return;
     }
 
-    // Show the actual URL for debugging
-    const urlToShow = result.type === 'success' ? result.url : 'N/A';
+    // At this point, we did not get tokens and we have no session, and the
+    // browser result was not a user-driven cancel/dismiss. Surface a real
+    // error so it can be debugged.
+    const urlToShow = result.type === 'success' && result.url ? result.url : 'N/A';
     throw new Error(
       `OAuth callback didn't return tokens.\n\nCallback URL: ${urlToShow.substring(0, 150)}...\n\nPlease check Metro logs.`
     );

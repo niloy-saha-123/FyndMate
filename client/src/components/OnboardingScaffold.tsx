@@ -1,19 +1,21 @@
 import { ReactNode, useEffect, useMemo, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, Text, View, TouchableOpacity } from "react-native";
+import { COLORS, BORDERS, SHADOWS, RADIUS } from "../theme/colors";
 
-const PRIMARY = "#6058AE";
-const ACCENT = "#8B85C2";
+const PRIMARY = COLORS.primary;
 
 export function OnboardingScaffold({
   step,
   title,
   subtitle,
   children,
+  onBack,
 }: {
   step: number;
   title: string;
   subtitle?: string;
   children: ReactNode;
+  onBack?: () => void;
 }) {
   const progress = useRef(new Animated.Value(step / 3)).current;
 
@@ -43,7 +45,21 @@ export function OnboardingScaffold({
         />
       </View>
       <View style={styles.header}>
-        <Text style={styles.stepText}>Step {step} of 3</Text>
+        <View style={styles.headerTopRow}>
+          {onBack ? (
+            <TouchableOpacity
+              onPress={onBack}
+              style={styles.backButton}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <Text style={styles.backLabel}>‹</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.backButtonPlaceholder} />
+          )}
+          <Text style={styles.stepText}>Step {step} of 3</Text>
+        </View>
         <Text style={styles.title}>{title}</Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
@@ -57,37 +73,69 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.background,
   },
   progressBarBackground: {
-    height: 8,
+    height: 10,
     width: "100%",
-    borderRadius: 8,
-    backgroundColor: "#F3F4F6",
+    borderRadius: RADIUS.small,
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDERS.medium,
+    borderColor: COLORS.border,
     overflow: "hidden",
+    ...SHADOWS.small,
   },
   progressFill: {
     height: "100%",
-    borderRadius: 8,
+    borderRadius: 4,
     backgroundColor: PRIMARY,
   },
   header: {
     marginTop: 18,
     gap: 6,
   },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    marginBottom: 4,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.full,
+    borderWidth: BORDERS.medium,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+    ...SHADOWS.small,
+  },
+  backButtonPlaceholder: {
+    width: 40,
+    height: 40,
+    marginRight: 8,
+  },
+  backLabel: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: COLORS.textPrimary,
+  },
   stepText: {
-    color: "#6B7280",
+    color: COLORS.textMuted,
     fontSize: 14,
     fontWeight: "600",
   },
   title: {
     fontSize: 26,
-    fontWeight: "700",
-    color: PRIMARY,
+    fontWeight: "800",
+    color: COLORS.textPrimary,
   },
   subtitle: {
     fontSize: 16,
-    color: "#4B5563",
+    fontWeight: "600",
+    color: COLORS.textSecondary,
   },
   body: {
     marginTop: 22,

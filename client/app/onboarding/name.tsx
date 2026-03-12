@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { TextInput, Text, View, StyleSheet, LayoutAnimation, Platform, UIManager } from "react-native";
 import { router } from "expo-router";
-import LottieView from "lottie-react-native";
 import { OnboardingScaffold } from "../../src/components/OnboardingScaffold";
 import { AnimatedCTA } from "../../src/components/AnimatedCTA";
 import { useOnboardingForm } from "../../src/hooks/useOnboardingForm";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { updateProfile } from "../../src/services/profileService";
-
-const PRIMARY = "#6058AE";
+import { supabase } from "../../src/auth/supabaseClient";
+import { COLORS, BORDERS, RADIUS, SHADOWS } from "../../src/theme/colors";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -17,7 +16,7 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 export default function OnboardingName() {
   const { data, update } = useOnboardingForm();
   const { user, profile, setProfileLocally } = useAuth();
-  const [fullName, setFullName] = useState(data.fullName ?? "");
+  const [fullName, setFullName] = useState(data.fullName ?? profile?.name ?? "");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,16 +63,21 @@ export default function OnboardingName() {
       step={1}
       title="Let’s start with your name"
       subtitle="Tell people what to call you"
-    >
-      <View style={styles.animationContainer}>
-        <LottieView
-          source={require("../../assets/animation.json")}
-          autoPlay
-          loop
-          style={styles.animation}
-        />
-      </View>
+      onBack={async () => {
+        // User wants to cancel onboarding/sign-up and go back to the previous screen.
+        // Sign out the Supabase session, then navigate back in the stack so the
+        // animation direction correctly reflects a "back" action (left-to-right).
+        try {
+          await supabase.auth.signOut();
+        } catch (err) {
+          console.warn("Failed to sign out during onboarding back navigation:", err);
+        }
 
+        // Prefer a stack back navigation for proper back animation.
+        // In typical flows this returns to the welcome screen.
+        router.back();
+      }}
+    >
       <View style={styles.formSection}>
         <Text style={styles.label}>Full name</Text>
         <TextInput
@@ -83,7 +87,7 @@ export default function OnboardingName() {
             if (error) setError(null);
           }}
           placeholder="Type your name"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={COLORS.textLight}
           style={styles.input}
           returnKeyType="next"
           autoCapitalize="words"
@@ -103,36 +107,30 @@ export default function OnboardingName() {
 }
 
 const styles = StyleSheet.create({
-  animationContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  animation: {
-    height: 140,
-    width: 140,
-  },
   formSection: {
     gap: 8,
-    marginTop: 4,
+    marginTop: 32,
   },
   label: {
-    color: "#374151",
+    color: COLORS.textPrimary,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "800",
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 14,
+    borderWidth: BORDERS.medium,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.large,
     padding: 14,
     fontSize: 16,
-    backgroundColor: "#FFF",
-    color: "#111827",
+    fontWeight: "600",
+    backgroundColor: COLORS.surface,
+    color: COLORS.textPrimary,
+    ...SHADOWS.small,
   },
   error: {
-    color: "#DC2626",
+    color: COLORS.danger,
     fontSize: 13,
+    fontWeight: "600",
     marginTop: 4,
   },
 });

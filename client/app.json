@@ -50,7 +50,17 @@
       }
     },
     "plugins": [
-      "@react-native-community/datetimepicker",
+      [
+        "@react-native-community/datetimepicker",
+        {
+          "android": {
+            "datePicker": {
+              "colorAccent": { "light": "#6366F1", "dark": "#6366F1" },
+              "textColorPrimary": { "light": "#000000", "dark": "#FFFFFF" }
+            }
+          }
+        }
+      ],
       [
         "expo-location",
         {

@@ -1,9 +1,10 @@
 import { useRef } from "react";
 import { Animated, Pressable, StyleSheet, Text, ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { BORDERS, COLORS, SHADOWS } from "../theme/colors";
 
-const PRIMARY = "#6058AE";
-const SECONDARY = "#8B85C2";
+const PRIMARY = COLORS.primary;
+const SECONDARY = COLORS.primaryGradient;
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export function AnimatedCTA({
@@ -63,22 +64,23 @@ export function AnimatedCTA({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 16,
+    borderRadius: 999,
+    borderWidth: BORDERS.medium,
+    borderColor: COLORS.border,
     overflow: "hidden",
-    shadowColor: PRIMARY,
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    backgroundColor: COLORS.surface,
+    ...SHADOWS.medium,
   },
   buttonPressed: {
     opacity: 0.9,
   },
   gradient: {
+    minHeight: 48,
+    paddingHorizontal: 20,
     paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 16,
+    borderRadius: 999,
   },
   label: {
     color: "#FFF",
