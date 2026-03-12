@@ -7,7 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -18,18 +17,15 @@
       "bundleIdentifier": "com.fyndMate.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "FyndMate uses your location to show your city and country on your profile.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "FyndMate uses your location in the background to keep your city and country up to date."
-      },
-      "uiBackgroundModes": [
-        "location"
-      ]
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "FyndMate uses your location in the background to keep your city and country up to date.",
+        "UIBackgroundModes": ["location"]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.fyndMate.app",
       "googleServicesFile": "./google-services.json",
