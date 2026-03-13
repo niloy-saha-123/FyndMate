@@ -8,6 +8,7 @@ import {
   Image,
   Platform,
   ScrollView,
+  useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,14 +20,9 @@ import { LoadingGate } from "../src/components/LoadingGate";
 import { COLORS } from "../src/theme/colors";
 import { AuthLegalNote } from "../src/components/AuthLegalNote";
 
-const googleSignInImage = Platform.select({
-  ios: require("../assets/iOS/png@4x/neutral/ios_neutral_rd_SI@4x.png"),
-  android: require("../assets/Android/png@4x/neutral/android_neutral_rd_SI@4x.png"),
-  default: require("../assets/Web (mobile + desktop)/png@4x/neutral/web_neutral_rd_SI@4x.png"),
-});
-
 export default function Login() {
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
   // Restore old behavior: show social/email choice first, not email form directly
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [name, setName] = useState("");
@@ -103,6 +99,9 @@ export default function Login() {
     }
   };
 
+  const sharedHeight = Platform.OS === "ios" ? 44 : 40;
+  const sharedWidth = Math.min(windowWidth - 16, 480);
+
   // Main sign-in/sign-up choice screen — clean layout matching Get Started
   if (!showEmailForm) {
     return (
@@ -140,14 +139,21 @@ export default function Login() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={styles.googleBtn}
+              style={[
+                styles.googleBtn,
+                { width: sharedWidth, height: sharedHeight, alignSelf: "center" },
+              ]}
               onPress={signInWithGoogle}
               accessibilityRole="button"
               accessibilityLabel="Sign in with Google"
             >
               <Image
-                source={googleSignInImage}
-                style={styles.googleBtnImage}
+                source={Platform.select({
+                  ios: require("../assets/login/google_ios.png"),
+                  android: require("../assets/login/google_android.png"),
+                  default: require("../assets/login/google_web.png"),
+                })}
+                style={{ width: sharedWidth, height: sharedHeight }}
                 resizeMode="contain"
               />
             </TouchableOpacity>
@@ -380,12 +386,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
-    width: "100%",
-    minHeight: 48,
-  },
-  googleBtnImage: {
-    width: "100%",
-    height: 48,
   },
   dividerRow: {
     flexDirection: "row",
