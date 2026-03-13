@@ -72,7 +72,7 @@ export default function TermsScreen() {
 
         <Text style={styles.sectionTitle}>1. Introduction and Acknowledgement</Text>
         <Text style={styles.paragraph}>
-          1.1 These Terms of Service (“Terms”) constitute a legal agreement between you and Troupe (“Company,” “we,” “our,” or “us”) governing your access to and use of the FyndMate mobile application, website, and related services (collectively, the “Service”).
+          1.1 These Terms of Service (“Terms”) constitute a legal agreement between you and Troupe (“Company,” “we,” “our,” or “us”) governing your access to and use of the Troupe mobile application, website, and related services (collectively, the “Service”).
         </Text>
         <Text style={styles.paragraph}>
           1.2 ACKNOWLEDGEMENT: You acknowledge that these Terms are concluded between you and the Company only, and not with Apple Inc., Google LLC, or any of their affiliates or subsidiaries. The Company, not Apple or Google, is solely responsible for the Service and the content thereof. These Terms may not provide for usage rules that conflict with the Apple Media Services Terms and Conditions (for iOS) or Google Play Terms of Service (for Android) as of the effective date.

@@ -72,13 +72,13 @@ export default function PrivacyScreen() {
 
         <Text style={styles.sectionTitle}>1. Introduction</Text>
         <Text style={styles.paragraph}>
-          Troupe (“Company,” “we,” “our,” or “us”) operates the FyndMate mobile application and related services (the “Service”). This Privacy Policy describes how we collect, use, disclose, and retain information about you when you use the Service. By using the Service, you agree to the practices described in this policy.
+          Troupe (“Company,” “we,” “our,” or “us”) operates the Troupe mobile application and related services (the “Service”). This Privacy Policy describes how we collect, use, disclose, and retain information about you when you use the Service. By using the Service, you agree to the practices described in this policy.
         </Text>
         <Text style={styles.paragraph}>
           If you do not agree with this Privacy Policy, you must not use the Service. We may update this policy from time to time; the “Last Updated” date above indicates when it was last revised.
         </Text>
         <Text style={styles.paragraph}>
-          This Privacy Policy applies when you use FyndMate on iOS (via the App Store), Android (via Google Play), or other platforms. We are not affiliated with, endorsed by, or acting on behalf of Apple Inc. or Google LLC.
+          This Privacy Policy applies when you use Troupe on iOS (via the App Store), Android (via Google Play), or other platforms. We are not affiliated with, endorsed by, or acting on behalf of Apple Inc. or Google LLC.
         </Text>
 
         <Text style={styles.sectionTitle}>2. Information We Collect</Text>

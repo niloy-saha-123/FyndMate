@@ -159,7 +159,7 @@ export async function clearLocationSecret(): Promise<void> {
 //    - If OS permission = "Denied" → Show error message
 // 
 // To change "Always" ↔ "While Using":
-// User must go to: iPhone Settings → FyndMate → Location
+// User must go to: iPhone Settings → Troupe → Location
 // 
 // See: LocationSettingsScreen.tsx for the UI implementation
 // ─────────────────────────────────────────────────────────────────────
@@ -419,7 +419,7 @@ export function useLocation() {
             showsBackgroundLocationIndicator: true,
             pausesUpdatesAutomatically: true,
             foregroundService: {
-                notificationTitle: 'FyndMate location',
+                notificationTitle: 'Troupe location',
                 notificationBody: 'Updating your city and country in the background',
             },
         });
@@ -650,7 +650,7 @@ export function useLocation() {
                     const userWantsToAllow = await new Promise<boolean>((resolve) => {
                         Alert.alert(
                             'Use your location?',
-                            'FyndMate uses your location to show your city and country on your profile. You can change this anytime in Settings.',
+                            'Troupe uses your location to show your city and country on your profile. You can change this anytime in Settings.',
                             [
                                 { text: 'Not Now', onPress: () => resolve(false), style: 'cancel' },
                                 { text: 'Allow', onPress: () => resolve(true) },

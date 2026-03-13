@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FyndMate",
+    "name": "Troupe",
     "slug": "FyndMate",
     "scheme": "fyndmate",
     "version": "1.0.0",
@@ -16,8 +16,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.fyndMate.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "FyndMate uses your location to show your city and country on your profile.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "FyndMate uses your location in the background to keep your city and country up to date.",
+        "NSLocationWhenInUseUsageDescription": "Troupe uses your location to show your city and country on your profile.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Troupe uses your location in the background to keep your city and country up to date.",
         "UIBackgroundModes": ["location"]
       }
     },
@@ -60,8 +60,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow FyndMate to access your location in the background to keep your city and country updated.",
-          "locationWhenInUsePermission": "Allow FyndMate to access your location while using the app to show your city and country.",
+          "locationAlwaysAndWhenInUsePermission": "Allow Troupe to access your location in the background to keep your city and country updated.",
+          "locationWhenInUsePermission": "Allow Troupe to access your location while using the app to show your city and country.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
         }
