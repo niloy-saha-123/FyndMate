@@ -139,7 +139,7 @@ CREATE POLICY "project_delete_own"
 --
 -- ACCESS PATTERN (HINGE-STYLE MATCHING):
 -- 
--- This is NOT blind matching like Tinder. FyndMate uses Hinge-style:
+-- This is NOT blind matching like Tinder. Troupe uses Hinge-style:
 -- - Liking REQUIRES sending a proposal message (can't just swipe right)
 -- - The recipient sees who liked them in their "Likes" section
 -- - One person accepts to create a match (no mutual like needed)
@@ -332,4 +332,3 @@ CREATE POLICY "message_delete_own"
 --
 -- REMEMBER: Our server uses the service role key which BYPASSES all RLS.
 -- These policies protect against direct client access and add defense-in-depth.
-

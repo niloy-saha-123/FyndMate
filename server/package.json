@@ -2,7 +2,7 @@
   "name": "fyndmate-server",
   "version": "1.0.0",
   "type": "module",
-  "description": "FyndMate backend API server",
+  "description": "Troupe backend API server",
   "main": "dist/server.js",
   "scripts": {
     "// === DEVELOPMENT ===": "",

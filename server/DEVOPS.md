@@ -1,4 +1,4 @@
-# FyndMate Server - DevOps Guide
+# Troupe Server - DevOps Guide
 
 ## 🚨 CRITICAL: Environment Safety
 

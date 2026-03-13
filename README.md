@@ -1,4 +1,4 @@
-# FyndMate
+# Troupe
 
 Mobile app for finding project collaborators, built with an Expo (React Native) client and a Fastify/Prisma API server backed by Supabase (auth, Postgres, storage, realtime) and Redis rate limiting.
 

@@ -285,7 +285,7 @@ describe('Profile Routes', () => {
             },
             payload: {
                 projects: [
-                    { name: 'Fyndmate', description: 'A mini portfolio + collaborator app' },
+                    { name: 'Troupe', description: 'A mini portfolio + collaborator app' },
                 ],
                 experiences: [
                     {
@@ -302,7 +302,7 @@ describe('Profile Routes', () => {
         expect(response.statusCode).toBe(200);
         const body = JSON.parse(response.body);
         expect(Array.isArray(body.projects)).toBe(true);
-        expect(body.projects[0].name).toBe('Fyndmate');
+        expect(body.projects[0].name).toBe('Troupe');
         expect(Array.isArray(body.experiences)).toBe(true);
         expect(body.experiences[0].company).toBe('Acme Labs');
     });

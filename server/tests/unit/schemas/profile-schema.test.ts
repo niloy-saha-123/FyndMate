@@ -104,7 +104,7 @@ describe('updateProfileSchema', () => {
     const result = updateProfileSchema.safeParse({
       fullName: 'Jane Doe',
       projects: [
-        { name: 'Fyndmate', description: 'Mini portfolio and matching app' },
+        { name: 'Troupe', description: 'Mini portfolio and matching app' },
       ],
       experiences: [
         {

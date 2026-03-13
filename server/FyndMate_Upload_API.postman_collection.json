@@ -1,6 +1,6 @@
 {
     "info": {
-        "name": "FyndMate - Complete API Test Suite",
+        "name": "Troupe - Complete API Test Suite",
         "description": "Comprehensive API test suite covering all 20 endpoints: health, auth, profile, feed, likes, matches, blocks, uploads, location, and notifications.\n\nSETUP:\n1. Run `npx ts-node scripts/get_test_token.ts` to generate a JWT token\n2. Set the `jwtToken` variable with the generated token\n3. Run requests in order within each folder (some depend on previous responses)\n\nNOTE: Run against local server (localhost:3000) with Docker PostgreSQL only.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
