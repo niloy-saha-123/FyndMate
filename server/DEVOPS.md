@@ -1,5 +1,10 @@
 # Troupe Server - DevOps Guide
 
+## Redis keepalive (Upstash)
+- Set `REDIS_URL` in `.env` to your production Upstash rediss URL.
+- In GitHub Actions secrets, set `KEEPALIVE_URL` to your deployed `/health/redis` endpoint to enable the keepalive workflow (`.github/workflows/redis-keepalive.yml` runs every 15 minutes).
+- The client does not need Redis settings; all Redis config lives on the server side.
+
 ## 🚨 CRITICAL: Environment Safety
 
 **ALWAYS verify which environment you're targeting before running commands!**
