@@ -1,20 +1,42 @@
+# Keeps Upstash Redis "warm" by sending a Redis PING from GitHub's runners.
+# This does NOT require your API to be publicly hosted — curl to /health/redis only
+# works after deploy; direct PING uses the same REDIS_URL as your server.
+#
+# Required repo secret: REDIS_URL (same value as server/.env — your Upstash rediss:// URL)
+
 name: Redis Keepalive
 
 on:
   schedule:
-    - cron: "*/15 * * * *"  # every 15 minutes
+    - cron: "*/15 * * * *" # every 15 minutes
   workflow_dispatch:
 
 jobs:
   ping-redis:
     runs-on: ubuntu-latest
     steps:
-      - name: Hit Redis health endpoint
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: PING Upstash Redis (ioredis)
         env:
-          KEEPALIVE_URL: ${{ secrets.KEEPALIVE_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
         run: |
-          if [ -z "$KEEPALIVE_URL" ]; then
-            echo "KEEPALIVE_URL secret is not set" >&2
+          if [ -z "$REDIS_URL" ]; then
+            echo "REDIS_URL secret is not set." >&2
+            echo "Add it: Repo → Settings → Secrets and variables → Actions → New secret" >&2
+            echo "Name: REDIS_URL  Value: same as your Upstash connection string in server/.env" >&2
             exit 1
           fi
-          curl -fsS "$KEEPALIVE_URL" || exit 1
+          cd "${{ runner.temp }}"
+          npm init -y >/dev/null 2>&1
+          npm install ioredis@5.9.2
+          node <<'NODE'
+          const Redis = require('ioredis');
+          const r = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, connectTimeout: 15000 });
+          r.ping()
+            .then((pong) => { console.log('Redis:', pong); return r.quit(); })
+            .then(() => process.exit(0))
+            .catch((err) => { console.error(err); process.exit(1); });
+          NODE
