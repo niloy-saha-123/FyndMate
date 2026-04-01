@@ -26,7 +26,7 @@ import { NeoCard } from '@/src/components/NeoCard';
 import { NeoButton } from '@/src/components/NeoButton';
 
 export default function LikesScreen() {
-    const { top, bottom } = useSafeAreaInsets();
+    const { bottom } = useSafeAreaInsets();
     const { isAuthenticated } = useAuth();
     const { likes, loading, error, fetchLikes, onAccept, onDecline } = useLikes();
     const { refreshAt } = useLocalSearchParams<{ refreshAt?: string | string[] }>();
@@ -141,7 +141,7 @@ export default function LikesScreen() {
     };
 
     return (
-        <View style={[styles.container, { paddingTop: top }]}>
+        <View style={styles.container}>
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Requests</Text>
@@ -315,6 +315,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.background,
+        paddingTop: 12,
     },
     centerContainer: {
         flex: 1,

@@ -8,7 +8,6 @@ import {
   Image,
   Platform,
   ScrollView,
-  useWindowDimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,9 +19,14 @@ import { LoadingGate } from "../src/components/LoadingGate";
 import { COLORS } from "../src/theme/colors";
 import { AuthLegalNote } from "../src/components/AuthLegalNote";
 
+const googleIconImage = Platform.select({
+  ios: require("../assets/login/google_icon_ios.png"),
+  android: require("../assets/login/google_icon_android.png"),
+  default: require("../assets/login/google_icon_web.png"),
+});
+
 export default function Login() {
   const router = useRouter();
-  const { width: windowWidth } = useWindowDimensions();
   // Restore old behavior: show social/email choice first, not email form directly
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [name, setName] = useState("");
@@ -99,8 +103,13 @@ export default function Login() {
     }
   };
 
-  const sharedHeight = Platform.OS === "ios" ? 44 : 40;
-  const sharedWidth = Math.min(windowWidth - 16, 480);
+  const authChoiceButtonHeight = 52;
+  const googleLogoTileSize = Platform.OS === "ios" ? 44 : 40;
+  const googlePadding =
+    Platform.select({
+      ios: { left: 16, iconGap: 12, right: 16 },
+      default: { left: 12, iconGap: 10, right: 12 },
+    }) ?? { left: 12, iconGap: 10, right: 12 };
 
   // Main sign-in/sign-up choice screen — clean layout matching Get Started
   if (!showEmailForm) {
@@ -139,23 +148,33 @@ export default function Login() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={[
-                styles.googleBtn,
-                { width: sharedWidth, height: sharedHeight, alignSelf: "center" },
-              ]}
+              style={[styles.googleBtn, { height: authChoiceButtonHeight }]}
               onPress={signInWithGoogle}
               accessibilityRole="button"
-              accessibilityLabel="Sign in with Google"
+              accessibilityLabel="Continue with Google"
             >
-              <Image
-                source={Platform.select({
-                  ios: require("../assets/login/google_ios.png"),
-                  android: require("../assets/login/google_android.png"),
-                  default: require("../assets/login/google_web.png"),
-                })}
-                style={{ width: sharedWidth, height: sharedHeight }}
-                resizeMode="contain"
-              />
+              <View
+                style={[
+                  styles.googleContent,
+                  { paddingHorizontal: googlePadding.right },
+                ]}
+              >
+                <Image
+                  source={googleIconImage}
+                  style={[
+                    styles.googleIcon,
+                    {
+                      width: googleLogoTileSize,
+                      height: googleLogoTileSize,
+                      left: googlePadding.left,
+                    },
+                  ]}
+                  resizeMode="contain"
+                />
+                <Text style={styles.googleText}>
+                  Continue with Google
+                </Text>
+              </View>
             </TouchableOpacity>
 
             <View style={styles.dividerRow}>
@@ -176,7 +195,7 @@ export default function Login() {
                 colors={[COLORS.primary, COLORS.primaryGradient]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.ctaInner}
+                style={[styles.ctaInner, { minHeight: authChoiceButtonHeight }]}
               >
                 <Text style={styles.ctaText}>Continue with Email</Text>
               </LinearGradient>
@@ -383,9 +402,32 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   googleBtn: {
+    width: "100%",
+    alignSelf: "stretch",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
+    backgroundColor: "#F2F2F2",
+    borderRadius: 999,
+  },
+  googleContent: {
+    width: "100%",
+    height: "100%",
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleIcon: {
+    width: 40,
+    height: 40,
+    position: "absolute",
+  },
+  googleText: {
+    color: "#1F1F1F",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "500",
+    textAlign: "center",
   },
   dividerRow: {
     flexDirection: "row",
@@ -407,6 +449,7 @@ const styles = StyleSheet.create({
   },
   ctaOuter: {
     width: "100%",
+    alignSelf: "stretch",
     borderWidth: 2,
     borderColor: COLORS.border,
     borderRadius: 999,
@@ -417,14 +460,15 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   ctaInner: {
-    paddingVertical: 16,
+    minHeight: 52,
+    paddingVertical: 0,
     alignItems: "center",
     justifyContent: "center",
   },
   ctaText: {
     color: "#FFFFFF",
     fontWeight: "700",
-    fontSize: 17,
+    fontSize: 16,
   },
   signupRow: {
     flexDirection: "row",

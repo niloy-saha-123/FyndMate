@@ -57,7 +57,7 @@ function persistMessagesCache(userId: string, matches: any[]) {
 }
 
 export default function MessagesTab() {
-  const { top, bottom } = useSafeAreaInsets();
+  const { bottom } = useSafeAreaInsets();
   const { user, loading } = useAuth();
   const [matches, setMatches] = useState<any[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
@@ -225,7 +225,7 @@ export default function MessagesTab() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { paddingTop: top }]}>
+      <View style={styles.container}>
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -377,7 +377,7 @@ export default function MessagesTab() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: top }]}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
@@ -478,6 +478,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    paddingTop: 12,
   },
 
   // Header

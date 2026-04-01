@@ -40,7 +40,7 @@ function formatMonth(value?: string | null) {
 }
 
 export default function MessageProfileScreen() {
-  const { top, bottom } = useSafeAreaInsets();
+  const { bottom } = useSafeAreaInsets();
   const { userId, matchId, self, mode, likeId, introMessage } = useLocalSearchParams<{
     userId?: string | string[];
     matchId?: string | string[];
@@ -191,7 +191,7 @@ export default function MessageProfileScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { paddingTop: top }]}>
+      <View style={styles.container}>
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Loading profile...</Text>
@@ -203,7 +203,7 @@ export default function MessageProfileScreen() {
   if (!profile) return null;
 
   return (
-    <View style={[styles.container, { paddingTop: top }]}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.headerIconButton}>
           <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
@@ -486,6 +486,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    paddingTop: 12,
   },
   loadingWrap: {
     flex: 1,

@@ -42,7 +42,7 @@ import {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function FeedScreen() {
-  const { top, bottom } = useSafeAreaInsets();
+  const { bottom } = useSafeAreaInsets();
   const { isAuthenticated } = useAuth();
   const { profiles, loading, error, hasMore, fetchFeed, swipe, swipeError, clearSwipeError } = useFeed();
 
@@ -125,7 +125,7 @@ export default function FeedScreen() {
   // Loading state
   if (loading && profiles.length === 0) {
     return (
-      <View style={[styles.centerContainer, { paddingTop: top }]}>
+      <View style={styles.centerContainer}>
         <View style={styles.loadingCard}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Finding collaborators...</Text>
@@ -137,7 +137,7 @@ export default function FeedScreen() {
   // Error state
   if (error) {
     return (
-      <View style={[styles.centerContainer, { paddingTop: top }]}>
+      <View style={styles.centerContainer}>
         <NeoCard style={styles.errorCard}>
           <Ionicons name="alert-circle" size={48} color={COLORS.danger} />
           <Text style={styles.errorText}>{error}</Text>
@@ -150,7 +150,7 @@ export default function FeedScreen() {
   // Empty state
   if (!currentProfile || currentIndex >= profiles.length) {
     return (
-      <View style={[styles.centerContainer, { paddingTop: top }]}>
+      <View style={styles.centerContainer}>
         <NeoCard style={styles.emptyCard}>
           <View style={styles.emptyIconContainer}>
             <Ionicons name="search" size={48} color={COLORS.primary} />
@@ -173,7 +173,7 @@ export default function FeedScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: top }]}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerCenter}>
@@ -469,6 +469,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    paddingTop: 12,
   },
   centerContainer: {
     flex: 1,

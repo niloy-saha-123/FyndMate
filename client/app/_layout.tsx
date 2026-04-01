@@ -36,6 +36,7 @@ export default function RootLayout() {
         <LocationProvider>
           <NotificationProvider>
             <ApiClientInitializer>
+              {/* Global safe-area handling: screens should not add extra top inset unless they opt out intentionally. */}
               <SafeAreaView style={styles.statusbar}>
                 <OfflineBanner />
                 <Stack>

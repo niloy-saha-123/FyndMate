@@ -256,7 +256,7 @@ function SettingsToggle({
 }
 
 export default function ProfilePage() {
-  const { top, bottom } = useSafeAreaInsets();
+  const { bottom } = useSafeAreaInsets();
   const { profile, setProfileLocally, session } = useAuth();
   const { upload, uploading, progress, error: uploadError, rateLimit } = useProfilePictureUpload();
   const {
@@ -719,7 +719,7 @@ export default function ProfilePage() {
   }, [profile?.id]);
 
   return (
-    <View style={[styles.container, { paddingTop: top }]}>
+    <View style={styles.container}>
       {/* Header */}
       {/* Header */}
       <View style={styles.header}>
@@ -1547,6 +1547,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    paddingTop: 12,
   },
 
 
