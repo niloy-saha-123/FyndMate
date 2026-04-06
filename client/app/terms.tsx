@@ -268,10 +268,10 @@ export default function TermsScreen() {
 
         <Text style={styles.sectionTitle}>17. Governing Law and Dispute Resolution</Text>
         <Text style={styles.paragraph}>
-          17.1 These Terms and any dispute arising out of or in connection with them or the Service shall be governed by and construed in accordance with the laws of [Jurisdiction], without regard to its conflict of law rules.
+          17.1 These Terms and any dispute arising out of or in connection with them or the Service shall be governed by and construed in accordance with the laws of the Province of Ontario and the federal laws of Canada applicable therein, without regard to its conflict of law rules.
         </Text>
         <Text style={styles.paragraph}>
-          17.2 Any disputes arising under or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts located in [Jurisdiction], except where applicable law provides you with mandatory rights to bring claims in other forums.
+          17.2 Any disputes arising under or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts located in Toronto, Ontario, Canada, except where applicable law provides you with mandatory rights to bring claims in other forums.
         </Text>
 
         <Text style={styles.sectionTitle}>18. Third-Party Beneficiary</Text>
@@ -293,7 +293,7 @@ export default function TermsScreen() {
           19.4 Assignment. You may not assign or transfer these Terms or your rights and obligations under them without our prior written consent. We may assign or transfer these Terms, in whole or in part, without restriction.
         </Text>
         <Text style={styles.paragraph}>
-          19.5 Developer Name and Address. For questions about these Terms, you may contact us at: Email: [Contact Email] | Address: [Postal Address]
+          19.5 Developer Name and Address. For questions about these Terms, you may contact us at: Email: infotroupe1@gmail.com | Address: 58 Haynes Avenue, North York, Ontario M3J 0C1, Canada
         </Text>
 
           <View style={styles.bottomSpacer} />

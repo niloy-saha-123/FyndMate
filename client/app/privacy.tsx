@@ -166,7 +166,7 @@ export default function PrivacyScreen() {
 
         <Text style={styles.sectionTitle}>9. Children</Text>
         <Text style={styles.paragraph}>
-          The Service is not intended for users under the age of 13. We do not knowingly collect personal information from children under 13. If you believe we have collected information from a child under 13, please contact us at [Privacy Contact Email] and we will take steps to delete such information.
+          The Service is not intended for users under the age of 13. We do not knowingly collect personal information from children under 13. If you believe we have collected information from a child under 13, please contact us at infotroupe1@gmail.com and we will take steps to delete such information.
         </Text>
 
         <Text style={styles.sectionTitle}>10. Your Rights and Choices</Text>
@@ -189,7 +189,7 @@ export default function PrivacyScreen() {
           10.6 Complaints. If you are in the EEA or UK, you have the right to lodge a complaint with a supervisory authority in your country of residence.
         </Text>
         <Text style={styles.paragraph}>
-          10.7 To exercise any of the above rights or for privacy-related questions, contact us at: [Privacy Contact Email] or [Postal Address]. We will respond in accordance with applicable law.
+          10.7 To exercise any of the above rights or for privacy-related questions, contact us at: infotroupe1@gmail.com or 58 Haynes Avenue, North York, Ontario M3J 0C1, Canada. We will respond in accordance with applicable law.
         </Text>
 
         <Text style={styles.sectionTitle}>11. Updates to This Policy</Text>
@@ -199,7 +199,7 @@ export default function PrivacyScreen() {
 
         <Text style={styles.sectionTitle}>12. Contact</Text>
         <Text style={styles.paragraph}>
-          For questions about this Privacy Policy or our privacy practices, please contact us at: Email: [Privacy Contact Email] | Address: [Postal Address]
+          For questions about this Privacy Policy or our privacy practices, please contact us at: Email: infotroupe1@gmail.com | Address: 58 Haynes Avenue, North York, Ontario M3J 0C1, Canada
         </Text>
 
           <View style={styles.bottomSpacer} />
