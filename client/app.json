@@ -16,9 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.fyndMate.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Troupe uses your location to show your city and country on your profile.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Troupe uses your location in the background to keep your city and country up to date.",
-        "UIBackgroundModes": ["location"]
+        "NSLocationWhenInUseUsageDescription": "Troupe uses your location to show your city and country on your profile."
       }
     },
     "android": {
@@ -31,10 +29,12 @@
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "ACCESS_FINE_LOCATION"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
@@ -51,8 +51,14 @@
         {
           "android": {
             "datePicker": {
-              "colorAccent": { "light": "#6366F1", "dark": "#6366F1" },
-              "textColorPrimary": { "light": "#000000", "dark": "#FFFFFF" }
+              "colorAccent": {
+                "light": "#6366F1",
+                "dark": "#6366F1"
+              },
+              "textColorPrimary": {
+                "light": "#000000",
+                "dark": "#FFFFFF"
+              }
             }
           }
         }
@@ -60,12 +66,15 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Troupe to access your location in the background to keep your city and country updated.",
           "locationWhenInUsePermission": "Allow Troupe to access your location while using the app to show your city and country.",
-          "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
         }
-      ]
+      ],
+      "expo-image",
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser"
     ]
   }
 }

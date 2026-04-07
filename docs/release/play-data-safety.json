@@ -1,0 +1,124 @@
+{
+  "generatedAt": "2026-04-06",
+  "app": "Troupe",
+  "playConsoleAnswers": {
+    "collectsData": true,
+    "sharesData": true,
+    "encryptedInTransit": true,
+    "deletionRequestAvailable": true,
+    "deletionRequestMethods": {
+      "inApp": "Profile > Settings > Delete Account",
+      "web": "EXPO_PUBLIC_ACCOUNT_DELETION_URL"
+    },
+    "sellsData": false,
+    "dataTypes": [
+      {
+        "playCategory": "Personal info",
+        "playDataType": "Name",
+        "collected": true,
+        "shared": true,
+        "requiredForApp": true,
+        "purposes": ["App functionality", "Account management"]
+      },
+      {
+        "playCategory": "Personal info",
+        "playDataType": "Email address",
+        "collected": true,
+        "shared": true,
+        "requiredForApp": true,
+        "purposes": ["App functionality", "Account management", "Fraud prevention, security, and compliance"]
+      },
+      {
+        "playCategory": "Personal info",
+        "playDataType": "User IDs",
+        "collected": true,
+        "shared": true,
+        "requiredForApp": true,
+        "purposes": ["App functionality", "Account management", "Fraud prevention, security, and compliance"]
+      },
+      {
+        "playCategory": "Location",
+        "playDataType": "Precise location",
+        "collected": true,
+        "shared": true,
+        "requiredForApp": false,
+        "purposes": ["App functionality", "Personalization"]
+      },
+      {
+        "playCategory": "Location",
+        "playDataType": "Approximate location",
+        "collected": true,
+        "shared": true,
+        "requiredForApp": false,
+        "purposes": ["App functionality", "Personalization"]
+      },
+      {
+        "playCategory": "Photos and videos",
+        "playDataType": "Photos",
+        "collected": true,
+        "shared": true,
+        "requiredForApp": false,
+        "purposes": ["App functionality"]
+      },
+      {
+        "playCategory": "Messages",
+        "playDataType": "Other in-app messages",
+        "collected": true,
+        "shared": true,
+        "requiredForApp": true,
+        "purposes": ["App functionality", "Fraud prevention, security, and compliance"]
+      },
+      {
+        "playCategory": "App activity",
+        "playDataType": "In-app interactions",
+        "collected": true,
+        "shared": true,
+        "requiredForApp": true,
+        "purposes": ["App functionality", "Fraud prevention, security, and compliance"]
+      },
+      {
+        "playCategory": "App info and performance",
+        "playDataType": "Diagnostics",
+        "collected": true,
+        "shared": true,
+        "requiredForApp": true,
+        "purposes": ["App functionality", "Fraud prevention, security, and compliance"]
+      },
+      {
+        "playCategory": "Device or other IDs",
+        "playDataType": "Device or other IDs",
+        "collected": true,
+        "shared": true,
+        "requiredForApp": false,
+        "purposes": ["App functionality", "Fraud prevention, security, and compliance"]
+      }
+    ]
+  },
+  "thirdPartyProcessors": [
+    {
+      "name": "Supabase",
+      "purpose": "Authentication, Postgres database, Storage, Realtime",
+      "policyUrl": "https://supabase.com/privacy"
+    },
+    {
+      "name": "Expo",
+      "purpose": "Push notifications and runtime services",
+      "policyUrl": "https://expo.dev/privacy"
+    },
+    {
+      "name": "Redis provider (for example Upstash)",
+      "purpose": "Rate limiting and cache",
+      "policyUrl": "https://upstash.com/privacy"
+    },
+    {
+      "name": "OpenStreetMap/Nominatim",
+      "purpose": "Reverse geocoding coordinates to city/country",
+      "policyUrl": "https://wiki.osmfoundation.org/wiki/Privacy_Policy"
+    },
+    {
+      "name": "Google OAuth",
+      "purpose": "Optional sign-in",
+      "policyUrl": "https://policies.google.com/privacy"
+    }
+  ]
+}

@@ -4,17 +4,29 @@ import {
   Text,
   ScrollView,
   Pressable,
+  Linking,
   StyleSheet,
   Animated,
   PanResponder,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { COLORS } from "../src/theme/colors";
+import { LEGAL_LINKS } from "../src/config/legalLinks";
 
 export default function PrivacyScreen() {
   const router = useRouter();
+  const hostedPrivacyUrl = LEGAL_LINKS.privacyPolicy;
 
   const translateY = useRef(new Animated.Value(0)).current;
+
+  const openHostedPrivacyPolicy = async () => {
+    if (!hostedPrivacyUrl) return;
+    try {
+      await Linking.openURL(hostedPrivacyUrl);
+    } catch (error) {
+      console.error('Failed to open hosted privacy policy URL:', error);
+    }
+  };
 
   const panResponder = useRef(
     PanResponder.create({
@@ -63,12 +75,22 @@ export default function PrivacyScreen() {
           <View style={styles.handle} />
         </View>
         <Text style={styles.title}>Privacy Policy</Text>
+        {hostedPrivacyUrl ? (
+          <Pressable
+            style={styles.hostedLinkButton}
+            onPress={() => void openHostedPrivacyPolicy()}
+            accessibilityRole="link"
+            accessibilityLabel="Open hosted privacy policy"
+          >
+            <Text style={styles.hostedLinkButtonText}>Open Hosted Version</Text>
+          </Pressable>
+        ) : null}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={true}
         >
-        <Text style={styles.lastUpdated}>Last Updated: March 5, 2025</Text>
+        <Text style={styles.lastUpdated}>Last Updated: April 6, 2026</Text>
 
         <Text style={styles.sectionTitle}>1. Introduction</Text>
         <Text style={styles.paragraph}>
@@ -240,6 +262,21 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 20,
     paddingBottom: 10,
+  },
+  hostedLinkButton: {
+    alignSelf: "center",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    backgroundColor: COLORS.background,
+  },
+  hostedLinkButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
   scroll: {
     flex: 1,

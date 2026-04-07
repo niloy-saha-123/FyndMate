@@ -4,17 +4,29 @@ import {
   Text,
   ScrollView,
   Pressable,
+  Linking,
   StyleSheet,
   Animated,
   PanResponder,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { COLORS } from "../src/theme/colors";
+import { LEGAL_LINKS } from "../src/config/legalLinks";
 
 export default function TermsScreen() {
   const router = useRouter();
+  const hostedTermsUrl = LEGAL_LINKS.termsOfService;
 
   const translateY = useRef(new Animated.Value(0)).current;
+
+  const openHostedTerms = async () => {
+    if (!hostedTermsUrl) return;
+    try {
+      await Linking.openURL(hostedTermsUrl);
+    } catch (error) {
+      console.error('Failed to open hosted terms URL:', error);
+    }
+  };
 
   const panResponder = useRef(
     PanResponder.create({
@@ -63,12 +75,22 @@ export default function TermsScreen() {
           <View style={styles.handle} />
         </View>
         <Text style={styles.title}>Terms of Service</Text>
+        {hostedTermsUrl ? (
+          <Pressable
+            style={styles.hostedLinkButton}
+            onPress={() => void openHostedTerms()}
+            accessibilityRole="link"
+            accessibilityLabel="Open hosted terms of service"
+          >
+            <Text style={styles.hostedLinkButtonText}>Open Hosted Version</Text>
+          </Pressable>
+        ) : null}
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={true}
         >
-        <Text style={styles.lastUpdated}>Last Updated: March 5, 2025</Text>
+        <Text style={styles.lastUpdated}>Last Updated: April 6, 2026</Text>
 
         <Text style={styles.sectionTitle}>1. Introduction and Acknowledgement</Text>
         <Text style={styles.paragraph}>
@@ -334,6 +356,21 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 20,
     paddingBottom: 10,
+  },
+  hostedLinkButton: {
+    alignSelf: "center",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    backgroundColor: COLORS.background,
+  },
+  hostedLinkButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
   scroll: {
     flex: 1,

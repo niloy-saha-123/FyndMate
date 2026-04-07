@@ -36,6 +36,7 @@ import { useProfilePictureUpload } from '../../src/hooks/useProfilePictureUpload
 import { useLocationContext } from '../../src/location/LocationProvider';
 import { useNotifications } from '../../src/notifications/NotificationProvider';
 import type { UserProfile } from '../../src/types/profile';
+import { LEGAL_LINKS } from '../../src/config/legalLinks';
 import {
   PROFILE_BIO_MAX_LENGTH,
   PROFILE_MAX_SKILLS,
@@ -650,6 +651,22 @@ export default function ProfilePage() {
     setDeleteAccountModalVisible(true);
   }, []);
 
+  const handleOpenAccountDeletionWeb = useCallback(async () => {
+    if (!LEGAL_LINKS.accountDeletion) {
+      Alert.alert(
+        'Unavailable',
+        'Account deletion web URL is not configured. Please contact support at infotroupe1@gmail.com.'
+      );
+      return;
+    }
+    try {
+      await Linking.openURL(LEGAL_LINKS.accountDeletion);
+    } catch (error) {
+      console.error('Failed to open account deletion web URL:', error);
+      Alert.alert('Error', 'Unable to open account deletion page right now.');
+    }
+  }, []);
+
   const confirmDeleteAccount = useCallback(async () => {
     if (deletingAccount) return;
     setDeletingAccount(true);
@@ -1234,6 +1251,13 @@ export default function ProfilePage() {
             <Ionicons name="log-out-outline" size={22} color={COLORS.danger} />
             <Text style={[styles.settingsItemText, { color: COLORS.danger }]}>Logout</Text>
           </TouchableOpacity>
+
+          {LEGAL_LINKS.accountDeletion ? (
+            <TouchableOpacity style={styles.settingsItem} onPress={handleOpenAccountDeletionWeb}>
+              <Ionicons name="open-outline" size={22} color={COLORS.textPrimary} />
+              <Text style={styles.settingsItemText}>Delete Account on Web</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <TouchableOpacity style={styles.settingsItem} onPress={handleDeleteAccount}>
             <Ionicons name="trash-outline" size={22} color={COLORS.danger} />
