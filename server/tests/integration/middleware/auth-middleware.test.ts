@@ -11,9 +11,14 @@ import { getAuthToken, clearDatabase } from '../../helpers.js';
 import { prisma } from '../../../src/lib/prisma.js';
 
 async function createAuthOnlyToken() {
+    const localServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!localServiceRoleKey) {
+        throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY in test environment');
+    }
+
     const localSupabase = createClient(
         'http://127.0.0.1:54321',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
+        localServiceRoleKey,
     );
 
     const email = `middleware_${Date.now()}_${Math.random().toString(36).slice(2)}@test.com`;

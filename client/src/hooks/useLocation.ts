@@ -408,23 +408,6 @@ export function useLocation() {
         }
     }
 
-    async function registerBackgroundUpdates() {
-        const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_BACKGROUND_TASK);
-        if (alreadyStarted) return;
-
-        await Location.startLocationUpdatesAsync(LOCATION_BACKGROUND_TASK, {
-            accuracy: Location.Accuracy.Balanced,
-            timeInterval: LOCATION_UPDATE_INTERVAL_MS,
-            distanceInterval: 1000,
-            showsBackgroundLocationIndicator: true,
-            pausesUpdatesAutomatically: true,
-            foregroundService: {
-                notificationTitle: 'Troupe location',
-                notificationBody: 'Updating your city and country in the background',
-            },
-        });
-    }
-
     async function unregisterBackgroundUpdates() {
         const started = await Location.hasStartedLocationUpdatesAsync(LOCATION_BACKGROUND_TASK);
         if (!started) return;
@@ -435,14 +418,9 @@ export function useLocation() {
         pref: LocationSharing,
         permissionLevel: LocationPermission | null
     ) {
-        if (pref === 'on' && permissionLevel === 'always') {
-            try {
-                await registerBackgroundUpdates();
-            } catch (error) {
-                console.error('Failed to register background location updates:', error);
-            }
-            return;
-        }
+        // Background updates are intentionally disabled for Play policy compliance.
+        void pref;
+        void permissionLevel;
 
         try {
             await unregisterBackgroundUpdates();
@@ -477,10 +455,10 @@ export function useLocation() {
 
             const { latitude, longitude } = location.coords;
 
-            const backgroundPerm = await Location.getBackgroundPermissionsAsync();
-            const osPermission: LocationPermission = backgroundPerm.granted
-                ? 'always'
-                : 'whileUsing';
+            const foregroundPerm = await Location.getForegroundPermissionsAsync();
+            const osPermission: LocationPermission = foregroundPerm.granted
+                ? 'whileUsing'
+                : 'denied';
 
             await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, osPermission);
             setPermission(osPermission);
@@ -527,18 +505,6 @@ export function useLocation() {
             }
 
             let effectivePermission = await getPermissionLevel();
-
-            try {
-                const bg = await Location.getBackgroundPermissionsAsync();
-                if (!bg.granted) {
-                    const req = await Location.requestBackgroundPermissionsAsync();
-                    if (req.granted) {
-                        effectivePermission = 'always';
-                    }
-                }
-            } catch (error) {
-                console.log('Background permission request skipped:', error);
-            }
 
             setPermission(effectivePermission);
             await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, effectivePermission);

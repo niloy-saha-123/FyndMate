@@ -188,7 +188,8 @@ export class FeedService {
                 birthDate: true,
             },
             orderBy: {
-                createdAt: 'desc',
+                // Keep cursor semantics stable by ordering on the same unique field used as cursor.
+                id: 'desc',
             },
         });
 

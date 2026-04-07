@@ -27,9 +27,26 @@ export async function buildApp() {
   });
 
   // TODO: Add Sentry or similar monitoring for production
-  // TODO: Configure stricter CORS whitelist for production
+  const isProduction = process.env.NODE_ENV === 'production';
+  const corsAllowlist = (process.env.CORS_ORIGIN ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (isProduction && corsAllowlist.length === 0) {
+    throw new Error('CORS_ORIGIN must be configured in production');
+  }
+
   await app.register(cors, {
-    origin: true,
+    origin: isProduction
+      ? (origin, cb) => {
+          // Allow non-browser or same-origin requests without an Origin header.
+          if (!origin) return cb(null, true);
+          if (corsAllowlist.includes(origin)) return cb(null, true);
+          return cb(new Error('Not allowed by CORS'), false);
+        }
+      : true,
+    credentials: true,
   });
 
   // Multipart - File uploads

@@ -33,8 +33,9 @@ const TAB_CONFIG: Record<string, {
   profilePage: { icon: 'person-outline', label: 'Profile' },
 };
 
-const ICON_SIZE = 26;
-const PILL_SIZE = 46;
+const ICON_SIZE = 24;
+const PILL_SIZE = 42;
+const TAB_BAR_TOP_PADDING = 5;
 
 const SPRING_CONFIG = {
   stiffness: 400,
@@ -92,7 +93,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   };
 
   // The icon wrapper top position inside the navbar (paddingTop)
-  const PILL_TOP = 7; // matches paddingTop of navbar
+  const PILL_TOP = TAB_BAR_TOP_PADDING;
 
   return (
     <View style={[styles.navbar, { paddingBottom: bottomInset }]}>
@@ -203,7 +204,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.navBackground,
     borderTopWidth: BORDERS.medium,
     borderTopColor: COLORS.border,
-    paddingTop: 7,
+    paddingTop: TAB_BAR_TOP_PADDING,
   },
 
   // Sliding pill — absolute in navbar, slides along X axis with spring
@@ -220,6 +221,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 50,
   },
 
   iconColumn: {
@@ -236,8 +238,8 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    marginTop: 2,
-    fontSize: 11,
+    marginTop: 1,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.2,
   },

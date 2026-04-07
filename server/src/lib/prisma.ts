@@ -6,6 +6,14 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { assertProductionNonLocalUrl, assertProductionRequired } from './env.js';
+
+const databaseUrl = process.env.DATABASE_URL;
+const directUrl = process.env.DIRECT_URL;
+
+assertProductionRequired('DATABASE_URL', databaseUrl);
+assertProductionNonLocalUrl('DATABASE_URL', databaseUrl);
+assertProductionNonLocalUrl('DIRECT_URL', directUrl);
 
 // Extend globalThis to store prisma instance (for hot reload in dev)
 declare global {
@@ -25,4 +33,3 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export type { PrismaClient };
-

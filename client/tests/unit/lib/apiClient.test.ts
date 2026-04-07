@@ -27,6 +27,7 @@ describe('apiClient', () => {
 
   afterEach(() => {
     process.env = { ...originalEnv };
+    (globalThis as any).__DEV__ = false;
     vi.restoreAllMocks();
   });
 
@@ -66,5 +67,25 @@ describe('apiClient', () => {
 
     await expect(apiClient.get('/v1/needs-auth')).rejects.toThrow(/Not authenticated/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fails fast when EXPO_PUBLIC_API_URL is missing in production', async () => {
+    delete process.env.EXPO_PUBLIC_API_URL;
+    (globalThis as any).__DEV__ = false;
+    vi.resetModules();
+
+    await expect(import('../../../src/lib/apiClient')).rejects.toThrow(
+      /EXPO_PUBLIC_API_URL must be set for production builds/i
+    );
+  });
+
+  it('fails fast when production API URL points to localhost', async () => {
+    process.env.EXPO_PUBLIC_API_URL = 'http://localhost:3000';
+    (globalThis as any).__DEV__ = false;
+    vi.resetModules();
+
+    await expect(import('../../../src/lib/apiClient')).rejects.toThrow(
+      /cannot point to local host/i
+    );
   });
 });

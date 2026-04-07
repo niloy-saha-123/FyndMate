@@ -2,13 +2,13 @@
 // Centralized Redis client for the application.
 // Uses the REDIS_URL environment variable (e.g., redis://:password@host:6379/0).
 import Redis from 'ioredis';
+import { assertProductionNonLocalUrl, assertProductionRequired } from './env.js';
 
-// Validate REDIS_URL in production
-if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL) {
-    throw new Error('REDIS_URL environment variable is required in production');
-}
+const redisUrl = process.env.REDIS_URL;
+assertProductionRequired('REDIS_URL', redisUrl);
+assertProductionNonLocalUrl('REDIS_URL', redisUrl);
 
-const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+const redis = new Redis(redisUrl ?? 'redis://localhost:6379', {
     // Connection timeout: fail fast if Redis is unavailable
     connectTimeout: 5000,
     // Command timeout: prevent hanging on slow operations
@@ -68,6 +68,40 @@ redis.on('close', () => {
     console.warn('Redis connection closed');
 });
 
+function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForRedisReady(timeoutMs = 8000): Promise<void> {
+    if (redis.status === 'ready') return;
+
+    await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+            cleanup();
+            reject(new Error(`Redis did not become ready within ${timeoutMs}ms (status: ${redis.status})`));
+        }, timeoutMs);
+
+        const onReady = () => {
+            cleanup();
+            resolve();
+        };
+
+        const onError = (err: Error) => {
+            cleanup();
+            reject(err);
+        };
+
+        const cleanup = () => {
+            clearTimeout(timer);
+            redis.off('ready', onReady);
+            redis.off('error', onError);
+        };
+
+        redis.on('ready', onReady);
+        redis.on('error', onError);
+    });
+}
+
 // TODO [5K Users]: Migrate to managed Redis with SLA (Upstash Pro, AWS ElastiCache, Redis Cloud)
 // TODO [10K Users]: Implement Redis Cluster for high availability and automatic failover
 // TODO [10K Users]: Add Prometheus metrics for Redis health (connection pool, hit rate, latency)
@@ -79,9 +113,29 @@ redis.on('close', () => {
  */
 export async function checkRedisHealth(): Promise<void> {
     try {
-        const start = Date.now();
-        await redis.ping();
-        const latency = Date.now() - start;
+        let latency = 0;
+        let lastError: unknown = null;
+
+        // Retry a few times because Redis may still be connecting during app boot.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                await waitForRedisReady(8000);
+                const start = Date.now();
+                await redis.ping();
+                latency = Date.now() - start;
+                lastError = null;
+                break;
+            } catch (err) {
+                lastError = err;
+                if (attempt < 3) {
+                    await sleep(attempt * 300);
+                }
+            }
+        }
+
+        if (lastError) {
+            throw lastError;
+        }
         
         console.info(`✅ Redis connected successfully (latency: ${latency}ms)`);
         

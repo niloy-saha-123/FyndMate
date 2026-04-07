@@ -317,18 +317,21 @@ export default function MessageProfileScreen() {
       </ScrollView>
 
       <Modal visible={menuVisible && showManageMenu} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
-        <Pressable style={styles.overlay} onPress={() => setMenuVisible(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setMenuVisible(false)}>
           <View style={styles.menuSheet}>
             {normalizedMatchId ? (
               <Pressable style={styles.menuItem} onPress={handleUnmatch}>
                 <Text style={styles.menuDangerText}>Unmatch</Text>
               </Pressable>
             ) : null}
-            <Pressable style={styles.menuItem} onPress={handleBlock}>
+            <Pressable
+              style={[styles.menuItem, !normalizedMatchId && styles.menuItemLast]}
+              onPress={handleBlock}
+            >
               <Text style={styles.menuDangerText}>Block</Text>
             </Pressable>
             <Pressable
-              style={styles.menuItem}
+              style={[styles.menuItem, styles.menuItemLast]}
               onPress={() => {
                 setMenuVisible(false);
                 setReportModalVisible(true);
@@ -504,16 +507,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: BORDERS.thin,
     borderBottomColor: COLORS.border,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     backgroundColor: COLORS.background,
   },
   headerIconButton: {
-    width: 36,
+    width: 40,
+    height: 40,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     flex: 1,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: COLORS.textPrimary,
     marginHorizontal: 8,
@@ -624,22 +629,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'flex-end',
+    paddingTop: 70,
+    paddingRight: 16,
+  },
   menuSheet: {
     backgroundColor: COLORS.surface,
-    borderWidth: BORDERS.medium,
+    borderWidth: BORDERS.thin,
     borderColor: COLORS.border,
     borderRadius: RADIUS.medium,
     overflow: 'hidden',
+    minWidth: 180,
+    ...SHADOWS.medium,
   },
   menuItem: {
-    paddingVertical: 18,
-    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     borderBottomWidth: BORDERS.thin,
     borderBottomColor: COLORS.border,
   },
+  menuItemLast: {
+    borderBottomWidth: 0,
+  },
   menuText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: COLORS.textPrimary,
   },
   menuDangerText: {
@@ -649,12 +666,13 @@ const styles = StyleSheet.create({
   },
   reportSheet: {
     backgroundColor: COLORS.surface,
-    borderWidth: BORDERS.medium,
+    borderWidth: BORDERS.thin,
     borderColor: COLORS.border,
     borderRadius: RADIUS.medium,
-    padding: 16,
-    width: '92%',
-    maxWidth: 420,
+    padding: 20,
+    width: '88%',
+    maxWidth: 360,
+    ...SHADOWS.medium,
   },
   reportTitle: {
     fontSize: 18,
@@ -666,20 +684,21 @@ const styles = StyleSheet.create({
     borderWidth: BORDERS.thin,
     borderColor: COLORS.border,
     borderRadius: RADIUS.small,
-    minHeight: 180,
+    minHeight: 132,
     padding: 12,
     fontSize: 16,
     color: COLORS.textPrimary,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.gray100,
   },
   confirmSheet: {
     backgroundColor: COLORS.surface,
-    borderWidth: BORDERS.medium,
+    borderWidth: BORDERS.thin,
     borderColor: COLORS.border,
     borderRadius: RADIUS.medium,
-    padding: 18,
-    width: '92%',
-    maxWidth: 420,
+    padding: 20,
+    width: '88%',
+    maxWidth: 360,
+    ...SHADOWS.medium,
   },
   confirmTitle: {
     fontSize: 22,
@@ -711,7 +730,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
   },
   reportSubmit: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.danger,
   },
   reportSubmitDisabled: {
     opacity: 0.6,

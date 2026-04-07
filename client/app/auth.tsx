@@ -5,6 +5,13 @@ import { supabase } from "../src/auth/supabaseClient";
 import * as Linking from "expo-linking";
 
 export default function AuthRedirect() {
+  const AUTH_DEBUG = __DEV__ && process.env.EXPO_PUBLIC_DEBUG_AUTH === "1";
+  const debugLog = (...args: unknown[]) => {
+    if (!AUTH_DEBUG) return;
+    // eslint-disable-next-line no-console
+    console.log(...args);
+  };
+
   const router = useRouter();
   const [processed, setProcessed] = useState(false);
 
@@ -14,14 +21,14 @@ export default function AuthRedirect() {
     const processAuthUrl = async (url: string) => {
       if (!url || processed) return;
 
-      console.log("Processing URL:", url);
+      debugLog("Processing auth callback URL");
 
       let access_token = null;
       let refresh_token = null;
 
       if (url.includes('#')) {
         const hashPart = url.split('#')[1];
-        console.log("Hash part:", hashPart);
+        debugLog("Hash fragment present");
         const hashParams = new URLSearchParams(hashPart);
         access_token = hashParams.get('access_token');
         refresh_token = hashParams.get('refresh_token');
@@ -29,20 +36,20 @@ export default function AuthRedirect() {
 
       if (!access_token && url.includes('?')) {
         const queryPart = url.split('?')[1]?.split('#')[0];
-        console.log("Query part:", queryPart);
+        debugLog("Query params present");
         const queryParams = new URLSearchParams(queryPart);
         access_token = queryParams.get('access_token');
         refresh_token = queryParams.get('refresh_token');
       }
 
-      console.log("Tokens found:", {
+      debugLog("Tokens found:", {
         hasAccessToken: !!access_token,
         hasRefreshToken: !!refresh_token,
       });
 
       if (access_token && refresh_token) {
         setProcessed(true);
-        console.log("Setting session...");
+        debugLog("Setting session...");
         
         const { data, error } = await supabase.auth.setSession({
           access_token,
@@ -55,24 +62,24 @@ export default function AuthRedirect() {
           return;
         }
 
-        console.log("Session set successfully!");
+        debugLog("Session set successfully");
         if (mounted) router.replace("/app-gate");
       }
     };
 
     const handleAuthCallback = async () => {
       try {
-        console.log("=== AUTH CALLBACK STARTED ===");
+        debugLog("=== AUTH CALLBACK STARTED ===");
 
         // Listen for incoming URLs 
         const subscription = Linking.addEventListener('url', async (event) => {
-          console.log("📨 URL Event received:", event.url);
+          debugLog("URL event received");
           await processAuthUrl(event.url);
         });
 
         await new Promise(resolve => setTimeout(resolve, 500));
         const initialUrl = await Linking.getInitialURL();
-        console.log("Initial URL:", initialUrl);
+        debugLog("Initial URL exists:", Boolean(initialUrl));
         
         if (initialUrl) {
           await processAuthUrl(initialUrl);
@@ -81,14 +88,14 @@ export default function AuthRedirect() {
         // If no tokens found after 3 seconds, check for session or redirect to login
         setTimeout(async () => {
           if (!processed && mounted) {
-            console.log("Timeout reached, checking session...");
+            debugLog("Timeout reached, checking session...");
             const { data: { session } } = await supabase.auth.getSession();
             
             if (session) {
-              console.log("Session found!");
+              debugLog("Session found");
               router.replace("/app-gate");
             } else {
-              console.log("No session, redirecting to login");
+              debugLog("No session, redirecting to login");
               router.replace("/login");
             }
           }

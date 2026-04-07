@@ -26,6 +26,13 @@ export interface SendRequestPushParams {
   message?: string | null;
 }
 
+interface ExpoPushSendResponse {
+  data?: {
+    status?: string;
+    message?: string;
+  };
+}
+
 /**
  * Send a push notification to the receiver of a message.
  * Respects MatchNotificationPreference (no push if receiver muted).
@@ -87,7 +94,7 @@ export async function sendMessagePush(params: SendMessagePushParams): Promise<vo
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const result = await res.json();
+    const result = (await res.json()) as ExpoPushSendResponse;
 
     if (result.data?.status === 'error') {
       console.error('[push] Expo push error:', result.data.message);

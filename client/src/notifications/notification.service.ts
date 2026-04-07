@@ -4,6 +4,13 @@ import { Platform, Linking } from 'react-native';
 import Constants from 'expo-constants';
 import { apiClient } from '../lib/apiClient';
 
+const NOTIFICATION_DEBUG = __DEV__ && process.env.EXPO_PUBLIC_DEBUG_NOTIFICATIONS === '1';
+const debugLog = (...args: unknown[]) => {
+  if (!NOTIFICATION_DEBUG) return;
+  // eslint-disable-next-line no-console
+  console.log(...args);
+};
+
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -29,7 +36,7 @@ export async function setupNotificationChannel() {
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       bypassDnd: false,
     });
-    console.log('✅ Android notification channel configured');
+    debugLog('✅ Android notification channel configured');
   }
 }
 
@@ -37,12 +44,12 @@ export async function setupNotificationChannel() {
 export function setupNotificationListeners() {
   // Listen for notifications arriving while app is in foreground
   const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
-    console.log('📬 Notification received:', notification);
+    debugLog('📬 Notification received');
   });
 
   // Listen for user interactions with notifications
   const responseListener = Notifications.addNotificationResponseReceivedListener((response) => {
-    console.log('👆 Notification clicked:', response.notification.request.content.data);
+    debugLog('👆 Notification clicked', response.notification.request.identifier);
   });
 
   // Return cleanup function
@@ -66,7 +73,7 @@ export async function sendTestNotification() {
 export async function registerForPushNotifications(forceOpenSettingsOnDeny = false): Promise<string | null> {
 
   if (!Device.isDevice) {
-    console.log('⚠️ Push notifications only work on physical devices');
+    debugLog('⚠️ Push notifications only work on physical devices');
     return null;
   }
 
@@ -75,25 +82,25 @@ export async function registerForPushNotifications(forceOpenSettingsOnDeny = fal
     await setupNotificationChannel();
 
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    console.log('📱 Existing notification permission status:', existingStatus);
+    debugLog('📱 Existing notification permission status:', existingStatus);
     
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
-      console.log('📱 Requesting notification permissions...');
+      debugLog('📱 Requesting notification permissions...');
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
 
     if (finalStatus !== 'granted') {
-      console.log('❌ Failed to get push notification permissions');
+      debugLog('❌ Failed to get push notification permissions');
       if (forceOpenSettingsOnDeny) {
         Linking.openSettings().catch(() => {});
       }
       return null;
     }
 
-    console.log('✅ Notification permissions granted');
+    debugLog('✅ Notification permissions granted');
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
     
@@ -102,13 +109,16 @@ export async function registerForPushNotifications(forceOpenSettingsOnDeny = fal
       return null;
     }
 
-    console.log('📱 Getting Expo push token with project ID:', projectId);
+    debugLog('📱 Getting Expo push token with project ID:', projectId);
 
     const token = await Notifications.getExpoPushTokenAsync({
       projectId,
     });
 
-    console.log('✅ Expo push token obtained:', token.data);
+    const tokenPreview = token.data.length > 12
+      ? `${token.data.slice(0, 6)}...${token.data.slice(-4)}`
+      : 'masked';
+    debugLog('✅ Expo push token obtained:', tokenPreview);
 
     return token.data;
   } catch (error) {
@@ -118,17 +128,17 @@ export async function registerForPushNotifications(forceOpenSettingsOnDeny = fal
 }
 
 export async function savePushToken(token: string) {
-  console.log('📱 Saving push token');
+  debugLog('📱 Saving push token');
   const result = await apiClient.patch<{ success: boolean }>(
     '/api/notifications/push-token',
     { pushToken: token }
   );
-  console.log('✅ Push token saved successfully');
+  debugLog('✅ Push token saved successfully');
   return result;
 }
 
 export async function clearPushToken() {
-  console.log('📱 Clearing push token');
+  debugLog('📱 Clearing push token');
   return apiClient.delete<{ success: boolean }>('/api/notifications/push-token');
 }
 

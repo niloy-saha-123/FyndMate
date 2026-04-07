@@ -18,13 +18,48 @@ import Constants from 'expo-constants';
 
 /**
  * API base URL resolution
- * - If `EXPO_PUBLIC_API_URL` is provided use it.
- * - Otherwise default to localhost but when running in the
- *   simulator/emulator replace `localhost` with the proper host
- *   so device/emulator can reach the dev server.
+ * - Production requires an explicit EXPO_PUBLIC_API_URL.
+ * - Development can fall back to localhost for local API work.
  */
 const DEFAULT_LOCAL = 'http://localhost:3000';
-let API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_LOCAL;
+const LOCAL_DEV_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2']);
+const isDevRuntime = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
+
+function normalizeApiBaseUrl(rawUrl: string): string {
+  return rawUrl.replace(/\/+$/, '');
+}
+
+function resolveApiBaseUrl(): string {
+  const configured = (process.env.EXPO_PUBLIC_API_URL ?? '').trim();
+
+  if (!configured) {
+    if (isDevRuntime) return DEFAULT_LOCAL;
+    throw new Error(
+      'EXPO_PUBLIC_API_URL must be set for production builds. Refusing to fall back to localhost.'
+    );
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(configured);
+  } catch {
+    throw new Error(`EXPO_PUBLIC_API_URL is invalid: "${configured}"`);
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('EXPO_PUBLIC_API_URL must use http or https');
+  }
+
+  if (!isDevRuntime && LOCAL_DEV_HOSTS.has(parsed.hostname.toLowerCase())) {
+    throw new Error(
+      `EXPO_PUBLIC_API_URL cannot point to local host "${parsed.hostname}" in production`
+    );
+  }
+
+  return normalizeApiBaseUrl(configured);
+}
+
+let API_BASE_URL = resolveApiBaseUrl();
 
 /**
  * Get the development server host IP for device/emulator connectivity.
@@ -58,7 +93,7 @@ function getDevServerHost(): string | null {
   }
 }
 
-if (__DEV__) {
+if (isDevRuntime) {
   // If the URL targets localhost, try to find a host reachable from device/emulator
   if (API_BASE_URL.includes('localhost')) {
     const hostIp = getDevServerHost();

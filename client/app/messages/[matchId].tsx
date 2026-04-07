@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useLocalSearchParams, router, useNavigation } from "expo-router";
+import { useLocalSearchParams, router } from "expo-router";
 import { useAuth } from "../../src/auth/AuthProvider";
 import {
   getMessagesPage,
@@ -130,17 +130,6 @@ export default function MessageScreen() {
   const { matchId } = useLocalSearchParams<{ matchId?: string | string[] }>();
   const normalizedMatchId = Array.isArray(matchId) ? matchId[0] : matchId;
   const { user } = useAuth();
-  const navigation = useNavigation();
-
-  // Show a stable fallback header immediately to avoid header disappearing
-  useEffect(() => {
-    navigation.setOptions({
-      headerShown: true,
-      title: "Messages",
-      headerBackTitleVisible: false,
-      headerRight: () => null,
-    });
-  }, [navigation]);
 
   if (normalizedMatchId) {
     useMessageNotificationGuard(normalizedMatchId);
@@ -170,45 +159,6 @@ export default function MessageScreen() {
   const threadCacheWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const FAILED_MESSAGE_TEXT = "Cannot send message";
   const MESSAGE_SEND_WINDOW_MS = 5 * 60 * 1000;
-
-  const applyHeaderForOtherUser = useCallback((resolvedOtherUser: MatchUserInfo, currentMatchId: string) => {
-    navigation.setOptions({
-      headerShown: true,
-      title: resolvedOtherUser.name,
-      headerTitle: () => (
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: "/messages/profile/[userId]",
-              params: { userId: resolvedOtherUser.id, matchId: currentMatchId },
-            })
-          }
-          style={styles.headerTitleContainer}
-        >
-          {resolvedOtherUser.profilePicture ? (
-            <Image
-              source={{ uri: resolvedOtherUser.profilePicture }}
-              style={styles.headerAvatar}
-            />
-          ) : (
-            <View style={[styles.headerAvatar, styles.noHeaderAvatar]}>
-              <Ionicons name="person" size={20} color={COLORS.border} />
-            </View>
-          )}
-          <Text style={styles.headerTitleText}>{resolvedOtherUser.name}</Text>
-        </Pressable>
-      ),
-      headerRight: () => (
-        <Pressable
-          onPress={() => setMenuVisible(true)}
-          style={styles.headerMenuButton}
-        >
-          <Ionicons name="ellipsis-vertical" size={24} color={COLORS.textPrimary} />
-        </Pressable>
-      ),
-      headerBackTitleVisible: false,
-    });
-  }, [navigation]);
 
   // Process messages with metadata for UI rendering
   useEffect(() => {
@@ -294,7 +244,6 @@ export default function MessageScreen() {
         const interimUser = resolveOtherUserFromMessages(page.data);
         if (interimUser && !otherUser) {
           setOtherUser(interimUser);
-          applyHeaderForOtherUser(interimUser, normalizedMatchId);
         }
 
         // Always fetch the authoritative profile — it has a signed picture
@@ -309,7 +258,6 @@ export default function MessageScreen() {
               profilePicture: profile.profilePicture ?? null,
             };
             setOtherUser(authoritative);
-            applyHeaderForOtherUser(authoritative, normalizedMatchId);
           } catch (error) {
             console.error("Failed to resolve other user profile for header", error);
             // If profile fetch failed but we have interim data, keep it
@@ -328,10 +276,9 @@ export default function MessageScreen() {
       const cached = await loadThreadCache(cacheKey);
       if (mounted && cached) {
           setMessages(cached.messages);
-          setMatchStatus(cached.matchStatus);
-          if (cached.otherUser) {
-            setOtherUser(cached.otherUser);
-          applyHeaderForOtherUser(cached.otherUser, normalizedMatchId);
+        setMatchStatus(cached.matchStatus);
+        if (cached.otherUser) {
+          setOtherUser(cached.otherUser);
         }
         setLoadingThread(false);
       } else if (mounted) {
@@ -403,7 +350,7 @@ export default function MessageScreen() {
       mounted = false;
       unsubscribe();
     };
-  }, [normalizedMatchId, user, applyHeaderForOtherUser]);
+  }, [normalizedMatchId, user]);
 
   useEffect(() => {
     if (!normalizedMatchId || !user) return;
@@ -676,6 +623,7 @@ export default function MessageScreen() {
   const canSend = isMessageValid(text) && !savingEdit;
   const canEditSelected = selectedMessage ? canEditMessage(selectedMessage) : false;
   const canDeleteSelected = selectedMessage ? canDeleteMessage(selectedMessage) : false;
+  const headerTitle = otherUser?.name ?? "Messages";
 
   return (
     <KeyboardAvoidingView
@@ -684,6 +632,50 @@ export default function MessageScreen() {
       keyboardVerticalOffset={80}
     >
       <View style={styles.container}>
+        <View style={styles.threadHeader}>
+          <Pressable onPress={() => router.back()} style={styles.threadHeaderIconButton}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+          </Pressable>
+
+          <Pressable
+            style={styles.threadHeaderTitleContainer}
+            onPress={() => {
+              if (!otherUser || !normalizedMatchId) return;
+              router.push({
+                pathname: "/messages/profile/[userId]",
+                params: { userId: otherUser.id, matchId: normalizedMatchId },
+              });
+            }}
+            disabled={!otherUser || !normalizedMatchId}
+          >
+            {otherUser?.profilePicture ? (
+              <Image
+                source={{ uri: otherUser.profilePicture }}
+                style={styles.threadHeaderAvatar}
+              />
+            ) : (
+              <View style={[styles.threadHeaderAvatar, styles.threadHeaderNoAvatar]}>
+                <Ionicons name="person" size={18} color={COLORS.border} />
+              </View>
+            )}
+            <Text numberOfLines={1} style={styles.threadHeaderTitleText}>
+              {headerTitle}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setMenuVisible(true)}
+            style={styles.threadHeaderIconButton}
+            disabled={!otherUser}
+          >
+            <Ionicons
+              name="ellipsis-vertical"
+              size={24}
+              color={otherUser ? COLORS.textPrimary : COLORS.textLight}
+            />
+          </Pressable>
+        </View>
+
         {loadingThread ? (
           <View style={styles.threadLoadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
@@ -841,7 +833,7 @@ export default function MessageScreen() {
             style={styles.modalOverlay}
             onPress={() => setActionModalVisible(false)}
           >
-            <View style={styles.modalBox}>
+            <View style={styles.actionModalBox}>
               <Pressable
                 onPress={() => {
                   if (!selectedMessage || !canEditSelected) return;
@@ -931,7 +923,7 @@ export default function MessageScreen() {
               setReportModalVisible(false);
             }}
           >
-            <View style={styles.modalBox}>
+            <View style={styles.reportBox}>
               <Text style={styles.modalTitle}>Report user</Text>
               <Text style={styles.modalSubtitle}>
                 Tell us what happened
@@ -1017,7 +1009,52 @@ export default function MessageScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    paddingTop: 12,
+  },
+  threadHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: BORDERS.thin,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.background,
+  },
+  threadHeaderIconButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  threadHeaderTitleContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 6,
+    minHeight: 40,
+    gap: 8,
+  },
+  threadHeaderAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+  },
+  threadHeaderNoAvatar: {
+    backgroundColor: COLORS.gray200,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  threadHeaderTitleText: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.textPrimary,
+  },
   threadLoadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1032,44 +1069,15 @@ const styles = StyleSheet.create({
   },
   messageList: { padding: 16 },
 
-  // Header Title
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginLeft: -20,
-  },
-  headerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: BORDERS.thin,
-    borderColor: COLORS.border,
-  },
-  noHeaderAvatar: {
-    backgroundColor: COLORS.gray200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitleText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  headerMenuButton: {
-    padding: 12,
-    marginRight: -8,
-  },
-
   // Menu Modal
   menuOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'flex-end',
+    paddingTop: 70,
+    paddingRight: 16,
   },
   menuContainer: {
-    position: 'absolute',
-    top: 60,
-    right: 16,
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.medium,
     borderWidth: BORDERS.thin,
@@ -1265,7 +1273,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center"
   },
-  modalBox: {
+  actionModalBox: {
     backgroundColor: COLORS.surface,
     padding: 20,
     borderRadius: RADIUS.medium,
@@ -1279,6 +1287,16 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: RADIUS.medium,
     width: '88%',
+    maxWidth: 360,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.border,
+    ...SHADOWS.medium,
+  },
+  reportBox: {
+    backgroundColor: COLORS.surface,
+    padding: 20,
+    borderRadius: RADIUS.medium,
+    width: "88%",
     maxWidth: 360,
     borderWidth: BORDERS.thin,
     borderColor: COLORS.border,
@@ -1337,11 +1355,11 @@ const styles = StyleSheet.create({
   },
 
   reportInput: {
-    minHeight: 180,
+    minHeight: 132,
     borderWidth: BORDERS.thin,
     borderColor: COLORS.border,
     borderRadius: RADIUS.small,
-    padding: 10,
+    padding: 12,
     fontSize: 16,
     textAlignVertical: 'top',
     backgroundColor: COLORS.gray100,

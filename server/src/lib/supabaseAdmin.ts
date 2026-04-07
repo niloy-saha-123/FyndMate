@@ -6,9 +6,14 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { assertProductionNonLocalUrl, assertProductionRequired } from './env.js';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+assertProductionRequired('SUPABASE_URL', supabaseUrl);
+assertProductionRequired('SUPABASE_SERVICE_ROLE_KEY', supabaseServiceKey);
+assertProductionNonLocalUrl('SUPABASE_URL', supabaseUrl);
 
 if (!supabaseUrl) {
     throw new Error('SUPABASE_URL environment variable is not set');

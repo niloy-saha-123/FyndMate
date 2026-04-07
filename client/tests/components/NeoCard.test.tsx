@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import renderer from 'react-test-renderer';
+import { act } from 'react-test-renderer';
 import { StyleSheet, View } from 'react-native';
 import { describe, it, expect } from 'vitest';
 import { NeoCard } from '../../src/components/NeoCard';
@@ -13,9 +14,17 @@ function flattenStyle(style: any) {
   return StyleSheet.flatten(style);
 }
 
+function createTree(element: React.ReactElement) {
+  let tree: renderer.ReactTestRenderer;
+  act(() => {
+    tree = renderer.create(element);
+  });
+  return tree!;
+}
+
 describe('NeoCard', () => {
   it('renders children content', () => {
-    const tree = renderer.create(
+    const tree = createTree(
       <NeoCard>
         <View testID="child-content" />
       </NeoCard>
@@ -26,7 +35,7 @@ describe('NeoCard', () => {
   });
 
   it('applies default card styles', () => {
-    const tree = renderer.create(
+    const tree = createTree(
       <NeoCard>
         <View />
       </NeoCard>
@@ -40,7 +49,7 @@ describe('NeoCard', () => {
   });
 
   it('applies custom style override', () => {
-    const tree = renderer.create(
+    const tree = createTree(
       <NeoCard style={{ marginTop: 12 }}>
         <View />
       </NeoCard>

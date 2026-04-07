@@ -7,6 +7,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../src/app.js';
 import { getAuthToken, clearDatabase } from '../../helpers.js';
+import { rateLimiter } from '../../../src/rate-limiting/index.js';
 
 describe('Auth Routes', () => {
     let app: FastifyInstance;
@@ -22,6 +23,30 @@ describe('Auth Routes', () => {
 
     beforeEach(async () => {
         await clearDatabase();
+        // Signup limiter window is 24h; reset test IP keys for deterministic runs.
+        await rateLimiter.reset('signup:127.0.0.1');
+        await rateLimiter.reset('signup:::1');
+    });
+
+    /**
+     * Should reject signup with missing email
+     */
+    it('POST /auth/signup creates account with valid payload', async () => {
+        const email = `signup${Date.now()}@mailinator.com`;
+
+        const response = await app.inject({
+            method: 'POST',
+            url: '/auth/signup',
+            payload: {
+                email,
+                password: 'password123',
+                name: 'John Doe',
+            },
+        });
+
+        expect(response.statusCode).toBe(201);
+        const body = JSON.parse(response.body);
+        expect(body).toEqual({ success: true });
     });
 
     /**

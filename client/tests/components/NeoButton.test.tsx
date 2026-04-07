@@ -12,9 +12,17 @@ function flattenStyle(style: any) {
   return StyleSheet.flatten(style);
 }
 
+function createTree(element: React.ReactElement) {
+  let tree: renderer.ReactTestRenderer;
+  act(() => {
+    tree = renderer.create(element);
+  });
+  return tree!;
+}
+
 describe('NeoButton', () => {
   it('renders title text', () => {
-    const tree = renderer.create(
+    const tree = createTree(
       <NeoButton title="Request" onPress={() => undefined} />
     );
 
@@ -24,7 +32,7 @@ describe('NeoButton', () => {
 
   it('calls onPress when pressed', () => {
     const onPress = vi.fn();
-    const tree = renderer.create(
+    const tree = createTree(
       <NeoButton title="Send" onPress={onPress} />
     );
 
@@ -38,7 +46,7 @@ describe('NeoButton', () => {
   });
 
   it('uses gradient wrapper for primary variant', () => {
-    const tree = renderer.create(
+    const tree = createTree(
       <NeoButton title="Primary" onPress={() => undefined} variant="primary" />
     );
 
@@ -47,7 +55,7 @@ describe('NeoButton', () => {
   });
 
   it('does not render gradient for secondary variant', () => {
-    const tree = renderer.create(
+    const tree = createTree(
       <NeoButton title="Secondary" onPress={() => undefined} variant="secondary" />
     );
 
@@ -56,7 +64,7 @@ describe('NeoButton', () => {
   });
 
   it('applies full width style when enabled', () => {
-    const tree = renderer.create(
+    const tree = createTree(
       <NeoButton title="Wide" onPress={() => undefined} fullWidth />
     );
 

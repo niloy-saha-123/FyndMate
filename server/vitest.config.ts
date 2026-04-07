@@ -8,5 +8,7 @@ export default defineConfig({
         globals: true,
         setupFiles: ['./tests/setup.ts'],
         fileParallelism: false, // Prevent shared DB race conditions
+        include: ['tests/**/*.test.ts'],
+        exclude: ['**/dist/**', '**/node_modules/**'],
     },
 });

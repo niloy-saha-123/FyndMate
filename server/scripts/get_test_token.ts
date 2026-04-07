@@ -35,8 +35,11 @@ if (!SUPABASE_URL.includes("localhost") && !SUPABASE_URL.includes("127.0.0.1")) 
     process.exit(1);
 }
 
-// Use the Local Service Role Key (Ignore .env to avoid Prod key mismatch)
-const SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("\n❌ Missing SUPABASE_SERVICE_ROLE_KEY in environment.");
+    process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -45,7 +48,7 @@ import { prisma } from '../src/lib/prisma.js';
 
 
 const TEST_EMAIL = "postman_final@fyndmate.com";
-const TEST_PASSWORD = "password123";
+const TEST_PASSWORD = process.env.TEST_USER_PASSWORD ?? "password123";
 
 async function getToken() {
     console.log(`🔄 Setting up test user: ${TEST_EMAIL}...`);

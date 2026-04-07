@@ -8,16 +8,32 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Simple hook renderer
 function renderHook<T>(hook: () => T) {
-  let value: T;
+  let value: T | undefined;
   function Test() {
     value = hook();
     return null;
   }
-  const inst = renderer.create(<Test />);
+  let inst: renderer.ReactTestRenderer;
+  act(() => {
+    inst = renderer.create(<Test />);
+  });
   return {
-    result: () => value!,
-    rerender: () => inst.update(<Test />),
-    unmount: () => inst.unmount(),
+    result: () => {
+      if (value === undefined) {
+        throw new Error('Hook value not initialized');
+      }
+      return value;
+    },
+    rerender: () => {
+      act(() => {
+        inst.update(<Test />);
+      });
+    },
+    unmount: () => {
+      act(() => {
+        inst.unmount();
+      });
+    },
   };
 }
 
@@ -88,7 +104,7 @@ describe('useFeed', () => {
     );
 
     // Simulate offline fetch so cache stays visible
-    getDiscoveryFeed.mockRejectedValueOnce(new Error('offline'));
+    getDiscoveryFeed.mockRejectedValue(new Error('offline'));
 
     const { useFeed } = await import('../../../src/hooks/useFeed');
     const { result } = renderHook(() => useFeed());

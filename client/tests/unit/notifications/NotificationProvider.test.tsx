@@ -77,17 +77,24 @@ vi.mock('../../../src/auth/AuthProvider', () => ({
 import { NotificationProvider, useNotifications } from '../../../src/notifications/NotificationProvider';
 
 function renderWithProvider() {
-  let ctx: ReturnType<typeof useNotifications>;
+  let ctx: ReturnType<typeof useNotifications> | undefined;
   function Test() {
     ctx = useNotifications();
     return null;
   }
-  renderer.create(
-    <NotificationProvider>
-      <Test />
-    </NotificationProvider>
-  );
-  return () => ctx!;
+  act(() => {
+    renderer.create(
+      <NotificationProvider>
+        <Test />
+      </NotificationProvider>
+    );
+  });
+  return () => {
+    if (!ctx) {
+      throw new Error('Notification context not initialized');
+    }
+    return ctx;
+  };
 }
 
 describe('NotificationProvider', () => {

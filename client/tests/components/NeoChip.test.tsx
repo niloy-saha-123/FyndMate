@@ -13,9 +13,17 @@ function flattenStyle(style: any) {
   return StyleSheet.flatten(style);
 }
 
+function createTree(element: React.ReactElement) {
+  let tree: renderer.ReactTestRenderer;
+  act(() => {
+    tree = renderer.create(element);
+  });
+  return tree!;
+}
+
 describe('NeoChip', () => {
   it('renders plain chip without press handler', () => {
-    const tree = renderer.create(<NeoChip label="React" variant="skill" />);
+    const tree = createTree(<NeoChip label="React" variant="skill" />);
     const textNode = tree.root.findByProps({ children: 'React' });
 
     expect(textNode).toBeTruthy();
@@ -23,7 +31,7 @@ describe('NeoChip', () => {
 
   it('renders touchable chip when onPress is provided', () => {
     const onPress = vi.fn();
-    const tree = renderer.create(
+    const tree = createTree(
       <NeoChip label="Open Source" variant="looking" onPress={onPress} />
     );
 
@@ -37,7 +45,7 @@ describe('NeoChip', () => {
   });
 
   it('uses selected colors for looking variant', () => {
-    const tree = renderer.create(
+    const tree = createTree(
       <NeoChip label="Startups" variant="looking" selected />
     );
 

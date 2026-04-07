@@ -1,17 +1,28 @@
 import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
-import * as Crypto from "expo-crypto";
 import { supabase } from "./supabaseClient";
 import { router } from "expo-router";
 
 WebBrowser.maybeCompleteAuthSession();
+const AUTH_DEBUG = __DEV__ && process.env.EXPO_PUBLIC_DEBUG_AUTH === "1";
+
+function debugLog(...args: unknown[]) {
+  if (!AUTH_DEBUG) return;
+  // eslint-disable-next-line no-console
+  console.log(...args);
+}
+
+function redactCallbackTokens(rawUrl: string): string {
+  return rawUrl
+    .replace(/(access_token=)[^&#]+/gi, "$1[redacted]")
+    .replace(/(refresh_token=)[^&#]+/gi, "$1[redacted]");
+}
 
 export async function signInWithGoogle() {
   try {
     const redirectUrl = 'fyndmate://auth';
-    
-    console.log("=== GOOGLE SIGN IN ===");
-    console.log("Redirect URL:", redirectUrl);
+
+    debugLog("=== GOOGLE SIGN IN ===");
+    debugLog("Redirect URL:", redirectUrl);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -34,17 +45,17 @@ export async function signInWithGoogle() {
       throw new Error("No OAuth URL returned");
     }
 
-    console.log("Opening browser...");
+    debugLog("Opening browser...");
 
     // Open the browser
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
 
-    console.log("=== BROWSER RESULT ===");
-    console.log("Type:", result.type);
+    debugLog("=== BROWSER RESULT ===");
+    debugLog("Type:", result.type);
     
     if (result.type === 'success' && result.url) {
-      console.log("Full URL:", result.url);
-      
+      debugLog("OAuth callback URL received");
+
       // Parse the URL
       const url = result.url;
       let access_token: string | null = null;
@@ -54,7 +65,7 @@ export async function signInWithGoogle() {
       const hashIndex = url.indexOf('#');
       if (hashIndex !== -1) {
         const hash = url.substring(hashIndex + 1);
-        console.log("Hash fragment:", hash.substring(0, 100));
+        debugLog("Hash fragment present");
         const params = new URLSearchParams(hash);
         access_token = params.get('access_token');
         refresh_token = params.get('refresh_token');
@@ -66,14 +77,14 @@ export async function signInWithGoogle() {
         if (queryIndex !== -1) {
           const endIndex = hashIndex !== -1 ? hashIndex : url.length;
           const query = url.substring(queryIndex + 1, endIndex);
-          console.log("Query params:", query.substring(0, 100));
+          debugLog("Query params present");
           const params = new URLSearchParams(query);
           access_token = params.get('access_token');
           refresh_token = params.get('refresh_token');
         }
       }
 
-      console.log("Tokens found:", { access: !!access_token, refresh: !!refresh_token });
+      debugLog("Tokens found:", { access: !!access_token, refresh: !!refresh_token });
 
       if (access_token && refresh_token) {
         const { error: sessionError } = await supabase.auth.setSession({
@@ -83,7 +94,7 @@ export async function signInWithGoogle() {
 
         if (sessionError) throw sessionError;
 
-        console.log("✅ Session set successfully!");
+        debugLog("✅ Session set successfully!");
         router.replace("/app-gate");
         return;
       }
@@ -92,12 +103,12 @@ export async function signInWithGoogle() {
     // Fallback: Check if session exists (deep link may have handled it)
     // This covers flows where the browser is dismissed but a deep link
     // handler (e.g. AuthRedirect screen) has already created a session.
-    console.log("Checking for existing session...");
+    debugLog("Checking for existing session...");
     await new Promise(r => setTimeout(r, 1500));
     
     const { data: sessionData } = await supabase.auth.getSession();
     if (sessionData?.session) {
-      console.log("✅ Session found!");
+      debugLog("✅ Session found!");
       router.replace("/app-gate");
       return;
     }
@@ -106,14 +117,16 @@ export async function signInWithGoogle() {
     // a normal user action, not an error. This avoids noisy alerts when a
     // user decides not to pick an account.
     if (result.type === 'cancel' || result.type === 'dismiss') {
-      console.log("User cancelled Google sign-in flow (type:", result.type, ")");
+      debugLog("User cancelled Google sign-in flow (type:", result.type, ")");
       return;
     }
 
     // At this point, we did not get tokens and we have no session, and the
     // browser result was not a user-driven cancel/dismiss. Surface a real
     // error so it can be debugged.
-    const urlToShow = result.type === 'success' && result.url ? result.url : 'N/A';
+    const urlToShow = result.type === 'success' && result.url
+      ? redactCallbackTokens(result.url)
+      : 'N/A';
     throw new Error(
       `OAuth callback didn't return tokens.\n\nCallback URL: ${urlToShow.substring(0, 150)}...\n\nPlease check Metro logs.`
     );

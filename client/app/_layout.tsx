@@ -72,6 +72,10 @@ export default function RootLayout() {
 
                   {/* Message profile detail */}
                   <Stack.Screen
+                    name="messages/[matchId]"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
                     name="messages/profile/[userId]"
                     options={{ headerShown: false }}
                   />

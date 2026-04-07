@@ -23,12 +23,13 @@ describe('sendMessagePush', () => {
 
   beforeEach(async () => {
     fetchCalls = [];
-    globalThis.fetch = vi.fn((url: string, init?: RequestInit) => {
+    globalThis.fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       fetchCalls.push({ url, body: (init?.body as string) ?? '' });
-      return Promise.resolve({
+      return {
         ok: true,
         json: () => Promise.resolve({ data: { status: 'ok' } }),
-      } as Response);
+      } as Response;
     });
     matchFindUnique.mockReset();
     prefFindUnique.mockReset();
