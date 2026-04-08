@@ -1,15 +1,16 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# EAS upload ignore rules (separate from .gitignore)
+# Keep native folders (/android, /ios) included for cloud builds.
 
 # dependencies
 node_modules/
 
-# Expo
+# Expo cache/output
 .expo/
 dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native build artifacts/secrets
 .kotlin/
 *.orig.*
 *.jks
