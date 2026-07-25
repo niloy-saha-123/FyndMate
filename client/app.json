@@ -78,7 +78,8 @@
       "expo-image",
       "expo-router",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@sentry/react-native"
     ],
     "owner": "niloysahas-organization"
   }
