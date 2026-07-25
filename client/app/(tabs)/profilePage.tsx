@@ -24,9 +24,15 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { deleteMyAccount, updateProfile } from '../../src/services/profileService';
 import { supabase } from '../../src/auth/supabaseClient';
+import { clearLocationSecret } from '../../src/hooks/useLocation';
+import { FEED_CACHE_KEY } from '../../src/hooks/useFeed';
+import { LIKES_CACHE_KEY } from '../../src/hooks/useLikes';
+import { MESSAGES_CACHE_PREFIX } from './messages';
+import { THREAD_CACHE_PREFIX } from '../messages/[matchId]';
 import { getOptimizedImageUrl, ImageSizes } from '../../src/utils/imageOptimization';
 import { COLORS, SHADOWS, BORDERS, RADIUS } from '../../src/theme/colors';
 import { NeoCard } from '../../src/components/NeoCard';
@@ -644,8 +650,23 @@ export default function ProfilePage() {
 
   const confirmLogout = useCallback(async () => {
     setLogoutModalVisible(false);
+    const userId = session?.user?.id;
+    await clearLocationSecret();
+    if (userId) {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const staleKeys = allKeys.filter(
+        (key) =>
+          key === FEED_CACHE_KEY ||
+          key === LIKES_CACHE_KEY ||
+          key === `${MESSAGES_CACHE_PREFIX}${userId}` ||
+          key.startsWith(`${THREAD_CACHE_PREFIX}${userId}:`)
+      );
+      if (staleKeys.length > 0) {
+        await AsyncStorage.multiRemove(staleKeys);
+      }
+    }
     await supabase.auth.signOut();
-  }, []);
+  }, [session]);
 
   const handleDeleteAccount = useCallback(() => {
     setDeleteAccountModalVisible(true);

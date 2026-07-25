@@ -30,7 +30,7 @@ import { COLORS, SHADOWS, BORDERS, RADIUS } from '../../src/theme/colors';
 import { NeoCard } from '../../src/components/NeoCard';
 import { formatRelativeTime, convertToLocalTime } from '../../src/utils/timeFormatting';
 
-const MESSAGES_CACHE_PREFIX = 'fyndmate_messages_cache:';
+export const MESSAGES_CACHE_PREFIX = 'fyndmate_messages_cache:';
 
 type MessagesCache = {
   matches: any[];

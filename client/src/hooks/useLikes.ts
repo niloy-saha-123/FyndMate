@@ -15,7 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getReceivedLikes, acceptLike, declineLike, Like } from '../services/matchingService';
 import { getUserFriendlyErrorMessage } from '../utils/errorMessages';
 
-const LIKES_CACHE_KEY = 'fyndmate_likes_cache';
+export const LIKES_CACHE_KEY = 'fyndmate_likes_cache';
 
 type LikesCache = {
     likes: Like[];

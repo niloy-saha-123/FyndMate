@@ -22,7 +22,7 @@ import {
 import { getUserFriendlyErrorMessage } from '../utils/errorMessages';
 import { ApiError } from '../lib/apiClient';
 
-const FEED_CACHE_KEY = 'fyndmate_feed_cache';
+export const FEED_CACHE_KEY = 'fyndmate_feed_cache';
 const BATCH_SIZE = 5;
 const LOAD_MORE_THRESHOLD = 2;
 const MAX_ATTEMPTS = 2;
