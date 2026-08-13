@@ -28,7 +28,7 @@ export function OfflineBanner() {
 
   return (
     <View style={[styles.banner, { top: insets.top }]}>
-      <Text style={styles.text}>You're offline</Text>
+      <Text style={styles.text}>You&apos;re offline</Text>
     </View>
   );
 }

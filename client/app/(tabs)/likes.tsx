@@ -111,7 +111,7 @@ export default function LikesScreen() {
                 {/* Message */}
                 <View style={styles.messageBox}>
                     <Text style={styles.messageLabel}>They said:</Text>
-                    <Text style={styles.messageText}>"{item.message}"</Text>
+                    <Text style={styles.messageText}>&quot;{item.message}&quot;</Text>
                 </View>
 
                 {/* Actions */}
@@ -212,7 +212,7 @@ export default function LikesScreen() {
 
                         {/* Quote */}
                         <View style={styles.quoteBox}>
-                            <Text style={styles.quoteText}>"{selectedLike?.message}"</Text>
+                            <Text style={styles.quoteText}>&quot;{selectedLike?.message}&quot;</Text>
                         </View>
 
                         {/* Reply Input */}

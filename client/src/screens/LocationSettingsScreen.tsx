@@ -175,7 +175,7 @@ export const LocationSettingsScreen = () => {
             <View style={styles.infoNote}>
                 <Ionicons name="information-circle-outline" size={18} color={COLORS.textSecondary} />
                 <Text style={styles.infoNoteText}>
-                    To change between "Always" and "While Using App", go to your device's Settings → Troupe → Location
+                    To change between &quot;Always&quot; and &quot;While Using App&quot;, go to your device&apos;s Settings → Troupe → Location
                 </Text>
             </View>
         </View>

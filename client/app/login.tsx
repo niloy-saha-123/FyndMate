@@ -202,7 +202,7 @@ export default function Login() {
             </TouchableOpacity>
 
             <View style={styles.signupRow}>
-              <Text style={styles.signupText}>Don't have an account? </Text>
+              <Text style={styles.signupText}>Don&apos;t have an account? </Text>
               <TouchableOpacity
                 onPress={() => {
                   setIsSignUp(true);

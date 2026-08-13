@@ -131,9 +131,7 @@ export default function MessageScreen() {
   const normalizedMatchId = Array.isArray(matchId) ? matchId[0] : matchId;
   const { user } = useAuth();
 
-  if (normalizedMatchId) {
-    useMessageNotificationGuard(normalizedMatchId);
-  }
+  useMessageNotificationGuard(normalizedMatchId);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);

@@ -5,8 +5,15 @@
 const isDevRuntime =
   typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV !== 'production';
 
-function readHttpsEnv(envKey: string): string | null {
-  const raw = (process.env[envKey] ?? '').trim();
+/**
+ * NOTE: `process.env.EXPO_PUBLIC_*` must be read with a *static* member
+ * expression. babel-preset-expo only inlines literal `process.env.EXPO_PUBLIC_X`
+ * accesses; a dynamic `process.env[key]` lookup is left untouched and resolves to
+ * undefined at runtime, which silently nulled every link here. Do not refactor
+ * these reads behind a variable key.
+ */
+function parseHttpsUrl(envKey: string, rawValue: string | undefined): string | null {
+  const raw = (rawValue ?? '').trim();
   if (!raw) return null;
 
   try {
@@ -24,8 +31,14 @@ function readHttpsEnv(envKey: string): string | null {
 }
 
 export const LEGAL_LINKS = {
-  privacyPolicy: readHttpsEnv('EXPO_PUBLIC_PRIVACY_POLICY_URL'),
-  termsOfService: readHttpsEnv('EXPO_PUBLIC_TERMS_URL'),
-  accountDeletion: readHttpsEnv('EXPO_PUBLIC_ACCOUNT_DELETION_URL'),
+  privacyPolicy: parseHttpsUrl(
+    'EXPO_PUBLIC_PRIVACY_POLICY_URL',
+    process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL
+  ),
+  termsOfService: parseHttpsUrl('EXPO_PUBLIC_TERMS_URL', process.env.EXPO_PUBLIC_TERMS_URL),
+  accountDeletion: parseHttpsUrl(
+    'EXPO_PUBLIC_ACCOUNT_DELETION_URL',
+    process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL
+  ),
 } as const;
 
