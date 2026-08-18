@@ -1,0 +1,46 @@
+# Enforces the account-deletion retention window promised in the privacy policy.
+#
+# Account deletion quarantines the user's uploaded images and writes a
+# `deleted_account_retention` row with a `retention_ends_at` date. This job is what
+# actually acts on that date: it deletes the quarantined files and erases the personal
+# fields of the row. Without it, the stated retention window is not enforced.
+#
+# Required repo secrets (same values as server/.env):
+#   DATABASE_URL, DIRECT_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+
+name: Retention Purge
+
+on:
+  schedule:
+    - cron: "30 3 * * *" # daily at 03:30 UTC
+  workflow_dispatch:
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Purge expired retention records
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NODE_ENV: production
+        run: npm run purge:retention
