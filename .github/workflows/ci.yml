@@ -21,3 +21,37 @@ jobs:
       - run: npm run lint
       - run: npx tsc --noEmit
       - run: npm test
+
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase start
+      - run: npm run db:generate
+      - run: npm run typecheck
+      - run: npm run test:setup
+      - run: npm test
+      - if: always()
+        run: supabase stop --no-backup
