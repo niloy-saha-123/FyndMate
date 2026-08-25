@@ -6,7 +6,7 @@
 # fields of the row. Without it, the stated retention window is not enforced.
 #
 # Required repo secrets (same values as server/.env):
-#   DATABASE_URL, DIRECT_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+#   DATABASE_URL, DIRECT_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, REDIS_URL
 
 name: Retention Purge
 
@@ -42,5 +42,6 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
           NODE_ENV: production
         run: npm run purge:retention
