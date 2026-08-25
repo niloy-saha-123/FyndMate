@@ -327,3 +327,33 @@ function extractPathFromUrl(url: string): string {
 
   return url.substring(index + bucketPattern.length);
 }
+
+
+/**
+ * Permanently delete quarantined files once their retention window has elapsed.
+ *
+ * The supplied paths come from `deleted_account_retention.quarantined_file_paths`,
+ * which `buildQuarantinePath` already produced as storage paths, so they are removed
+ * as-is rather than being run back through URL extraction.
+ *
+ * Removing an object that is already gone is not an error, which is what makes the
+ * retention purge safe to retry after a partial run.
+ */
+export async function deleteQuarantinedFiles(
+  paths: string[]
+): Promise<{ deleted: string[]; failed: QuarantineFailure[] }> {
+  if (paths.length === 0) {
+    return { deleted: [], failed: [] };
+  }
+
+  const { error } = await supabaseAdmin.storage.from(BUCKET_NAME).remove(paths);
+
+  if (error) {
+    return {
+      deleted: [],
+      failed: paths.map((sourcePath) => ({ sourcePath, reason: error.message })),
+    };
+  }
+
+  return { deleted: paths, failed: [] };
+}

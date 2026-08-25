@@ -101,7 +101,7 @@ export class ErrorBoundary extends Component<Props, State> {
             {/* Error Message */}
             <Text style={styles.title}>Something went wrong</Text>
             <Text style={styles.subtitle}>
-              We're sorry, but something unexpected happened. Please try again.
+              We&apos;re sorry, but something unexpected happened. Please try again.
             </Text>
 
             {/* Retry Button */}

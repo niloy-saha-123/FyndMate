@@ -41,7 +41,8 @@
     "test:setup": "bash scripts/setup-test-env.sh",
     "// === PRE-DEPLOYMENT ===": "",
     "prebuild": "npm run db:generate",
-    "prestart:prod": "npm run db:prod:migrate"
+    "prestart:prod": "npm run db:prod:migrate",
+    "purge:retention": "tsx scripts/purge-retention.ts"
   },
   "keywords": [
     "fastify",

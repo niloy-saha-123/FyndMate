@@ -219,7 +219,7 @@ export default function TermsScreen() {
           11.2 Your use of third-party services may be subject to additional terms and privacy policies of those providers. We are not responsible for third-party services beyond what is described in these Terms and our Privacy Policy.
         </Text>
         <Text style={styles.paragraph}>
-          11.3 Third-Party Terms. You must comply with applicable third-party terms of agreement when using the Service (e.g., if you use Google Sign-In, you must comply with Google's Terms of Service; if the Service includes VoIP or wireless data features, you must not be in violation of your carrier's terms when using the Service).
+          11.3 Third-Party Terms. You must comply with applicable third-party terms of agreement when using the Service (e.g., if you use Google Sign-In, you must comply with Google&apos;s Terms of Service; if the Service includes VoIP or wireless data features, you must not be in violation of your carrier&apos;s terms when using the Service).
         </Text>
 
         <Text style={styles.sectionTitle}>12. Intellectual Property of the Company</Text>
@@ -263,7 +263,7 @@ export default function TermsScreen() {
 
         <Text style={styles.sectionTitle}>14. Legal Compliance</Text>
         <Text style={styles.paragraph}>
-          14.1 You represent and warrant that (i) you are not located in a country that is subject to a U.S. Government embargo, or that has been designated by the U.S. Government as a "terrorist supporting" country; and (ii) you are not listed on any U.S. Government list of prohibited or restricted parties.
+          14.1 You represent and warrant that (i) you are not located in a country that is subject to a U.S. Government embargo, or that has been designated by the U.S. Government as a &quot;terrorist supporting&quot; country; and (ii) you are not listed on any U.S. Government list of prohibited or restricted parties.
         </Text>
 
         <Text style={styles.sectionTitle}>15. Limitation of Liability</Text>
