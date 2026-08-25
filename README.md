@@ -3,7 +3,7 @@
 Mobile app for finding project collaborators, built with an Expo (React Native) client and a Fastify/Prisma API server backed by Supabase (auth, Postgres, storage, realtime) and Redis rate limiting.
 
 ## Tech Stack
-- Client: Expo SDK 52, React Native 0.76, TypeScript, Expo Router, Expo Notifications, Expo Location, AsyncStorage, Supabase JS, Expo Image.
+- Client: Expo SDK ~55.0.12, React Native 0.83.4, React 19.2.0, TypeScript, Expo Router, Expo Notifications, Expo Location, AsyncStorage, Supabase JS, Expo Image.
 - Server: Fastify 4, TypeScript, Prisma, PostgreSQL (Supabase), Zod validation, Redis (rate limiting/cache), Supabase Storage, Expo push API.
 - Tooling: Vitest, TSX, Supabase CLI, Docker (for local Postgres via Supabase).
 

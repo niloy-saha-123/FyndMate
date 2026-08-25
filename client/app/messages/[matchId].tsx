@@ -96,7 +96,7 @@ interface ThreadCache {
 
 type RealtimeEvent = "upsert" | "delete" | "match_inactive";
 type ConfirmAction = "unmatch" | "block" | null;
-const THREAD_CACHE_PREFIX = "fyndmate_thread_cache:";
+export const THREAD_CACHE_PREFIX = "fyndmate_thread_cache:";
 const THREAD_CACHE_MAX_AGE_MS = 2 * 60 * 1000;
 
 function getThreadCacheKey(userId: string, matchId: string): string {

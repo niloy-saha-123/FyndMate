@@ -22,9 +22,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Sentry from '@sentry/react-native';
 
 interface Props {
   children: ReactNode;
@@ -68,10 +68,9 @@ export class ErrorBoundary extends Component<Props, State> {
       this.props.onError(error, errorInfo);
     }
 
-    // TODO: Send to error reporting service (e.g., Sentry)
-    // if (__PROD__) {
-    //   Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
-    // }
+    Sentry.captureException(error, {
+      extra: { componentStack: errorInfo.componentStack },
+    });
   }
 
   handleRetry = (): void => {

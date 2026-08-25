@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import 'react-native-reanimated';
+import * as Sentry from '@sentry/react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet } from 'react-native';
 import { AuthProvider } from "../src/auth/AuthProvider";
@@ -9,27 +10,21 @@ import { LocationProvider } from '@/src/location/LocationProvider';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { OfflineBanner } from '../src/components/OfflineBanner';
 
+const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    enabled: !__DEV__,
+    tracesSampleRate: 1.0,
+  });
+}
+
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
-  /*
-  useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (session) {
-          router.replace("/(tabs)");
-        } else {
-          router.replace("/login");
-        }
-      }
-    );
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
-  */
-
+function RootLayout() {
   return (
     <ErrorBoundary>
       <AuthProvider>
@@ -117,3 +112,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   }
 });
+
+export default Sentry.wrap(RootLayout);
