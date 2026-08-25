@@ -26,7 +26,6 @@ export async function buildApp() {
     logger: true,
   });
 
-  // TODO: Add Sentry or similar monitoring for production
   const isProduction = process.env.NODE_ENV === 'production';
   const corsAllowlist = (process.env.CORS_ORIGIN ?? '')
     .split(',')

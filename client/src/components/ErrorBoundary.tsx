@@ -24,7 +24,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Sentry from '@sentry/react-native';
 
 interface Props {
   children: ReactNode;
@@ -67,10 +66,6 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
-
-    Sentry.captureException(error, {
-      extra: { componentStack: errorInfo.componentStack },
-    });
   }
 
   handleRetry = (): void => {
