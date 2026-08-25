@@ -1,0 +1,27 @@
+# Keeps the Supabase free-tier project from auto-pausing.
+# Supabase pauses free projects after 7 days with no API activity. A lightweight
+# REST request well within that window keeps it counted as active.
+#
+# Required repo secrets: SUPABASE_URL, SUPABASE_ANON_KEY
+
+name: Supabase Keepalive
+
+on:
+  schedule:
+    - cron: "0 */12 * * *" # every 12 hours
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: GET /rest/v1/
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "SUPABASE_URL or SUPABASE_ANON_KEY secret is not set." >&2
+            exit 1
+          fi
+          curl -fsS -m 20 "$SUPABASE_URL/rest/v1/" -H "apikey: $SUPABASE_ANON_KEY"

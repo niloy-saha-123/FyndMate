@@ -1,0 +1,20 @@
+# Keeps the Render free-tier backend warm by hitting /health periodically.
+# Free web services on Render spin down after ~15 minutes of no inbound traffic
+# (cold start on the next real request). This workflow pings it more often than
+# that so it stays warm. If usage grows, upgrading to a paid instance removes
+# the need for this entirely.
+
+name: Render Keepalive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 minutes
+  workflow_dispatch:
+
+jobs:
+  ping-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: GET /health
+        run: |
+          curl -fsS -m 20 https://troupe-api-dck1.onrender.com/health
