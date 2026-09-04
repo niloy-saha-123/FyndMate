@@ -1,5 +1,13 @@
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
+/**
+ * Every gate on the auth bootstrap path (welcome -> login -> app-gate -> tabs)
+ * must render this exact message. Those routes hand off to each other while the
+ * session and profile load, so differing copy makes one wait look like several
+ * separate loading screens.
+ */
+export const AUTH_LOADING_MESSAGE = "Getting things ready";
+
 export function LoadingGate({
   message = "Loading",
   subtext,

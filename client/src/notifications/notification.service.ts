@@ -70,7 +70,56 @@ export async function sendTestNotification() {
   });
 }
 
-export async function registerForPushNotifications(forceOpenSettingsOnDeny = false): Promise<string | null> {
+export type NotificationPermissionState = {
+  granted: boolean;
+  /** True when the OS is still willing to show the permission dialog. */
+  canAskAgain: boolean;
+  /** False on simulators/emulators, where push tokens cannot be issued. */
+  supported: boolean;
+};
+
+/**
+ * Reads the live OS notification permission. This is the only trustworthy
+ * source for whether notifications actually work — a stored preference can say
+ * "on" while the OS has the permission denied.
+ */
+export async function getNotificationPermissionState(): Promise<NotificationPermissionState> {
+  if (!Device.isDevice) {
+    return { granted: false, canAskAgain: false, supported: false };
+  }
+
+  try {
+    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+    return {
+      granted: status === 'granted',
+      canAskAgain: status !== 'granted' && canAskAgain,
+      supported: true,
+    };
+  } catch (error) {
+    console.error('❌ Failed to read notification permission:', error);
+    return { granted: false, canAskAgain: false, supported: true };
+  }
+}
+
+export type RegisterPushOptions = {
+  /**
+   * Show the OS permission dialog when permission is missing. Leave false for
+   * automatic/background registration so the user is never re-prompted after
+   * they have already declined.
+   */
+  prompt?: boolean;
+  /**
+   * When the OS refuses to show the dialog again, send the user to system
+   * settings. Only appropriate when the user explicitly asked to turn
+   * notifications on.
+   */
+  openSettingsIfBlocked?: boolean;
+};
+
+export async function registerForPushNotifications(
+  options: RegisterPushOptions = {}
+): Promise<string | null> {
+  const { prompt = false, openSettingsIfBlocked = false } = options;
 
   if (!Device.isDevice) {
     debugLog('⚠️ Push notifications only work on physical devices');
@@ -81,22 +130,35 @@ export async function registerForPushNotifications(forceOpenSettingsOnDeny = fal
     // Setup Android notification channel first
     await setupNotificationChannel();
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    debugLog('📱 Existing notification permission status:', existingStatus);
-    
-    let finalStatus = existingStatus;
+    const existing = await Notifications.getPermissionsAsync();
+    debugLog('📱 Existing notification permission status:', existing.status);
 
-    if (existingStatus !== 'granted') {
+    let granted = existing.status === 'granted';
+
+    if (!granted) {
+      // Only the explicit user-driven path may open a dialog. Requesting here
+      // on every automatic pass is what re-prompted users immediately after
+      // they declined.
+      if (!prompt) {
+        debugLog('📱 Permission not granted and prompting is disabled; skipping');
+        return null;
+      }
+
+      if (!existing.canAskAgain) {
+        debugLog('📱 OS will not prompt again for notifications');
+        if (openSettingsIfBlocked) {
+          Linking.openSettings().catch(() => {});
+        }
+        return null;
+      }
+
       debugLog('📱 Requesting notification permissions...');
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+      const requested = await Notifications.requestPermissionsAsync();
+      granted = requested.status === 'granted';
     }
 
-    if (finalStatus !== 'granted') {
+    if (!granted) {
       debugLog('❌ Failed to get push notification permissions');
-      if (forceOpenSettingsOnDeny) {
-        Linking.openSettings().catch(() => {});
-      }
       return null;
     }
 

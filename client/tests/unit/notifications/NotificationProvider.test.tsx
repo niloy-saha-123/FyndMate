@@ -63,11 +63,13 @@ vi.mock('react-native', () => ({
 const registerForPushNotifications = vi.fn();
 const savePushToken = vi.fn();
 const clearPushToken = vi.fn();
+const getNotificationPermissionState = vi.fn();
 
 vi.mock('../../../src/notifications/notification.service', () => ({
   registerForPushNotifications: (...args: any[]) => registerForPushNotifications(...args),
   savePushToken: (...args: any[]) => savePushToken(...args),
   clearPushToken: (...args: any[]) => clearPushToken(...args),
+  getNotificationPermissionState: (...args: any[]) => getNotificationPermissionState(...args),
 }));
 
 vi.mock('../../../src/auth/AuthProvider', () => ({
@@ -97,12 +99,18 @@ function renderWithProvider() {
   };
 }
 
+const GRANTED = { granted: true, canAskAgain: false, supported: true };
+const DENIED_BLOCKED = { granted: false, canAskAgain: false, supported: true };
+const UNDETERMINED = { granted: false, canAskAgain: true, supported: true };
+
 describe('NotificationProvider', () => {
   beforeEach(() => {
     asyncStore.clear();
     registerForPushNotifications.mockReset();
     savePushToken.mockReset();
     clearPushToken.mockReset();
+    getNotificationPermissionState.mockReset();
+    getNotificationPermissionState.mockResolvedValue(DENIED_BLOCKED);
     appStateListeners.length = 0;
   });
 
@@ -114,6 +122,8 @@ describe('NotificationProvider', () => {
 
     // initial hydration
     await act(async () => {});
+
+    getNotificationPermissionState.mockResolvedValue(GRANTED);
 
     await act(async () => {
       await ctx().setNotificationsEnabled(true);
@@ -128,6 +138,7 @@ describe('NotificationProvider', () => {
     // First enable to set token state
     registerForPushNotifications.mockResolvedValue('token');
     savePushToken.mockResolvedValue({});
+    getNotificationPermissionState.mockResolvedValue(GRANTED);
     const ctx = renderWithProvider();
     await act(async () => {
       await ctx().setNotificationsEnabled(true);
@@ -139,5 +150,58 @@ describe('NotificationProvider', () => {
 
     expect(clearPushToken).toHaveBeenCalled();
     expect(ctx().notificationsEnabled).toBe(false);
+  });
+
+  it('reports notifications off when the OS permission is denied, even if the stored preference says on', async () => {
+    asyncStore.set('fyndmate_notifications_enabled', '1');
+    asyncStore.set('fyndmate_notifications_prompted', '1');
+    getNotificationPermissionState.mockResolvedValue(DENIED_BLOCKED);
+
+    const ctx = renderWithProvider();
+    await act(async () => {});
+
+    expect(ctx().notificationsEnabled).toBe(false);
+    expect(ctx().notificationsCanAskAgain).toBe(false);
+  });
+
+  it('does not prompt again once the user has already been asked', async () => {
+    asyncStore.set('fyndmate_notifications_prompted', '1');
+    // Denied but the OS would still allow another dialog - we must not use it.
+    getNotificationPermissionState.mockResolvedValue(UNDETERMINED);
+
+    const ctx = renderWithProvider();
+    await act(async () => {});
+
+    expect(ctx().notificationsEnabled).toBe(false);
+    expect(registerForPushNotifications).not.toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: true })
+    );
+  });
+
+  it('prompts once on first run and does not re-prompt after a denial', async () => {
+    getNotificationPermissionState.mockResolvedValue(UNDETERMINED);
+    registerForPushNotifications.mockResolvedValue(null); // user denied
+
+    const ctx = renderWithProvider();
+    await act(async () => {});
+    // Let the first-run prompt effect settle.
+    await act(async () => {});
+
+    const promptCalls = registerForPushNotifications.mock.calls.filter(
+      ([opts]) => opts?.prompt === true
+    );
+    expect(promptCalls).toHaveLength(1);
+    expect(asyncStore.get('fyndmate_notifications_prompted')).toBe('1');
+    expect(ctx().notificationsEnabled).toBe(false);
+
+    // Foregrounding the app must not open the dialog again.
+    await act(async () => {
+      appStateListeners.forEach((cb) => cb('active'));
+    });
+
+    const promptCallsAfter = registerForPushNotifications.mock.calls.filter(
+      ([opts]) => opts?.prompt === true
+    );
+    expect(promptCallsAfter).toHaveLength(1);
   });
 });

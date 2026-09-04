@@ -10,7 +10,7 @@
  * - Debouncing updates to save battery and API quota
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as Crypto from 'expo-crypto';
@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, getApiBaseUrl } from '../lib/apiClient';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../auth/supabaseClient';
+import { queuePermissionPrompt } from '../permissions/permissionPromptQueue';
 import CryptoJS from 'crypto-js';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -361,6 +362,23 @@ export function useLocation() {
     const [currentLocation, setCurrentLocation] = useState<string | null>(null);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+    // Serializes the init effect, which re-runs on profile changes it also causes.
+    const initInFlightRef = useRef(false);
+    const initRerunPendingRef = useRef(false);
+    const [initRunId, setInitRunId] = useState(0);
+    // Claims the one-time permission prompt synchronously.
+    const promptedRef = useRef(false);
+    const autoUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Distinguishes "the init effect re-ran" from "the hook unmounted"; a
+    // deferred re-run must still be scheduled in the former case.
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
+
     // Get current user from auth context
     const { user, profile } = useAuth();
 
@@ -554,10 +572,25 @@ export function useLocation() {
 
     // Load saved preference first, prompt once, then auto-update if enabled
     useEffect(() => {
+        // This effect re-runs whenever the profile's location fields arrive or
+        // change, and its own body patches those fields on the server. Letting
+        // two initLocation passes overlap means both write state, both schedule
+        // an update, and both can stack a permission Alert, which renders as the
+        // screen flickering. So runs are serialized: a pass that arrives while
+        // another is active is deferred rather than dropped, since it may be
+        // carrying the profile's saved preference.
+        if (initInFlightRef.current) {
+            initRerunPendingRef.current = true;
+            return;
+        }
+
+        let cancelled = false;
+        initInFlightRef.current = true;
+
         async function initLocation() {
             if (!user?.id) {
                 await unregisterBackgroundUpdates().catch(() => {});
-                setInitialized(true);
+                if (!cancelled) setInitialized(true);
                 return;
             }
 
@@ -609,40 +642,48 @@ export function useLocation() {
             }
 
             // Ask once on first app start for this user (when they're in the app).
-            if (!hasPrompted) {
+            if (!hasPrompted && !promptedRef.current) {
                 const foreground = await Location.getForegroundPermissionsAsync();
                 if (foreground.status === 'undetermined') {
-                    // In-app prompt first so the user knows why we're asking
-                    const userWantsToAllow = await new Promise<boolean>((resolve) => {
-                        Alert.alert(
-                            'Use your location?',
-                            'Troupe uses your location to show your city and country on your profile. You can change this anytime in Settings.',
-                            [
-                                { text: 'Not Now', onPress: () => resolve(false), style: 'cancel' },
-                                { text: 'Allow', onPress: () => resolve(true) },
-                            ]
-                        );
-                    });
-                    if (userWantsToAllow) {
+                    // Claim the prompt before awaiting anything, and persist it
+                    // up front. Writing the flag only after the Alert resolved
+                    // let a second pass read it as unset and stack another Alert.
+                    promptedRef.current = true;
+                    await AsyncStorage.setItem(promptedKey, '1');
+
+                    // Queued so this waits for the notification permission
+                    // dialog instead of fighting it for the screen.
+                    const level = await queuePermissionPrompt(async () => {
+                        const userWantsToAllow = await new Promise<boolean>((resolve) => {
+                            Alert.alert(
+                                'Use your location?',
+                                'Troupe uses your location to show your city and country on your profile. You can change this anytime in Settings.',
+                                [
+                                    { text: 'Not Now', onPress: () => resolve(false), style: 'cancel' },
+                                    { text: 'Allow', onPress: () => resolve(true) },
+                                ],
+                                { cancelable: false }
+                            );
+                        });
+
+                        if (!userWantsToAllow) return 'denied' as LocationPermission;
+
                         const requested = await Location.requestForegroundPermissionsAsync();
-                        if (requested.granted) {
-                            const level = await getPermissionLevel();
-                            effectivePermission = level;
-                            setPermission(level);
-                            await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, level);
-                        } else {
-                            effectivePermission = 'denied';
-                            setPermission('denied');
-                            await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
-                        }
-                    } else {
-                        effectivePermission = 'denied';
-                        setPermission('denied');
-                        await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, 'denied');
-                    }
+                        if (!requested.granted) return 'denied' as LocationPermission;
+                        return await getPermissionLevel();
+                    });
+
+                    if (cancelled) return;
+                    effectivePermission = level;
+                    setPermission(level);
+                    await AsyncStorage.setItem(LOCATION_PERMISSION_KEY, level);
+                } else {
+                    promptedRef.current = true;
+                    await AsyncStorage.setItem(promptedKey, '1');
                 }
-                await AsyncStorage.setItem(promptedKey, '1');
             }
+
+            if (cancelled) return;
 
             if (effectivePermission === 'denied' && effectivePref === 'on') {
                 effectivePref = 'off';
@@ -658,20 +699,41 @@ export function useLocation() {
             }
 
             await syncBackgroundUpdatesForState(effectivePref, effectivePermission);
+            if (cancelled) return;
             setInitialized(true);
-            
+
             // Auto-update on app launch if preference is 'on'
             if (effectivePref === 'on') {
                 console.log('📍 Auto-updating location on app launch...');
                 // Small delay to ensure everything is ready
-                setTimeout(() => {
+                autoUpdateTimerRef.current = setTimeout(() => {
+                    autoUpdateTimerRef.current = null;
                     updateLocationNow();
                 }, 500);
             }
         }
-        
-        initLocation();
-    }, [profile?.locationSharing, profile?.locationPermission, user?.id]); // Re-run on auth/profile availability
+
+        initLocation()
+            .catch((error) => {
+                console.error('Location initialization failed:', error);
+            })
+            .finally(() => {
+                initInFlightRef.current = false;
+                if (initRerunPendingRef.current && mountedRef.current) {
+                    initRerunPendingRef.current = false;
+                    setInitRunId((id) => id + 1);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+            if (autoUpdateTimerRef.current) {
+                clearTimeout(autoUpdateTimerRef.current);
+                autoUpdateTimerRef.current = null;
+            }
+        };
+        // initRunId replays a pass that was deferred while another was running.
+    }, [profile?.locationSharing, profile?.locationPermission, user?.id, initRunId]); // Re-run on auth/profile availability
 
     useEffect(() => {
         if (!initialized) return;

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { router } from "expo-router";
 import { useAuth } from "../src/auth/AuthProvider";
-import { LoadingGate } from "../src/components/LoadingGate";
+import { AUTH_LOADING_MESSAGE, LoadingGate } from "../src/components/LoadingGate";
 import { UserProfile } from "../src/services/profileService";
 
 export default function AppGate() {
@@ -41,12 +41,7 @@ export default function AppGate() {
     );
   }
 
-  return (
-    <LoadingGate
-      message={user ? "Preparing your account" : "Checking session"}
-      subtext="Sit tight while we decide where to take you."
-    />
-  );
+  return <LoadingGate message={AUTH_LOADING_MESSAGE} />;
 }
 
 function resolveDestination(profile: UserProfile) {

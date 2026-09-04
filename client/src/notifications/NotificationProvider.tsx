@@ -1,33 +1,50 @@
 import { createContext, useContext, useEffect, useRef, ReactNode, useCallback, useState } from 'react';
 import * as Notifications from 'expo-notifications';
 import { useAuth } from '../auth/AuthProvider';
-import { clearPushToken, registerForPushNotifications, savePushToken } from './notification.service';
+import {
+  clearPushToken,
+  getNotificationPermissionState,
+  registerForPushNotifications,
+  savePushToken,
+} from './notification.service';
 import { router } from 'expo-router';
 import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { queuePermissionPrompt } from '../permissions/permissionPromptQueue';
 
 interface NotificationContextType {
   refreshPushToken: () => Promise<void>;
   notificationsEnabled: boolean;
   notificationsReady: boolean;
+  /** False once the OS refuses to show the permission dialog again. */
+  notificationsCanAskAgain: boolean;
   setNotificationsEnabled: (enabled: boolean) => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
   refreshPushToken: async () => { },
-  notificationsEnabled: true,
+  notificationsEnabled: false,
   notificationsReady: false,
+  notificationsCanAskAgain: false,
   setNotificationsEnabled: async () => { },
 });
 
 const NOTIFICATIONS_ENABLED_KEY = 'fyndmate_notifications_enabled';
+const NOTIFICATIONS_PROMPTED_KEY = 'fyndmate_notifications_prompted';
 const NOTIFICATIONS_LAST_TOKEN_KEY = 'fyndmate_notifications_last_token';
 const NOTIFICATIONS_LAST_SYNC_KEY = 'fyndmate_notifications_last_sync';
 const MIN_SYNC_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [notificationsEnabled, setNotificationsEnabledState] = useState(true);
+
+  // The user's own opt-in/opt-out choice, persisted locally.
+  const [preferenceEnabled, setPreferenceEnabled] = useState(true);
+  // The live OS permission. Kept separate from the preference because the OS can
+  // revoke or grant it behind the app's back (system settings), and because a
+  // stored "on" preference must never claim notifications work when they don't.
+  const [permissionGranted, setPermissionGranted] = useState(false);
+  const [canAskAgain, setCanAskAgain] = useState(false);
   const [notificationsReady, setNotificationsReady] = useState(false);
 
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
@@ -35,6 +52,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const lastSavedTokenRef = useRef<string | null>(null);
   const lastSyncAtRef = useRef<number | null>(null);
+  // Guards the first-run prompt so re-renders and foreground events can't ask again.
+  const hasPromptedRef = useRef(true);
+
+  const notificationsEnabled = permissionGranted && preferenceEnabled;
 
   const persistTokenState = useCallback(async (token: string) => {
     lastSavedTokenRef.current = token;
@@ -52,31 +73,50 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return Date.now() - lastSyncAtRef.current > MIN_SYNC_INTERVAL_MS;
   }, []);
 
-  const ensureRegistered = useCallback(async (forceOpenSettingsOnDeny: boolean) => {
-    if (!user || !notificationsEnabled) return;
+  const syncToken = useCallback(async (token: string | null) => {
+    if (!token || !shouldSyncToken(token)) return;
+    await savePushToken(token);
+    await persistTokenState(token);
+    console.log('✅ Push token saved to database');
+  }, [persistTokenState, shouldSyncToken]);
+
+  const applyPermissionState = useCallback(
+    (state: { granted: boolean; canAskAgain: boolean }) => {
+      setPermissionGranted(state.granted);
+      setCanAskAgain(state.canAskAgain);
+    },
+    []
+  );
+
+  /**
+   * Registers the push token without ever showing a dialog. Safe to call on
+   * mount and on every foreground.
+   */
+  const refreshPushToken = useCallback(async () => {
+    if (!user) return;
     try {
-      const token = await registerForPushNotifications(forceOpenSettingsOnDeny);
-      if (token && shouldSyncToken(token)) {
-        await savePushToken(token);
-        await persistTokenState(token);
-        console.log('✅ Push token saved to database');
-      }
+      const state = await getNotificationPermissionState();
+      applyPermissionState(state);
+
+      if (!state.granted) return;
+
+      const storedPreference = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
+      if (storedPreference === '0') return;
+
+      const token = await registerForPushNotifications({ prompt: false });
+      await syncToken(token);
     } catch (error) {
       console.error('❌ Failed to refresh push token:', error);
     }
-  }, [notificationsEnabled, persistTokenState, shouldSyncToken, user]);
-
-  const refreshPushToken = useCallback(async () => {
-    await ensureRegistered(false);
-  }, [ensureRegistered]);
+  }, [applyPermissionState, syncToken, user]);
 
   const setNotificationsEnabled = useCallback(async (enabled: boolean) => {
-    setNotificationsEnabledState(enabled);
-    await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, enabled ? '1' : '0');
-
-    if (!user) return;
-
     if (!enabled) {
+      setPreferenceEnabled(false);
+      await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, '0').catch(() => {});
+
+      if (!user) return;
+
       // Only clear once when transitioning from on -> off
       if (lastSavedTokenRef.current) {
         try {
@@ -88,84 +128,137 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       }
       lastSavedTokenRef.current = null;
       lastSyncAtRef.current = null;
-      await AsyncStorage.multiRemove([NOTIFICATIONS_LAST_TOKEN_KEY, NOTIFICATIONS_LAST_SYNC_KEY]).catch(() => {});
-      try {
-        await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, '0');
-      } catch {
-        //
-      }
+      await AsyncStorage.multiRemove([
+        NOTIFICATIONS_LAST_TOKEN_KEY,
+        NOTIFICATIONS_LAST_SYNC_KEY,
+      ]).catch(() => {});
       return;
     }
 
-    try {
-      const token = await registerForPushNotifications(true);
-      if (!token) {
-        setNotificationsEnabledState(false);
-        await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, '0');
-        return;
-      }
+    setPreferenceEnabled(true);
+    await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, '1').catch(() => {});
 
-      if (shouldSyncToken(token)) {
-        await savePushToken(token);
-        await persistTokenState(token);
-      }
+    if (!user) return;
+
+    try {
+      // The user asked for this, so prompting (or bouncing them to system
+      // settings when the OS won't prompt) is expected here.
+      const token = await queuePermissionPrompt(() =>
+        registerForPushNotifications({ prompt: true, openSettingsIfBlocked: true })
+      );
+      await AsyncStorage.setItem(NOTIFICATIONS_PROMPTED_KEY, '1').catch(() => {});
+      hasPromptedRef.current = true;
+
+      applyPermissionState(await getNotificationPermissionState());
+
+      if (!token) return;
+
+      await syncToken(token);
       console.log('✅ Push notifications enabled');
     } catch (error) {
       console.error('❌ Failed to enable push notifications:', error);
-      setNotificationsEnabledState(false);
-      await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, '0');
+      applyPermissionState(await getNotificationPermissionState());
     }
-  }, [persistTokenState, shouldSyncToken, user]);
+  }, [applyPermissionState, syncToken, user]);
 
+  // Hydrate stored state and the live OS permission for the signed-in user.
   useEffect(() => {
     let mounted = true;
+
     if (!user) {
-      setNotificationsEnabledState(true);
+      setPreferenceEnabled(true);
+      setPermissionGranted(false);
+      setCanAskAgain(false);
       setNotificationsReady(false);
+      hasPromptedRef.current = true;
       return;
     }
 
+    setNotificationsReady(false);
+
     (async () => {
       try {
-        const [storedEnabled, storedToken, storedSync] = await AsyncStorage.multiGet([
-          NOTIFICATIONS_ENABLED_KEY,
-          NOTIFICATIONS_LAST_TOKEN_KEY,
-          NOTIFICATIONS_LAST_SYNC_KEY,
-        ]);
+        const [storedEnabled, storedPrompted, storedToken, storedSync] =
+          await AsyncStorage.multiGet([
+            NOTIFICATIONS_ENABLED_KEY,
+            NOTIFICATIONS_PROMPTED_KEY,
+            NOTIFICATIONS_LAST_TOKEN_KEY,
+            NOTIFICATIONS_LAST_SYNC_KEY,
+          ]);
+        const permission = await getNotificationPermissionState();
         if (!mounted) return;
-        setNotificationsEnabledState(storedEnabled?.[1] == null ? true : storedEnabled[1] === '1');
+
+        setPreferenceEnabled(storedEnabled?.[1] == null ? true : storedEnabled[1] === '1');
+        hasPromptedRef.current = storedPrompted?.[1] === '1';
         lastSavedTokenRef.current = storedToken?.[1] || null;
         lastSyncAtRef.current = storedSync?.[1] ? Number(storedSync[1]) : null;
+        applyPermissionState(permission);
+      } catch (error) {
+        console.error('❌ Failed to load notification state:', error);
       } finally {
-        if (mounted) {
-          setNotificationsReady(true);
-        }
+        if (mounted) setNotificationsReady(true);
       }
     })();
 
     return () => {
       mounted = false;
     };
-  }, [user?.id]);
+  }, [applyPermissionState, user?.id]);
 
+  // First-run permission request. Runs at most once per install.
+  useEffect(() => {
+    if (!user || !notificationsReady) return;
+    if (hasPromptedRef.current) return;
+    if (permissionGranted || !canAskAgain || !preferenceEnabled) return;
+
+    let mounted = true;
+    // Claim the prompt synchronously so a re-render cannot queue a second one.
+    hasPromptedRef.current = true;
+
+    (async () => {
+      try {
+        const token = await queuePermissionPrompt(() =>
+          registerForPushNotifications({ prompt: true })
+        );
+        await AsyncStorage.setItem(NOTIFICATIONS_PROMPTED_KEY, '1').catch(() => {});
+        const permission = await getNotificationPermissionState();
+        if (!mounted) return;
+        applyPermissionState(permission);
+        await syncToken(token);
+      } catch (error) {
+        console.error('❌ Notification permission request failed:', error);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [
+    applyPermissionState,
+    canAskAgain,
+    notificationsReady,
+    permissionGranted,
+    preferenceEnabled,
+    syncToken,
+    user,
+  ]);
+
+  // Token upkeep and notification handling. Never prompts.
   useEffect(() => {
     if (!user || !notificationsReady) return;
 
-    if (!notificationsEnabled) return;
+    if (permissionGranted && preferenceEnabled) {
+      refreshPushToken();
+    }
 
-    // Initial registration
-    ensureRegistered(false);
-
-    // Refresh token when app comes to foreground (token can expire)
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
-      if (
-        appStateRef.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
-        // App has come to the foreground - refresh token
-        refreshPushToken();
-      }
+      const returningToForeground =
+        !!appStateRef.current.match(/inactive|background/) && nextAppState === 'active';
       appStateRef.current = nextAppState;
+      if (!returningToForeground) return;
+      // Re-reads the OS permission so a change made in system settings is
+      // picked up, and refreshes the token if it is still granted.
+      refreshPushToken();
     });
 
     notificationListener.current =
@@ -198,7 +291,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       responseListener.current?.remove();
       appStateSubscription.remove();
     };
-  }, [user, notificationsEnabled, notificationsReady, refreshPushToken]);
+  }, [notificationsReady, permissionGranted, preferenceEnabled, refreshPushToken, user]);
 
   return (
     <NotificationContext.Provider
@@ -206,6 +299,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         refreshPushToken,
         notificationsEnabled,
         notificationsReady,
+        notificationsCanAskAgain: canAskAgain,
         setNotificationsEnabled,
       }}
     >
