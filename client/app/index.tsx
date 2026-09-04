@@ -9,7 +9,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { LoadingGate } from "../src/components/LoadingGate";
+import { AUTH_LOADING_MESSAGE, LoadingGate } from "../src/components/LoadingGate";
 import { useAuth } from "../src/auth/AuthProvider";
 import { BORDERS, COLORS, RADIUS, SHADOWS } from "../src/theme/colors";
 import { AuthLegalNote } from "../src/components/AuthLegalNote";
@@ -21,7 +21,7 @@ export default function Welcome() {
   const { user, loading, profile, profileLoading } = useAuth();
 
   if (loading || profileLoading) {
-    return <LoadingGate message="Checking your account" />;
+    return <LoadingGate message={AUTH_LOADING_MESSAGE} />;
   }
 
   if (user && profile) {

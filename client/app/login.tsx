@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  ActivityIndicator,
   View,
   TextInput,
   Text,
@@ -15,7 +16,7 @@ import { useRouter, Redirect } from "expo-router";
 import { signIn, signUp } from "../src/auth/emailAuth";
 import { signInWithGoogle } from "../src/auth/googleOAuth";
 import { useAuth } from "../src/auth/AuthProvider";
-import { LoadingGate } from "../src/components/LoadingGate";
+import { AUTH_LOADING_MESSAGE, LoadingGate } from "../src/components/LoadingGate";
 import { COLORS } from "../src/theme/colors";
 import { AuthLegalNote } from "../src/components/AuthLegalNote";
 
@@ -33,6 +34,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false); // default to login, not sign up
+  const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
@@ -40,8 +42,11 @@ export default function Login() {
   }>({});
   const { user, loading, profile, profileLoading } = useAuth();
 
-  if (loading || profileLoading) {
-    return <LoadingGate message="Checking your session" />;
+  // While this screen is driving the sign-in it must keep showing the form with
+  // an in-button spinner. Handing off to the full-screen gate here would render
+  // a loading screen that /app-gate immediately renders again.
+  if ((loading || profileLoading) && !submitting) {
+    return <LoadingGate message={AUTH_LOADING_MESSAGE} />;
   }
 
   if (user && profile) {
@@ -82,8 +87,10 @@ export default function Login() {
   };
 
   const handleAuth = async() => {
+    if (submitting) return;
     if (!validate()) return;
 
+    setSubmitting(true);
     try {
     if (isSignUp) {
       await signUp(email.trim(), password, name.trim());
@@ -100,6 +107,21 @@ export default function Login() {
     } 
     catch (e: any) {
       console.error("Auth error:", e.message);
+    }
+    finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await signInWithGoogle();
+    } catch (e: any) {
+      console.error("Google auth error:", e?.message ?? e);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -149,7 +171,8 @@ export default function Login() {
             )}
             <TouchableOpacity
               style={[styles.googleBtn, { height: authChoiceButtonHeight }]}
-              onPress={signInWithGoogle}
+              onPress={handleGoogleAuth}
+              disabled={submitting}
               accessibilityRole="button"
               accessibilityLabel="Continue with Google"
             >
@@ -309,9 +332,9 @@ export default function Login() {
             )}
 
             <TouchableOpacity
-              style={[styles.ctaOuter, (!email || !password || (isSignUp && !name)) && styles.ctaDisabled]}
+              style={[styles.ctaOuter, (!email || !password || (isSignUp && !name) || submitting) && styles.ctaDisabled]}
               onPress={handleAuth}
-              disabled={!email || !password || (isSignUp && !name)}
+              disabled={!email || !password || (isSignUp && !name) || submitting}
               activeOpacity={0.92}
             >
               <LinearGradient
@@ -320,7 +343,11 @@ export default function Login() {
                 end={{ x: 1, y: 1 }}
                 style={styles.ctaInner}
               >
-                <Text style={styles.ctaText}>{isSignUp ? "Create Account" : "Sign In"}</Text>
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.ctaText}>{isSignUp ? "Create Account" : "Sign In"}</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 

@@ -1,8 +1,8 @@
-import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { supabase } from "../src/auth/supabaseClient";
 import * as Linking from "expo-linking";
+import { AUTH_LOADING_MESSAGE, LoadingGate } from "../src/components/LoadingGate";
 
 export default function AuthRedirect() {
   const AUTH_DEBUG = __DEV__ && process.env.EXPO_PUBLIC_DEBUG_AUTH === "1";
@@ -117,31 +117,5 @@ export default function AuthRedirect() {
     };
   }, [processed]);
 
-  return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#3B82F6" />
-      <Text style={styles.text}>Completing sign in...</Text>
-      <Text style={styles.subtext}>Please wait...</Text>
-    </View>
-  );
+  return <LoadingGate message={AUTH_LOADING_MESSAGE} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#EBF4FF',
-  },
-  text: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  subtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#9CA3AF',
-  },
-});
