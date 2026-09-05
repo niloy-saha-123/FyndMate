@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '../lib/prisma.js';
-import { redis } from '../lib/redis.js';
+import { invalidateFeedCacheForUsers } from '../utils/cacheInvalidation.js';
 
 export class BlockService {
     /**
@@ -98,10 +98,7 @@ export class BlockService {
                 return block;
             });
 
-            await Promise.all([
-                redis.del(`feed:${blockerId}`),
-                redis.del(`feed:${blockedId}`),
-            ]).catch(() => {});
+            await invalidateFeedCacheForUsers([blockerId, blockedId]).catch(() => {});
 
             return block;
         } catch (error: any) {

@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '../lib/prisma.js';
-import { redis } from '../lib/redis.js';
+import { invalidateFeedCacheForUsers } from '../utils/cacheInvalidation.js';
 import { sanitizeText } from '../utils/sanitizeText.js';
 import {
     REPORT_REASON_MIN_LENGTH,
@@ -112,10 +112,7 @@ export class ReportService {
             return report;
         });
 
-        await Promise.all([
-            redis.del(`feed:${reporterId}`),
-            redis.del(`feed:${reportedId}`),
-        ]).catch(() => {});
+        await invalidateFeedCacheForUsers([reporterId, reportedId]).catch(() => {});
 
         return result;
     }
